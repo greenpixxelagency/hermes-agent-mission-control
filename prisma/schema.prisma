@@ -8,6 +8,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  OPERATOR
+  APPROVER
+  VIEWER
+}
+
+enum ProjectRole {
+  OWNER
+  ADMIN
+  OPERATOR
+  APPROVER
+  VIEWER
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -35,13 +61,73 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
+  id                      String               @id @default(cuid())
+  name                    String?
+  email                   String?              @unique
+  emailVerified           DateTime?
+  image                   String?
+  accounts                Account[]
+  sessions                Session[]
+  organizationMemberships OrganizationMember[]
+}
+
+model Organization {
+  id        String               @id @default(cuid())
+  name      String
+  slug      String               @unique
+  status    OrganizationStatus   @default(ACTIVE)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  members   OrganizationMember[]
+  projects  Project[]
+}
+
+model OrganizationMember {
+  id                 String           @id @default(cuid())
+  userId             String
+  organizationId     String
+  role               OrganizationRole @default(VIEWER)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectMemberships ProjectMember[]
+
+  @@unique([userId, organizationId])
+  @@unique([id, organizationId])
+  @@index([organizationId])
+}
+
+model Project {
+  id             String          @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  status         ProjectStatus   @default(ACTIVE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members        ProjectMember[]
+
+  @@unique([organizationId, slug])
+  @@unique([id, organizationId])
+  @@index([organizationId])
+}
+
+model ProjectMember {
+  id                   String             @id @default(cuid())
+  projectId            String
+  organizationMemberId String
+  organizationId       String
+  role                 ProjectRole        @default(VIEWER)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  project              Project            @relation(fields: [projectId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  organizationMember   OrganizationMember @relation(fields: [organizationMemberId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([projectId, organizationMemberId])
+  @@index([organizationId])
+  @@index([organizationMemberId])
 }
 
 model VerificationToken {
@@ -81,9 +167,9 @@ model Draft {
   quoteText       String?
 
   // Content intelligence fields
-  source          String?   // "sage" | "organic" | "csv_import"
-  engagementScore Float?    // time-weighted composite score (updated by scoring engine)
-  engagementTier  String?   // "top20" | "bottom20" | null (cleared/set on rescore)
+  source          String? // "sage" | "organic" | "csv_import"
+  engagementScore Float? // time-weighted composite score (updated by scoring engine)
+  engagementTier  String? // "top20" | "bottom20" | null (cleared/set on rescore)
 
   @@index([status])
   @@index([createdAt])
@@ -125,48 +211,48 @@ model ContentCalendar {
 }
 
 model YoutubeIdea {
-  id                String   @id @default(cuid())
-  title             String
-  hook              String?
-  angle             String?
-  hookType          String?
-  funnelStage       String?
-  status            String   @default("pending")
-  rejectedReason    String?
-  sourceUrl         String?
-  sourceSummary     String?
-  competitionScore  String?  // "gap" | "moderate" | "crowded"
-  competitionData   Json?    // { resultCount, avgViews, topVideos[], scoredAt }
-  createdAt         DateTime @default(now())
+  id               String   @id @default(cuid())
+  title            String
+  hook             String?
+  angle            String?
+  hookType         String?
+  funnelStage      String?
+  status           String   @default("pending")
+  rejectedReason   String?
+  sourceUrl        String?
+  sourceSummary    String?
+  competitionScore String? // "gap" | "moderate" | "crowded"
+  competitionData  Json? // { resultCount, avgViews, topVideos[], scoredAt }
+  createdAt        DateTime @default(now())
 
   @@index([status])
 }
 
 model YoutubeScript {
-  id              String   @id @default(cuid())
-  title           String
-  hook            String?
-  storySetup      String?
-  conflict        String?
-  insight         String?
-  cta             String?
-  caption         String?
-  onScreenText    String?
-  hookType        String?
-  funnelStage     String?
-  factCheck       Json?
-  fullScript      String?
-  status          String   @default("draft")
-  rejectedReason  String?
+  id               String   @id @default(cuid())
+  title            String
+  hook             String?
+  storySetup       String?
+  conflict         String?
+  insight          String?
+  cta              String?
+  caption          String?
+  onScreenText     String?
+  hookType         String?
+  funnelStage      String?
+  factCheck        Json?
+  fullScript       String?
+  status           String   @default("draft")
+  rejectedReason   String?
   // SEO Package
-  seoTitle        String?
-  seoDescription  String?
-  seoTags         Json?
-  seoChapters     Json?
-  titleVariants   Json?
+  seoTitle         String?
+  seoDescription   String?
+  seoTags          Json?
+  seoChapters      Json?
+  titleVariants    Json?
   thumbnailConcept String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([status])
 }
@@ -180,10 +266,10 @@ model YoutubeFeedback {
 }
 
 model LongformScript {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   title            String
   type             String?
-  status           String   @default("draft")
+  status           String    @default("draft")
   platform         String?
   platforms        Json?
   description      String?
@@ -206,10 +292,10 @@ model LongformScript {
   tweetRetweets    Int?
   tweetReplies     Int?
   postedAt         DateTime?
-  competitionScore String?  // "gap" | "moderate" | "crowded"
-  competitionData  Json?    // { resultCount, avgViews, topVideos[], scoredAt }
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  competitionScore String? // "gap" | "moderate" | "crowded"
+  competitionData  Json? // { resultCount, avgViews, topVideos[], scoredAt }
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([status])
 }
@@ -278,14 +364,14 @@ model Brief {
 // ─── Missions ───────────────────────────────────────────────────
 
 model Mission {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   agentId     String
   title       String
-  description String   @db.Text
-  status      String   @default("pending") // pending, active, completed, failed
-  priority    String   @default("medium") // high, medium, low
-  result      String?  @db.Text
-  createdAt   DateTime @default(now())
+  description String    @db.Text
+  status      String    @default("pending") // pending, active, completed, failed
+  priority    String    @default("medium") // high, medium, low
+  result      String?   @db.Text
+  createdAt   DateTime  @default(now())
   completedAt DateTime?
 
   @@index([agentId])
@@ -298,14 +384,14 @@ model Article {
   id              String    @id @default(uuid())
   title           String
   body            String    @db.Text
-  track           String    // "mega-viral" | "local-viral" | "icp-viral"
+  track           String // "mega-viral" | "local-viral" | "icp-viral"
   status          String    @default("idea") // "idea" | "draft" | "ready" | "posted"
   qtTweet         String?   @db.Text
   qtUrl           String?
   heroImageUrl    String?
   heroImageHtml   String?   @db.Text
   inspirationUrls String?   @db.Text // JSON array of URLs
-  themes          String?   // JSON array of themes
+  themes          String? // JSON array of themes
   scheduledDate   String?
   postedAt        DateTime?
   postedUrl       String?
@@ -324,7 +410,7 @@ model SavedTitle {
   id        String   @id @default(cuid())
   title     String
   track     String
-  themes    String?  // JSON array
+  themes    String? // JSON array
   createdAt DateTime @default(now())
 
   @@index([track])
@@ -450,12 +536,12 @@ model ClientPulseAlert {
 
 model AgentRequest {
   id            String    @id @default(cuid())
-  origin        String    @default("web")     // "web" | "hermes"
+  origin        String    @default("web") // "web" | "hermes"
   kind          String    @default("oneshot") // "oneshot" | "kanban" | "chat"
   title         String
   prompt        String?
   sideEffecting Boolean   @default(false)
-  status        String    @default("queued")  // queued | awaiting_approval | approved | running | done | failed | rejected
+  status        String    @default("queued") // queued | awaiting_approval | approved | running | done | failed | rejected
   result        String?
   error         String?
   hermesTaskId  String?
@@ -475,7 +561,7 @@ model AgentEvent {
   title     String
   detail    String?
   agent     String?
-  level     String   @default("info")     // info | up | warn | down
+  level     String   @default("info") // info | up | warn | down
   meta      Json?
   createdAt DateTime @default(now())
 
@@ -483,7 +569,7 @@ model AgentEvent {
 }
 
 model HermesTask {
-  id        String   @id                   // Hermes task id
+  id        String   @id // Hermes task id
   board     String   @default("default")
   title     String
   assignee  String?
@@ -499,8 +585,8 @@ model HermesTask {
 
 // ─── Hermes Memory Wiki (warm tier — git-tracked markdown, mirrored) ─────
 model HermesMemory {
-  id         String    @id            // wiki entry slug (relative path w/o .md)
-  path       String                   // file path relative to wiki root
+  id         String    @id // wiki entry slug (relative path w/o .md)
+  path       String // file path relative to wiki root
   type       String    @default("fact")
   title      String
   status     String    @default("active")
