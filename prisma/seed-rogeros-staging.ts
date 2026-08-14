@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  const email = (process.env.ALLOWED_EMAILS ?? '').split(',').map(value => value.trim().toLowerCase()).find(Boolean)
+  const email = (process.env.ROGEROS_STAGING_OWNER_EMAIL ?? process.env.ALLOWED_EMAILS ?? '').split(',').map(value => value.trim().toLowerCase()).find(Boolean)
   if (!email) throw new Error('ALLOWED_EMAILS is required for the staging RogerOS bootstrap')
   const user = await prisma.user.upsert({ where: { email }, create: { email }, update: {} })
   const organization = await prisma.organization.upsert({ where: { slug: 'green-pixxel' }, create: { name: 'Green Pixxel', slug: 'green-pixxel' }, update: { name: 'Green Pixxel' } })

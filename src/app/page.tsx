@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Twitter, Youtube, ArrowUpRight, ArrowDownRight, ChevronRight } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Sparkline } from "@/components/sparkline";
@@ -446,6 +448,15 @@ function ScoreGauge({ score }: { score: ScoreData }) {
 
 // ── Main ──────────────────────────────────────────────────
 export default function Dashboard() {
+  const router = useRouter();
+  const { status } = useSession();
+  const [workspaceState, setWorkspaceState] = useState<"loading" | "none" | "ready">("loading");
+  useEffect(() => {
+    if (status !== "authenticated") { setWorkspaceState("ready"); return; }
+    fetch("/api/me/projects").then(r => r.ok ? r.json() : { projects: [] }).then(({ projects }) => {
+      if (projects.length) router.replace(`/p/${projects[0].slug}`); else setWorkspaceState("none");
+    }).catch(() => setWorkspaceState("none"));
+  }, [router, status]);
   const [data, setData] = useState<HomeData>(EMPTY);
   const [time, setTime] = useState(new Date());
   const [loaded, setLoaded] = useState(false);
@@ -482,6 +493,8 @@ export default function Dashboard() {
   const stale = data.daysSincePost > 3 && data.daysSincePost < 999;
   const rise = (i: number) => ({ animationDelay: `${i * 60}ms` });
 
+  if (status === "authenticated" && workspaceState === "loading") return <main className="min-h-screen grid place-items-center"><p>Opening your workspace…</p></main>;
+  if (status === "authenticated" && workspaceState === "none") return <main className="min-h-screen grid place-items-center p-6"><section className="panel max-w-md p-8 text-center"><h1 className="text-xl font-semibold">No workspace access yet</h1><p className="mt-3 text-sm text-[var(--text-3)]">Your account is authenticated, but has not been assigned to a project.</p></section></main>;
   return (
     <>
       <div className="relative z-10 w-full mx-auto pb-16">
