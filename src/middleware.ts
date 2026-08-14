@@ -6,6 +6,20 @@ import { isInternalServiceBypassAllowed } from '@/lib/internal-service-auth';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Vercel's NextAuth integration derives OAuth callbacks from the request host.
+  // Keep the phase-3 Preview on its stable branch domain before auth so ephemeral
+  // deployment URLs never require individual Google OAuth redirect registrations.
+  const previewCanonicalUrl = process.env.PREVIEW_CANONICAL_URL;
+  if (process.env.VERCEL_ENV === 'preview' && previewCanonicalUrl) {
+    const canonicalUrl = new URL(previewCanonicalUrl);
+    if (request.nextUrl.host !== canonicalUrl.host) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.protocol = canonicalUrl.protocol;
+      redirectUrl.host = canonicalUrl.host;
+      return NextResponse.redirect(redirectUrl, 307);
+    }
+  }
+
   // DEV-ONLY local bypass (never active on Vercel preview/prod builds).
   if (process.env.NODE_ENV === 'development') {
     return NextResponse.next();
