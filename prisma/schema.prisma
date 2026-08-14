@@ -34,6 +34,18 @@ enum ProjectStatus {
   ARCHIVED
 }
 
+enum ConversationType {
+  DIRECT
+  GROUP
+  CHANNEL
+}
+
+enum ThreadStatus {
+  OPEN
+  RESOLVED
+  ARCHIVED
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -69,6 +81,9 @@ model User {
   accounts                Account[]
   sessions                Session[]
   organizationMemberships OrganizationMember[]
+  createdConversations    Conversation[]         @relation("ConversationCreator")
+  conversationParticipants ConversationParticipant[]
+  messages                Message[]              @relation("MessageAuthor")
 }
 
 model Organization {
@@ -113,6 +128,9 @@ model Project {
   hermesTasks      HermesTask[]
   hermesMemories   HermesMemory[]
   dataStoreEntries ProjectDataStore[]
+  conversations    Conversation[]
+  messages         Message[]
+  threads          Thread[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -133,6 +151,91 @@ model ProjectMember {
   @@unique([projectId, organizationMemberId])
   @@index([organizationId])
   @@index([organizationMemberId])
+}
+
+// ─── RogerOS Team ──────────────────────────────────────────────
+
+// A conversation is explicitly project-owned. The composite id/project key
+// lets child records enforce that they cannot point at another project's row.
+model Conversation {
+  id            String           @id @default(cuid())
+  projectId     String
+  type          ConversationType
+  slug          String?
+  title         String?
+  createdById   String?
+  archivedAt    DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy     User?            @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  participants  ConversationParticipant[]
+  messages      Message[]
+  threads       Thread[]
+
+  @@unique([id, projectId])
+  @@unique([projectId, slug])
+  @@index([projectId, type, updatedAt])
+}
+
+// Human participants use userId. systemIdentity is a deliberately small,
+// migratable bridge for M6 system employees (for example chief-of-staff).
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  projectId      String
+  conversationId String
+  userId         String?
+  systemIdentity String?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@unique([conversationId, systemIdentity])
+  @@index([projectId, userId])
+}
+
+model Message {
+  id                   String    @id @default(cuid())
+  projectId            String
+  conversationId       String
+  threadId             String?
+  authorUserId         String?
+  authorSystemIdentity String?
+  body                 String    @db.Text
+  kind                 String    @default("MESSAGE")
+  editedAt             DateTime?
+  deletedAt            DateTime?
+  createdAt            DateTime  @default(now())
+  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  conversation         Conversation @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
+  author               User?     @relation("MessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  thread               Thread?   @relation("ThreadReplies", fields: [threadId, projectId], references: [id, projectId], onDelete: Cascade)
+  rootForThread        Thread?   @relation("ThreadRootMessage")
+
+  @@unique([id, projectId, conversationId])
+  @@index([projectId, conversationId, createdAt])
+  @@index([projectId, threadId, createdAt])
+}
+
+model Thread {
+  id            String       @id @default(cuid())
+  projectId     String
+  conversationId String
+  rootMessageId String
+  title         String?
+  status        ThreadStatus @default(OPEN)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  conversation  Conversation @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
+  rootMessage   Message      @relation("ThreadRootMessage", fields: [rootMessageId, projectId, conversationId], references: [id, projectId, conversationId], onDelete: Restrict)
+  replies       Message[]    @relation("ThreadReplies")
+
+  @@unique([id, projectId])
+  @@unique([projectId, rootMessageId])
+  @@unique([rootMessageId, projectId, conversationId])
+  @@index([projectId, conversationId, status])
 }
 
 model VerificationToken {
