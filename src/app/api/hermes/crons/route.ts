@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { projectScopeErrorResponse, requireProjectContextForBody, requireProjectContextForRequest } from "@/lib/project-scope";
 
 export type CronJob = {
   id: string;
@@ -50,16 +51,21 @@ function parseCrons(raw: string): CronJob[] {
   return jobs;
 }
 
-export async function GET() {
-  const row = await prisma.dataStore.findUnique({ where: { key: "hermes-crons" } });
+export async function GET(req: Request) {
+  try {
+  const context = await requireProjectContextForRequest(req);
+  const row = await prisma.projectDataStore.findUnique({ where: { projectId_namespace_key: { projectId: context.project.id, namespace: "hermes", key: "crons" } } });
   const data = (row?.data as { raw?: string; syncedAt?: string } | null) ?? {};
   const jobs = data.raw ? parseCrons(data.raw) : [];
   return NextResponse.json({ jobs, syncedAt: data.syncedAt ?? null });
+  } catch (error) { return projectScopeErrorResponse(error); }
 }
 
 // POST { op: "create"|"pause"|"resume"|"run"|"remove"|"edit", ... } → queue a cron mutation for the bridge
 export async function POST(req: Request) {
   const b = await req.json().catch(() => ({}));
+  try {
+  const context = await requireProjectContextForBody(b);
   const op = (b.op || "").toString();
   if (!["create", "pause", "resume", "run", "remove", "edit"].includes(op))
     return NextResponse.json({ error: "bad op" }, { status: 400 });
@@ -67,6 +73,7 @@ export async function POST(req: Request) {
   const sideEffecting = op === "create" || op === "edit" || op === "remove";
   const row = await prisma.agentRequest.create({
     data: {
+      projectId: context.project.id,
       origin: "web",
       kind: `cron.${op}`,
       title: label.slice(0, 200),
@@ -76,4 +83,5 @@ export async function POST(req: Request) {
     },
   });
   return NextResponse.json({ request: row });
+  } catch (error) { return projectScopeErrorResponse(error); }
 }

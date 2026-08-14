@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { isInternalServiceBypassAllowed } from '@/lib/internal-service-auth';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -23,7 +24,7 @@ export async function middleware(request: NextRequest) {
 
   // Allow internal agent calls with shared secret
   const internalSecret = request.headers.get('x-internal-secret');
-  if (internalSecret && internalSecret === process.env.INTERNAL_API_SECRET) {
+  if (internalSecret && internalSecret === process.env.INTERNAL_API_SECRET && isInternalServiceBypassAllowed(pathname)) {
     return NextResponse.next();
   }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { projectScopeErrorResponse, requireProjectContextForRequest } from "@/lib/project-scope";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -46,9 +47,9 @@ function formatHermesKanban(tasks: Array<{ id: string; title: string; assignee?:
 // Reads the HermesTask mirror kept in sync by the bridge on the Mac mini.
 // Works on Vercel (no `hermes` binary needed); falls back to demo tasks until
 // the bridge has synced at least once.
-async function loadHermesKanban() {
+async function loadHermesKanban(projectId: string) {
   try {
-    const tasks = await prisma.hermesTask.findMany({ orderBy: [{ priority: "desc" }], take: 50 });
+    const tasks = await prisma.hermesTask.findMany({ where: { projectId }, orderBy: [{ priority: "desc" }], take: 50 });
     if (!tasks.length) return formatHermesKanban(HERMES_KANBAN_DEMO_TASKS, "demo");
     return formatHermesKanban(
       tasks.map(t => ({ id: t.id, title: t.title, assignee: t.assignee, status: t.status, priority: t.priority })),
@@ -83,7 +84,9 @@ async function hlPost(body: object) {
   return res.json();
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  try {
+  const context = await requireProjectContextForRequest(req);
   const [
     draftsResult,
     metricsResult,
@@ -109,7 +112,7 @@ export async function GET() {
     fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${YT_CHANNEL_ID}&key=${YT_API_KEY}`, { next: { revalidate: 3600 } }).then(r => r.json()),
     prisma.dataStore.findUnique({ where: { key: "x-account-stats" } }),
     prisma.youtubeIdea.findMany({ where: { status: { in: ["pending", "approved"] }, NOT: { status: "rejected" } }, orderBy: { createdAt: "desc" }, take: 3 }),
-    Promise.resolve(loadHermesKanban()),
+    Promise.resolve(loadHermesKanban(context.project.id)),
   ]);
 
   // ─── X Analytics ─────────────────────────────────────────────────────────────
@@ -407,4 +410,5 @@ export async function GET() {
     videosToFilm: await prisma.youtubeScript.count({ where: { status: { in: ["ready", "to_film", "tofilm", "approved"] } } }).catch(() => 0),
     insight: "",
   }, { headers: { "Cache-Control": "no-store, no-cache" } });
+  } catch (error) { return projectScopeErrorResponse(error); }
 }

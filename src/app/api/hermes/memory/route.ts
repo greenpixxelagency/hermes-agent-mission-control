@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { projectScopeErrorResponse, requireProjectContextForBody, requireProjectContextForRequest } from "@/lib/project-scope";
 
 // GET ?q=&type=&status= → list/search wiki entries (mirrored by the bridge)
 export async function GET(req: Request) {
+  try {
+  const context = await requireProjectContextForRequest(req);
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") || "").trim();
   const type = url.searchParams.get("type");
   const status = url.searchParams.get("status") || "active";
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { projectId: context.project.id };
   if (status !== "all") where.status = status;
   if (type && type !== "all") where.type = type;
   if (q) where.OR = [
@@ -16,17 +19,20 @@ export async function GET(req: Request) {
     { tags: { has: q.toLowerCase() } },
   ];
   const entries = await prisma.hermesMemory.findMany({ where, orderBy: { updatedAt: "desc" }, take: 300 });
-  const all = await prisma.hermesMemory.findMany({ select: { type: true }, where: status === "all" ? {} : { status } });
+  const all = await prisma.hermesMemory.findMany({ select: { type: true }, where: status === "all" ? { projectId: context.project.id } : { projectId: context.project.id, status } });
   const typeCounts: Record<string, number> = {};
   for (const e of all) typeCounts[e.type] = (typeCounts[e.type] || 0) + 1;
   const lastSync = entries[0]?.syncedAt ?? null;
   return NextResponse.json({ entries, typeCounts, total: all.length, lastSync });
+  } catch (error) { return projectScopeErrorResponse(error); }
 }
 
 // POST { path?, id?, type, title, body, tags?, links?, status?, confidence? }
 // → queue a wiki write for the bridge (writes the .md file + git commit on the mini).
 export async function POST(req: Request) {
   const b = await req.json().catch(() => ({}));
+  try {
+  const context = await requireProjectContextForBody(b);
   const title = (b.title || "").toString().trim();
   if (!title) return NextResponse.json({ error: "title required" }, { status: 400 });
   const slug = (b.id || b.path || title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")).toString();
@@ -44,6 +50,7 @@ export async function POST(req: Request) {
   };
   const row = await prisma.agentRequest.create({
     data: {
+      projectId: context.project.id,
       origin: "web",
       kind: "memory.write",
       title: `Memory: ${title}`.slice(0, 200),
@@ -53,4 +60,5 @@ export async function POST(req: Request) {
     },
   });
   return NextResponse.json({ request: row, entry });
+  } catch (error) { return projectScopeErrorResponse(error); }
 }

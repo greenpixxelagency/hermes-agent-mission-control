@@ -99,15 +99,20 @@ model OrganizationMember {
 }
 
 model Project {
-  id             String          @id @default(cuid())
-  organizationId String
-  name           String
-  slug           String
-  status         ProjectStatus   @default(ACTIVE)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  members        ProjectMember[]
+  id               String             @id @default(cuid())
+  organizationId   String
+  name             String
+  slug             String
+  status           ProjectStatus      @default(ACTIVE)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members          ProjectMember[]
+  agentRequests    AgentRequest[]
+  agentEvents      AgentEvent[]
+  hermesTasks      HermesTask[]
+  hermesMemories   HermesMemory[]
+  dataStoreEntries ProjectDataStore[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -351,6 +356,22 @@ model DataStore {
   updatedAt DateTime @updatedAt
 }
 
+// Project-owned replacement for the legacy global DataStore. Legacy callers
+// remain on DataStore until their respective isolation milestone.
+model ProjectDataStore {
+  id        String   @id @default(cuid())
+  projectId String
+  namespace String
+  key       String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, namespace, key])
+  @@index([projectId, namespace])
+}
+
 // ─── Daily Briefs ───────────────────────────────────────────────
 
 model Brief {
@@ -535,41 +556,50 @@ model ClientPulseAlert {
 // mirrors kanban tasks + activity back into HermesTask / AgentEvent.
 
 model AgentRequest {
-  id            String    @id @default(cuid())
-  origin        String    @default("web") // "web" | "hermes"
-  kind          String    @default("oneshot") // "oneshot" | "kanban" | "chat"
+  id            String       @id @default(cuid())
+  projectId     String
+  origin        String       @default("web") // "web" | "hermes"
+  kind          String       @default("oneshot") // "oneshot" | "kanban" | "chat"
   title         String
   prompt        String?
-  sideEffecting Boolean   @default(false)
-  status        String    @default("queued") // queued | awaiting_approval | approved | running | done | failed | rejected
+  sideEffecting Boolean      @default(false)
+  status        String       @default("queued") // queued | awaiting_approval | approved | running | done | failed | rejected
   result        String?
   error         String?
   hermesTaskId  String?
   decidedAt     DateTime?
   startedAt     DateTime?
   finishedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  events        AgentEvent[]
 
-  @@index([status])
+  @@index([projectId, status])
   @@index([createdAt])
 }
 
 model AgentEvent {
-  id        String   @id @default(cuid())
-  kind      String   @default("activity") // activity | run | status | memory
-  title     String
-  detail    String?
-  agent     String?
-  level     String   @default("info") // info | up | warn | down
-  meta      Json?
-  createdAt DateTime @default(now())
+  id             String        @id @default(cuid())
+  projectId      String
+  agentRequestId String?
+  kind           String        @default("activity") // activity | run | status | memory
+  title          String
+  detail         String?
+  agent          String?
+  level          String        @default("info") // info | up | warn | down
+  meta           Json?
+  createdAt      DateTime      @default(now())
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agentRequest   AgentRequest? @relation(fields: [agentRequestId], references: [id], onDelete: SetNull)
 
-  @@index([createdAt])
+  @@index([projectId, createdAt])
+  @@index([agentRequestId])
 }
 
 model HermesTask {
-  id        String   @id // Hermes task id
+  id        String // Hermes external task id
+  projectId String
   board     String   @default("default")
   title     String
   assignee  String?
@@ -578,14 +608,19 @@ model HermesTask {
   result    String?
   updatedAt DateTime @default(now())
   syncedAt  DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@index([board])
-  @@index([status])
+  @@id([projectId, id])
+  @@index([projectId, board])
+  @@index([projectId, status])
 }
 
 // ─── Hermes Memory Wiki (warm tier — git-tracked markdown, mirrored) ─────
 model HermesMemory {
-  id         String    @id // wiki entry slug (relative path w/o .md)
+  id         String // wiki entry slug (relative path w/o .md)
+  projectId  String
+  namespace  String    @default("default")
+  source     String    @default("hermes-wiki")
   path       String // file path relative to wiki root
   type       String    @default("fact")
   title      String
@@ -599,7 +634,9 @@ model HermesMemory {
   validTo    DateTime?
   updatedAt  DateTime  @default(now())
   syncedAt   DateTime  @updatedAt
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@index([type])
-  @@index([status])
+  @@id([projectId, id])
+  @@index([projectId, namespace, type])
+  @@index([projectId, status])
 }
