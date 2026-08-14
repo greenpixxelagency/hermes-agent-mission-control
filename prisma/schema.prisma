@@ -71,6 +71,15 @@ enum TaskActivityType {
   DUE_DATE_CHANGED
   COMPLETED
 }
+enum EmployeeType {
+  SYSTEM
+  CUSTOM
+}
+enum EmployeeStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
 
 model Account {
   id                String  @id @default(cuid())
@@ -159,6 +168,7 @@ model Project {
   messages         Message[]
   threads          Thread[]
   tasks            Task[]
+  employeeAssignments EmployeeProjectAssignment[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -216,13 +226,16 @@ model ConversationParticipant {
   conversationId String
   userId         String?
   systemIdentity String?
+  employeeProjectAssignmentId String?
   createdAt      DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
   user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeProjectAssignment EmployeeProjectAssignment? @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Cascade)
 
   @@unique([conversationId, userId])
   @@unique([conversationId, systemIdentity])
   @@index([projectId, userId])
+  @@index([projectId, employeeProjectAssignmentId])
 }
 
 model Message {
@@ -312,13 +325,50 @@ model TaskAssignment {
   taskId          String
   projectMemberId String?
   systemIdentity  String?
+  employeeProjectAssignmentId String?
   createdAt       DateTime      @default(now())
   task            Task          @relation(fields: [taskId, projectId], references: [id, projectId], onDelete: Cascade)
   projectMember   ProjectMember? @relation(fields: [projectMemberId, projectId], references: [id, projectId], onDelete: Cascade)
+  employeeProjectAssignment EmployeeProjectAssignment? @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Cascade)
 
   @@unique([taskId, projectMemberId])
   @@unique([taskId, systemIdentity])
   @@index([projectId, projectMemberId])
+  @@unique([taskId, employeeProjectAssignmentId])
+  @@index([projectId, employeeProjectAssignmentId])
+}
+
+model Employee {
+  id String @id @default(cuid())
+  systemKey String? @unique
+  name String
+  role String
+  description String? @db.Text
+  soulSummary String? @db.Text
+  type EmployeeType @default(CUSTOM)
+  status EmployeeStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  projectAssignments EmployeeProjectAssignment[]
+}
+
+model EmployeeProjectAssignment {
+  id String @id @default(cuid())
+  employeeId String
+  projectId String
+  status EmployeeStatus @default(ACTIVE)
+  roleOverride String?
+  joinedAt DateTime @default(now())
+  pausedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  employee Employee @relation(fields:[employeeId],references:[id],onDelete:Cascade)
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  conversationParticipants ConversationParticipant[]
+  taskAssignments TaskAssignment[]
+  @@unique([employeeId,projectId])
+  @@unique([id,projectId])
+  @@index([projectId,status])
 }
 
 model TaskDependency {
