@@ -1,3 +1,3 @@
 /* eslint-disable react-hooks/error-boundaries */
-import {notFound}from'next/navigation';import{ProjectContextError,requireProjectContextBySlug}from '@/lib/project-context';import{BrainWorkspace}from '@/components/brain-workspace'
-export default async function Page({params}:{params:Promise<{projectSlug:string}>}){try{const p=await params;const c=await requireProjectContextBySlug(p.projectSlug);return <BrainWorkspace project={c.project}/>}catch(e){if(e instanceof ProjectContextError)notFound();throw e}}
+import {notFound}from'next/navigation';import{ProjectContextError,requireProjectContextBySlug}from '@/lib/project-context';import{BrainWorkspace}from '@/components/brain-workspace';import{GovernanceWorkspace}from '@/components/governance-workspace'
+export default async function Page({params}:{params:Promise<{projectSlug:string}>}){try{const p=await params;const c=await requireProjectContextBySlug(p.projectSlug);return <><BrainWorkspace project={c.project}/><GovernanceWorkspace project={c.project}/></>}catch(e){if(e instanceof ProjectContextError)notFound();throw e}}

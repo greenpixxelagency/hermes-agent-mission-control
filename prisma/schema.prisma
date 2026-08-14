@@ -102,6 +102,29 @@ enum MemoryType {
   ENTITY
   OBSERVATION
 }
+enum SOPStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+enum PolicyStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+enum PolicyEnforcement {
+  ADVISORY
+  REQUIRE_APPROVAL
+  BLOCK
+}
+enum PolicyType {
+  ACTION
+  SPEND
+  PUBLISHING
+  DATA_ACCESS
+  COMMUNICATION
+  CUSTOM
+}
 
 model Account {
   id                String  @id @default(cuid())
@@ -199,10 +222,75 @@ model Project {
   decisions Decision[]
   memories ProjectMemory[]
   knowledgeSources KnowledgeSource[]
+  sops SOP[]
+  policies Policy[]
+  taskSops TaskSOP[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
   @@index([organizationId])
+}
+
+model SOP {
+  id String @id @default(cuid())
+  projectId String
+  title String
+  description String? @db.Text
+  category String @default("GENERAL")
+  tags String[] @default([])
+  appliesToRole String?
+  status SOPStatus @default(DRAFT)
+  activeVersionId String?
+  createdById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  versions SOPVersion[] @relation("SOPVersions")
+  activeVersion SOPVersion? @relation("ActiveSOPVersion",fields:[activeVersionId,projectId],references:[id,projectId],onDelete:Restrict)
+  taskLinks TaskSOP[]
+  @@unique([id,projectId])
+  @@index([projectId,status,updatedAt])
+}
+model SOPVersion {
+  id String @id @default(cuid())
+  sopId String
+  projectId String
+  version Int
+  content String @db.Text
+  changeSummary String?
+  createdById String?
+  createdAt DateTime @default(now())
+  sop SOP @relation("SOPVersions",fields:[sopId,projectId],references:[id,projectId],onDelete:Cascade)
+  activeFor SOP[] @relation("ActiveSOPVersion")
+  @@unique([sopId,version])
+  @@unique([id,projectId])
+}
+model Policy {
+  id String @id @default(cuid())
+  projectId String
+  title String
+  description String @db.Text
+  type PolicyType @default(CUSTOM)
+  status PolicyStatus @default(DRAFT)
+  enforcement PolicyEnforcement @default(ADVISORY)
+  rule Json
+  createdById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  @@index([projectId,status,type])
+}
+model TaskSOP {
+  id String @id @default(cuid())
+  projectId String
+  taskId String
+  sopId String
+  createdAt DateTime @default(now())
+  task Task @relation(fields:[taskId,projectId],references:[id,projectId],onDelete:Cascade)
+  sop SOP @relation(fields:[sopId,projectId],references:[id,projectId],onDelete:Cascade)
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  @@unique([taskId,sopId])
+  @@index([projectId,sopId])
 }
 
 model KnowledgeSource {
@@ -422,6 +510,7 @@ model Task {
   activities           TaskActivity[]
   dependencies         TaskDependency[] @relation("TaskDependencies")
   dependedOnBy         TaskDependency[] @relation("TaskDependents")
+  sopLinks             TaskSOP[]
 
   @@unique([id, projectId])
   @@index([projectId, status, updatedAt])
