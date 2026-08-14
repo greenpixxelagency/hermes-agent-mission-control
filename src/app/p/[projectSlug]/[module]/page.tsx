@@ -1,0 +1,5 @@
+/* eslint-disable react-hooks/error-boundaries */
+import { notFound } from 'next/navigation'
+import { ProjectContextError, requireProjectContextBySlug } from '@/lib/project-context'
+const labels: Record<string, string> = { team:'Team', tasks:'Tasks', meetings:'Meetings', workforce:'Workforce', brain:'Project Brain', workspaces:'Workspaces', market:'Market', approvals:'Approvals', reports:'Reports', automations:'Automations', settings:'Settings' }
+export default async function ModulePage({ params }: { params: Promise<{ projectSlug: string; module: string }> }) { try { const p = await params; const context = await requireProjectContextBySlug(p.projectSlug); const label = labels[p.module]; if (!label) notFound(); return <div><p className="text-sm text-slate-400">{context.project.name}</p><h1 className="mt-1 text-3xl font-semibold">{label}</h1><p className="mt-4 max-w-xl text-slate-400">This project-aware workspace is ready for its next milestone.</p></div> } catch (error) { if (error instanceof ProjectContextError) notFound(); throw error } }

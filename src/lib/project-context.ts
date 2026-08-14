@@ -93,3 +93,17 @@ export async function requireProjectContext(projectId: string): Promise<ProjectC
 
   return toProjectContext(user, membership)
 }
+
+export async function requireProjectContextBySlug(projectSlug: string): Promise<ProjectContext> {
+  const persistentUser = await requirePersistentUser()
+  const user = { id: persistentUser.id, email: persistentUser.email! }
+  const membership = await prisma.projectMember.findFirst({
+    where: { project: { slug: projectSlug }, organizationMember: { userId: user.id } },
+    select: {
+      role: true,
+      project: { select: { id: true, name: true, slug: true } },
+      organizationMember: { select: { role: true, organization: { select: { id: true, name: true, slug: true } } } },
+    },
+  })
+  return toProjectContext(user, membership)
+}

@@ -10,6 +10,7 @@
     "lint": "eslint",
     "test:tenancy": "node --env-file=.env.staging --import tsx --test tests/project-context.test.ts",
     "test:core-isolation": "node --env-file=.env.staging --import tsx --test tests/core-project-isolation.test.ts",
+    "db:seed:rogeros-staging": "node --env-file=.env.staging --import tsx prisma/seed-rogeros-staging.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
