@@ -18,7 +18,7 @@ export async function requireConversationAccess(context: ProjectContext, convers
 export async function requireThreadAccess(context: ProjectContext, threadId: string) {
   const thread = await prisma.thread.findFirst({
     where: { id: threadId, projectId: context.project.id, conversation: { participants: { some: { userId: context.user.id } } } },
-    include: { rootMessage: { include: { author: { select: { name: true, email: true } } } } },
+    include: { rootMessage: { include: { author: { select: { name: true, email: true } } } }, relatedTasks: { select: { id: true, title: true, status: true } } },
   })
   if (!thread) throw new ConversationAccessError()
   return thread

@@ -13,6 +13,8 @@
     "test:team-isolation": "node --env-file=.env.staging --import tsx --test tests/team-isolation.test.ts",
     "db:seed:rogeros-staging": "node --env-file=.env.staging --import tsx prisma/seed-rogeros-staging.ts",
     "db:seed:team-staging": "node --env-file=.env.staging --import tsx prisma/seed-team-staging.ts",
+    "db:seed:tasks-staging": "node --env-file=.env.staging --import tsx prisma/seed-tasks-staging.ts",
+    "test:task-isolation": "node --env-file=.env.staging --import tsx --test tests/task-isolation.test.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
