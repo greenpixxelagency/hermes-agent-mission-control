@@ -80,6 +80,28 @@ enum EmployeeStatus {
   PAUSED
   ARCHIVED
 }
+enum BrainSourceType {
+  HUMAN
+  THREAD
+  TASK
+  HERMES
+  MNEMOSYNE
+  FILE
+  INTEGRATION
+  SYSTEM
+}
+enum BrainRecordStatus {
+  ACTIVE
+  ARCHIVED
+}
+enum MemoryType {
+  FACT
+  PREFERENCE
+  LESSON
+  EXPERIENCE
+  ENTITY
+  OBSERVATION
+}
 
 model Account {
   id                String  @id @default(cuid())
@@ -120,6 +142,9 @@ model User {
   conversationParticipants ConversationParticipant[]
   messages                Message[]              @relation("MessageAuthor")
   taskActivities          TaskActivity[]         @relation("TaskActivityActor")
+  brainSources            KnowledgeSource[]
+  knowledgeItems          KnowledgeItem[]
+  decisions               Decision[]
 }
 
 model Organization {
@@ -169,10 +194,97 @@ model Project {
   threads          Thread[]
   tasks            Task[]
   employeeAssignments EmployeeProjectAssignment[]
+  constitution ProjectConstitution?
+  knowledgeItems KnowledgeItem[]
+  decisions Decision[]
+  memories ProjectMemory[]
+  knowledgeSources KnowledgeSource[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
   @@index([organizationId])
+}
+
+model KnowledgeSource {
+  id String @id @default(cuid())
+  projectId String
+  type BrainSourceType
+  label String
+  reference String?
+  occurredAt DateTime?
+  createdById String?
+  createdAt DateTime @default(now())
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  createdBy User? @relation(fields:[createdById],references:[id],onDelete:SetNull)
+  knowledgeItems KnowledgeItem[]
+  decisions Decision[]
+  memories ProjectMemory[]
+  @@unique([id,projectId])
+  @@index([projectId,type,createdAt])
+}
+
+model ProjectConstitution {
+  id String @id @default(cuid())
+  projectId String @unique
+  title String @default("Project Constitution")
+  content String @db.Text
+  status BrainRecordStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+}
+
+model KnowledgeItem {
+  id String @id @default(cuid())
+  projectId String
+  sourceId String?
+  title String
+  content String @db.Text
+  category String @default("GENERAL")
+  status BrainRecordStatus @default(ACTIVE)
+  createdById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  source KnowledgeSource? @relation(fields:[sourceId,projectId],references:[id,projectId],onDelete:Restrict)
+  createdBy User? @relation(fields:[createdById],references:[id],onDelete:SetNull)
+  @@index([projectId,status,updatedAt])
+}
+
+model Decision {
+  id String @id @default(cuid())
+  projectId String
+  sourceId String?
+  title String
+  decision String @db.Text
+  rationale String? @db.Text
+  status BrainRecordStatus @default(ACTIVE)
+  decidedAt DateTime @default(now())
+  decidedById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  source KnowledgeSource? @relation(fields:[sourceId,projectId],references:[id,projectId],onDelete:Restrict)
+  decidedBy User? @relation(fields:[decidedById],references:[id],onDelete:SetNull)
+  @@index([projectId,status,decidedAt])
+}
+
+model ProjectMemory {
+  id String @id @default(cuid())
+  projectId String
+  sourceId String?
+  title String
+  content String @db.Text
+  type MemoryType @default(FACT)
+  confidence String?
+  importance Int @default(3)
+  status BrainRecordStatus @default(ACTIVE)
+  learnedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  source KnowledgeSource? @relation(fields:[sourceId,projectId],references:[id,projectId],onDelete:Restrict)
+  @@index([projectId,type,status,updatedAt])
 }
 
 model ProjectMember {
