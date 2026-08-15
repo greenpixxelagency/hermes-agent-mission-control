@@ -45,6 +45,8 @@ export async function finishDriveOAuth(input: { projectId?: string; userId: stri
   const state = await consumeDriveOAuthState({ state: input.state, userId: input.userId })
   const projectId = input.projectId ?? state.projectId
   if (projectId !== state.projectId) throw new Error('DRIVE_OAUTH_STATE_DENIED')
+  const member = await prisma.projectMember.findFirst({ where: { projectId, organizationMember: { userId: input.userId } }, select: { id: true } })
+  if (!member) throw new Error('DRIVE_PROJECT_ACCESS_DENIED')
   const oauth = client(input.origin)
   const { tokens } = await oauth.getToken(input.code)
   if (!tokens.access_token) throw new Error('DRIVE_OAUTH_TOKEN_MISSING')
@@ -54,7 +56,6 @@ export async function finishDriveOAuth(input: { projectId?: string; userId: stri
   const profile = await google.oauth2('v2').userinfo.get({ auth: Object.assign(oauth, { credentials: tokens }) }).catch(() => ({ data: {} as { email?: string; name?: string } }))
   const payload: DriveTokens = { accessToken: tokens.access_token, refreshToken: tokens.refresh_token ?? undefined, expiryDate: tokens.expiry_date }
   await prisma.connectionCredential.upsert({ where: { connectionId: connection.id }, create: { projectId, connectionId: connection.id, provider: 'google_drive', encryptedPayload: encryptDriveCredential(payload), expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null, status: ConnectionCredentialStatus.ACTIVE, accountEmail: profile.data.email ?? null, accountDisplayName: profile.data.name ?? null }, update: { encryptedPayload: encryptDriveCredential(payload), expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null, status: ConnectionCredentialStatus.ACTIVE, accountEmail: profile.data.email ?? null, accountDisplayName: profile.data.name ?? null } })
-  const member = await prisma.projectMember.findFirst({ where: { projectId, organizationMember: { userId: input.userId } }, select: { id: true } })
   if (member) await recordAuditEvent({ projectId, eventType: 'drive.connection.connected', actor: { type: AuditActorType.HUMAN, projectMemberId: member.id }, targetType: 'ProjectConnection', targetId: connection.id, projectToolId: projectTool.id, summary: 'Google Drive connection established', metadata: { provider: 'google_drive', account: profile.data.email ? 'connected' : 'not-returned' } })
   return { connection, projectSlug: state.project.slug }
 }
