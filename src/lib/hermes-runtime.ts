@@ -12,6 +12,7 @@ import { hermesRuntimeAdapter } from '@/lib/hermes-runtime-adapter'
 import type { ProjectContext } from '@/lib/project-context'
 import { prisma } from '@/lib/prisma'
 import { canDispatchToHermes, canManageRuntimeAssignments } from '@/lib/hermes-runtime-rules'
+import { getProjectBrainContextForTask } from '@/lib/drive-brain'
 
 const activeStatuses: HermesExecutionStatus[] = [HermesExecutionStatus.QUEUED, HermesExecutionStatus.DISPATCHING, HermesExecutionStatus.RUNNING]
 const adapterStatuses = new Set(['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED'])
@@ -193,12 +194,14 @@ export async function dispatchTaskToHermes(context: ProjectContext, taskId: stri
   await recordLifecycle({ context, memberId: member.id, executionId: prepared.execution.id, taskId, eventType: 'runtime.execution.queued', activityType: TaskActivityType.RUNTIME_QUEUED, summary: 'Hermes execution queued' })
   try {
     await prisma.hermesExecution.update({ where: { id: prepared.execution.id }, data: { status: HermesExecutionStatus.DISPATCHING, startedAt: new Date() } })
+    const brain = await getProjectBrainContextForTask({ projectId: context.project.id, query: prepared.execution.prompt, maxSources: 4, maxCharacters: 8_000 })
+    const contextBlock = brain.length ? `\n\nAuthorized Project Brain context (use only when relevant):\n${brain.map(item => `[Source: ${item.provenance.name}; Drive file: ${item.provenance.fileId}]\n${item.content}`).join('\n\n')}` : ''
     const response = await adapter.dispatchExecution({
       executionId: prepared.execution.externalExecutionId!,
       projectKey: 'rogeros-vhalam',
       runtimeProfileKey: prepared.runtimeAssignment.profileKey as 'rogeros-vhalam-chief-of-staff',
       employeeKey: 'chief-of-staff',
-      taskInstruction: prepared.execution.prompt,
+      taskInstruction: `${prepared.execution.prompt}${contextBlock}`,
     })
     const saved = await persistAdapterStatus(context, member.id, prepared.execution.id, taskId, response)
     await pollBounded(context, member.id, saved, adapter)

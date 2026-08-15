@@ -5,6 +5,7 @@ import { recordAuditEvent, safeMetadata } from '@/lib/audit'
 import { prisma } from '@/lib/prisma'
 import { toolAdapterFor } from '@/lib/tool-adapters'
 import { resolveToolAuthorization } from '@/lib/tool-permissions'
+import { upsertDriveBrainSource } from '@/lib/drive-brain'
 
 type Request = { projectId: string; employeeProjectAssignmentId: string; projectToolId: string; capabilityKey: string; actionKey: 'read' | 'execute'; request?: Record<string, unknown>; summary: string }
 export class ToolExecutionError extends Error { constructor(public readonly code: string) { super(code); this.name = 'ToolExecutionError' } }
@@ -36,6 +37,13 @@ async function executeStored(executionId: string) {
     const result = await toolAdapterFor(execution.projectTool.tool.key).execute({ projectId: execution.projectId, connectionId: execution.projectConnectionId, capabilityKey: execution.capabilityKey, actionKey: execution.actionKey as 'read' | 'execute', request: execution.requestMetadata as Record<string, unknown> })
     if (!result || typeof result.resultText !== 'string' || !result.resultText.trim()) throw new ToolExecutionError('ADAPTER_MALFORMED_RESPONSE')
     const saved = await prisma.toolExecution.update({ where: { id: execution.id }, data: { status: ToolExecutionStatus.SUCCEEDED, resultText: result.resultText.slice(0, 20000), resultMetadata: safeMetadata(result.metadata ?? {}), completedAt: new Date(), errorMessage: null } })
+    if (execution.projectTool.tool.key === 'google_drive' && execution.capabilityKey === 'drive_read') {
+      const metadata = result.metadata ?? {}; const fileId = typeof metadata.fileId === 'string' ? metadata.fileId : ''
+      const name = typeof metadata.name === 'string' ? metadata.name : 'Google Drive file'; const mimeType = typeof metadata.mimeType === 'string' ? metadata.mimeType : 'text/plain'
+      const scope = fileId ? await prisma.projectConnectionScope.findFirst({ where: { projectId: execution.projectId, connectionId: execution.projectConnectionId, type: 'FILE', externalId: fileId }, select: { id: true } }) : null
+      if (!fileId || !scope) throw new ToolExecutionError('DRIVE_SCOPE_DENIED')
+      await upsertDriveBrainSource({ projectId: execution.projectId, connectionId: execution.projectConnectionId, scopeId: scope.id, externalFileId: fileId, parentExternalId: typeof metadata.parentId === 'string' ? metadata.parentId : undefined, name, mimeType, webUrl: typeof metadata.webUrl === 'string' ? metadata.webUrl : undefined, modifiedAt: typeof metadata.modifiedAt === 'string' ? new Date(metadata.modifiedAt) : undefined, content: result.resultText })
+    }
     await audit({ projectId: execution.projectId, assignmentId: execution.employeeProjectAssignmentId, executionId: execution.id, projectToolId: execution.projectToolId, approvalRequestId: execution.approvalRequestId ?? undefined, event: 'tool.execution.succeeded', summary: 'Governed tool execution succeeded' })
     return saved
   } catch (error) {

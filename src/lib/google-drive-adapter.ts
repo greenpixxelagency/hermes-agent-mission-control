@@ -44,5 +44,5 @@ export const googleDriveAdapter: ToolAdapter = { async execute(input: ToolAdapte
   if (input.capabilityKey === 'drive_metadata') return { resultText: `Metadata available for ${file.data.name ?? id}`, metadata: { fileId: file.data.id, name: file.data.name, mimeType: file.data.mimeType } }
   if (!file.data.mimeType || !supported.has(file.data.mimeType)) throw new Error('DRIVE_FILE_UNSUPPORTED')
   const response = file.data.mimeType === 'application/vnd.google-apps.document' ? await drive.files.export({ fileId: id, mimeType: 'text/plain' }, { responseType: 'text' }) : await drive.files.get({ fileId: id, alt: 'media' }, { responseType: 'text' })
-  return { resultText: String(response.data).slice(0, 20_000), metadata: { fileId: file.data.id, name: file.data.name, mimeType: file.data.mimeType } }
+  return { resultText: String(response.data).slice(0, 20_000), metadata: { fileId: file.data.id, name: file.data.name, mimeType: file.data.mimeType, parentId: file.data.parents?.[0] ?? null, webUrl: file.data.webViewLink ?? null, modifiedAt: file.data.modifiedTime ?? null } }
 } }
