@@ -168,6 +168,26 @@ enum ConnectionStatus {
   DISABLED
 }
 
+// M13: credential material is encrypted server-side. A connection never owns
+// plaintext OAuth tokens and these states are safe to render to project users.
+enum ConnectionCredentialStatus {
+  ACTIVE
+  NEEDS_ATTENTION
+  REVOKED
+}
+
+enum DriveScopeType {
+  FOLDER
+  FILE
+}
+
+enum DriveSourceStatus {
+  PENDING
+  READY
+  UNSUPPORTED
+  ERROR
+}
+
 enum ToolExecutionStatus {
   REQUESTED
   PENDING_APPROVAL
@@ -243,6 +263,7 @@ model User {
   decisions                Decision[]
   credential               UserCredential?
   passwordResetTokens      PasswordResetToken[]
+  driveOAuthStates         DriveOAuthState[]
 }
 
 model UserCredential {
@@ -329,6 +350,10 @@ model Project {
   auditEvents              AuditEvent[]
   hermesRuntimeAssignments HermesRuntimeAssignment[]
   hermesExecutions         HermesExecution[]
+  connectionCredentials    ConnectionCredential[]
+  connectionScopes         ProjectConnectionScope[]
+  driveSources             DriveSource[]
+  driveOAuthStates         DriveOAuthState[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -384,23 +409,86 @@ model ProjectTool {
 // M12: a project-owned connection references a server-side credential handle
 // only. It never persists the credential value or exposes it to a client.
 model ProjectConnection {
-  id            String           @id @default(cuid())
+  id            String                   @id @default(cuid())
   projectId     String
   projectToolId String
   name          String
-  status        ConnectionStatus @default(DISCONNECTED)
-  enabled       Boolean          @default(true)
+  status        ConnectionStatus         @default(DISCONNECTED)
+  enabled       Boolean                  @default(true)
   credentialRef String?
-  metadata      Json             @default("{}")
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectTool   ProjectTool      @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Restrict)
+  metadata      Json                     @default("{}")
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  project       Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectTool   ProjectTool              @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Restrict)
   executions    ToolExecution[]
+  credential    ConnectionCredential?
+  scopes        ProjectConnectionScope[]
+  driveSources  DriveSource[]
 
   @@unique([projectId, projectToolId])
   @@unique([id, projectId])
   @@index([projectId, status])
+}
+
+// Credential payloads contain an authenticated-encryption envelope only.
+// The encryption key is environment-only and never stored in PostgreSQL.
+model ConnectionCredential {
+  id                 String                     @id @default(cuid())
+  projectId          String
+  connectionId       String                     @unique
+  provider           String
+  encryptedPayload   String                     @db.Text
+  keyVersion         String                     @default("v1")
+  expiresAt          DateTime?
+  status             ConnectionCredentialStatus @default(ACTIVE)
+  accountEmail       String?
+  accountDisplayName String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  project            Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection         ProjectConnection          @relation(fields: [connectionId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([id, projectId])
+  @@unique([connectionId, projectId])
+  @@index([projectId, status])
+}
+
+// A connected account is not blanket authorization. Every external object
+// used by RogerOS must be deliberately selected into this project-owned list.
+model ProjectConnectionScope {
+  id               String            @id @default(cuid())
+  projectId        String
+  connectionId     String
+  type             DriveScopeType
+  externalId       String
+  displayName      String
+  parentExternalId String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection       ProjectConnection @relation(fields: [connectionId, projectId], references: [id, projectId], onDelete: Restrict)
+  driveSources     DriveSource[]
+
+  @@unique([connectionId, type, externalId])
+  @@unique([id, projectId])
+  @@index([projectId, connectionId, type])
+}
+
+// One-time database-backed state protects the Drive OAuth callback from CSRF,
+// cross-project substitution, and replay. Only a SHA-256 digest is persisted.
+model DriveOAuthState {
+  id        String    @id @default(cuid())
+  projectId String
+  userId    String
+  stateHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, userId, expiresAt])
 }
 
 // M12: ToolExecution records governed capability work. HermesExecution remains
@@ -603,9 +691,42 @@ model KnowledgeSource {
   knowledgeItems KnowledgeItem[]
   decisions      Decision[]
   memories       ProjectMemory[]
+  driveSource    DriveSource?
 
   @@unique([id, projectId])
   @@index([projectId, type, createdAt])
+}
+
+// Drive remains the source of truth. RogerOS retains only bounded selected
+// content plus safe provenance for searchable project context.
+model DriveSource {
+  id                String                  @id @default(cuid())
+  projectId         String
+  connectionId      String
+  scopeId           String?
+  knowledgeSourceId String                  @unique
+  externalFileId    String
+  parentExternalId  String?
+  name              String
+  mimeType          String
+  webUrl            String?
+  modifiedAt        DateTime?
+  contentPreview    String?                 @db.Text
+  contentHash       String?
+  status            DriveSourceStatus       @default(PENDING)
+  lastFetchedAt     DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  project           Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection        ProjectConnection       @relation(fields: [connectionId, projectId], references: [id, projectId], onDelete: Restrict)
+  scope             ProjectConnectionScope? @relation(fields: [scopeId, projectId], references: [id, projectId], onDelete: Restrict)
+  knowledgeSource   KnowledgeSource         @relation(fields: [knowledgeSourceId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([projectId, connectionId, externalFileId])
+  @@unique([id, projectId])
+  @@unique([knowledgeSourceId, projectId])
+  @@index([projectId, status, updatedAt])
+  @@index([projectId, connectionId])
 }
 
 model ProjectConstitution {

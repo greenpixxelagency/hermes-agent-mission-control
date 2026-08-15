@@ -33,6 +33,15 @@ export async function ensureBuiltInToolCatalog() {
       await prisma.toolCapability.upsert({ where: { toolDefinitionId_key: { toolDefinitionId: tool.id, key: 'reference_read' } }, create: { toolDefinitionId: tool.id, key: 'reference_read', name: 'Reference read', description: 'Deterministic, staging-safe reference status read.' }, update: {} })
       await prisma.toolCapability.upsert({ where: { toolDefinitionId_key: { toolDefinitionId: tool.id, key: 'reference_execute' } }, create: { toolDefinitionId: tool.id, key: 'reference_execute', name: 'Reference execute', description: 'Synthetic consequential action; requires governed approval.' }, update: {} })
     }
+    if (key === 'google_drive') {
+      for (const [capabilityKey, name, description] of [
+        ['drive_health', 'Connection health', 'Read-only connection health check.'],
+        ['drive_list', 'List scoped files', 'List files only within explicit project scopes.'],
+        ['drive_metadata', 'Read scoped metadata', 'Read metadata for an explicitly allowed Drive object.'],
+        ['drive_read', 'Read supported file', 'Read bounded content from an explicitly allowed supported file.'],
+        ['drive_search', 'Search scoped Drive', 'Search only within an explicitly selected folder scope.'],
+      ] as const) await prisma.toolCapability.upsert({ where: { toolDefinitionId_key: { toolDefinitionId: tool.id, key: capabilityKey } }, create: { toolDefinitionId: tool.id, key: capabilityKey, name, description }, update: { name, description } })
+    }
   }
 }
 
