@@ -1,0 +1,4 @@
+export type ToolPermissionLevel = 'NO_ACCESS'|'READ'|'DRAFT'|'EXECUTE_WITH_APPROVAL'|'FULL_EXECUTE'
+export type ToolDecision = 'DENY'|'ALLOW_READ'|'ALLOW_DRAFT'|'REQUIRE_APPROVAL'|'ALLOW_EXECUTE'
+export function decidePermission(level: ToolPermissionLevel|null|undefined, action:string, enforcement?:'BLOCK'|'REQUIRE_APPROVAL'):ToolDecision { if(!level||!['read','draft','execute'].includes(action)||enforcement==='BLOCK')return'DENY'; if(action==='read')return level==='NO_ACCESS'?'DENY':'ALLOW_READ'; if(action==='draft')return(['DRAFT','EXECUTE_WITH_APPROVAL','FULL_EXECUTE'] as ToolPermissionLevel[]).includes(level)?'ALLOW_DRAFT':'DENY'; if(!(['EXECUTE_WITH_APPROVAL','FULL_EXECUTE'] as ToolPermissionLevel[]).includes(level))return'DENY'; return level==='EXECUTE_WITH_APPROVAL'||enforcement==='REQUIRE_APPROVAL'?'REQUIRE_APPROVAL':'ALLOW_EXECUTE' }
+export function canManageToolPermissions(role:string){return role==='OWNER'||role==='ADMIN'}

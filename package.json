@@ -17,6 +17,7 @@
     "db:seed:workforce-staging": "node --env-file=.env.staging --import tsx prisma/seed-workforce-staging.ts",
     "test:task-isolation": "node --env-file=.env.staging --import tsx --test tests/task-isolation.test.ts",
     "test:governance": "node --env-file=.env.staging --import tsx --test tests/governance-isolation.test.ts",
+    "test:permissions": "node --experimental-strip-types --test tests/tool-permissions.test.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",

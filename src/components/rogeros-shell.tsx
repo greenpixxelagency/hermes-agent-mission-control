@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 const navigation = [
   ['Command Center', ''], ['Team', 'team'], ['Tasks', 'tasks'], ['Meetings', 'meetings'],
   ['Workforce', 'workforce'], ['Project Brain', 'brain'], ['Workspaces', 'workspaces'],
+  ['Tools', 'tools'],
   ['Market', 'market'], ['Approvals', 'approvals'], ['Reports', 'reports'], ['Automations', 'automations'],
 ]
 

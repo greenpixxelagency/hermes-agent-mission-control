@@ -125,6 +125,19 @@ enum PolicyType {
   COMMUNICATION
   CUSTOM
 }
+enum ProjectToolStatus {
+  AVAILABLE
+  CONNECTED
+  DISCONNECTED
+  DISABLED
+}
+enum PermissionLevel {
+  NO_ACCESS
+  READ
+  DRAFT
+  EXECUTE_WITH_APPROVAL
+  FULL_EXECUTE
+}
 
 model Account {
   id                String  @id @default(cuid())
@@ -249,10 +262,64 @@ model Project {
   sops SOP[]
   policies Policy[]
   taskSops TaskSOP[]
+  tools ProjectTool[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
   @@index([organizationId])
+}
+
+model ToolDefinition {
+  id String @id @default(cuid())
+  key String @unique
+  name String
+  description String?
+  category String @default("GENERAL")
+  builtIn Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  capabilities ToolCapability[]
+  projectTools ProjectTool[]
+}
+model ToolCapability {
+  id String @id @default(cuid())
+  toolDefinitionId String
+  key String
+  name String
+  description String?
+  tool ToolDefinition @relation(fields:[toolDefinitionId],references:[id],onDelete:Cascade)
+  @@unique([toolDefinitionId,key])
+}
+model ProjectTool {
+  id String @id @default(cuid())
+  projectId String
+  toolDefinitionId String
+  displayName String?
+  status ProjectToolStatus @default(DISCONNECTED)
+  credentialRef String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  tool ToolDefinition @relation(fields:[toolDefinitionId],references:[id],onDelete:Restrict)
+  permissions EmployeeToolPermission[]
+  @@unique([projectId,toolDefinitionId])
+  @@unique([id,projectId])
+  @@index([projectId,status])
+}
+model EmployeeToolPermission {
+  id String @id @default(cuid())
+  projectId String
+  employeeProjectAssignmentId String
+  projectToolId String
+  level PermissionLevel @default(NO_ACCESS)
+  capabilityKey String @default("*")
+  grantedById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  employeeAssignment EmployeeProjectAssignment @relation(fields:[employeeProjectAssignmentId,projectId],references:[id,projectId],onDelete:Cascade)
+  projectTool ProjectTool @relation(fields:[projectToolId,projectId],references:[id,projectId],onDelete:Cascade)
+  @@unique([employeeProjectAssignmentId,projectToolId,capabilityKey])
+  @@index([projectId,projectToolId])
 }
 
 model SOP {
@@ -591,6 +658,7 @@ model EmployeeProjectAssignment {
   project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
   conversationParticipants ConversationParticipant[]
   taskAssignments TaskAssignment[]
+  toolPermissions EmployeeToolPermission[]
   @@unique([employeeId,projectId])
   @@unique([id,projectId])
   @@index([projectId,status])

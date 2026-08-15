@@ -1,0 +1,18 @@
+CREATE TYPE "ProjectToolStatus" AS ENUM ('AVAILABLE','CONNECTED','DISCONNECTED','DISABLED');
+CREATE TYPE "PermissionLevel" AS ENUM ('NO_ACCESS','READ','DRAFT','EXECUTE_WITH_APPROVAL','FULL_EXECUTE');
+CREATE TABLE "ToolDefinition" ("id" TEXT NOT NULL,"key" TEXT NOT NULL,"name" TEXT NOT NULL,"description" TEXT,"category" TEXT NOT NULL DEFAULT 'GENERAL',"builtIn" BOOLEAN NOT NULL DEFAULT true,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "ToolDefinition_pkey" PRIMARY KEY("id"));
+CREATE TABLE "ToolCapability" ("id" TEXT NOT NULL,"toolDefinitionId" TEXT NOT NULL,"key" TEXT NOT NULL,"name" TEXT NOT NULL,"description" TEXT,CONSTRAINT "ToolCapability_pkey" PRIMARY KEY("id"));
+CREATE TABLE "ProjectTool" ("id" TEXT NOT NULL,"projectId" TEXT NOT NULL,"toolDefinitionId" TEXT NOT NULL,"displayName" TEXT,"status" "ProjectToolStatus" NOT NULL DEFAULT 'DISCONNECTED',"credentialRef" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "ProjectTool_pkey" PRIMARY KEY("id"));
+CREATE TABLE "EmployeeToolPermission" ("id" TEXT NOT NULL,"projectId" TEXT NOT NULL,"employeeProjectAssignmentId" TEXT NOT NULL,"projectToolId" TEXT NOT NULL,"level" "PermissionLevel" NOT NULL DEFAULT 'NO_ACCESS',"capabilityKey" TEXT NOT NULL DEFAULT '*',"grantedById" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "EmployeeToolPermission_pkey" PRIMARY KEY("id"));
+CREATE UNIQUE INDEX "ToolDefinition_key_key" ON "ToolDefinition"("key");
+CREATE UNIQUE INDEX "ToolCapability_toolDefinitionId_key_key" ON "ToolCapability"("toolDefinitionId","key");
+CREATE UNIQUE INDEX "ProjectTool_projectId_toolDefinitionId_key" ON "ProjectTool"("projectId","toolDefinitionId");
+CREATE UNIQUE INDEX "ProjectTool_id_projectId_key" ON "ProjectTool"("id","projectId");
+CREATE UNIQUE INDEX "EmployeeToolPermission_employeeProjectAssignmentId_projectToolId_capabilityKey_key" ON "EmployeeToolPermission"("employeeProjectAssignmentId","projectToolId","capabilityKey");
+CREATE INDEX "ProjectTool_projectId_status_idx" ON "ProjectTool"("projectId","status");
+CREATE INDEX "EmployeeToolPermission_projectId_projectToolId_idx" ON "EmployeeToolPermission"("projectId","projectToolId");
+ALTER TABLE "ToolCapability" ADD CONSTRAINT "ToolCapability_toolDefinitionId_fkey" FOREIGN KEY ("toolDefinitionId") REFERENCES "ToolDefinition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ProjectTool" ADD CONSTRAINT "ProjectTool_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ProjectTool" ADD CONSTRAINT "ProjectTool_toolDefinitionId_fkey" FOREIGN KEY ("toolDefinitionId") REFERENCES "ToolDefinition"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "EmployeeToolPermission" ADD CONSTRAINT "EmployeeToolPermission_assignment_project_fkey" FOREIGN KEY ("employeeProjectAssignmentId","projectId") REFERENCES "EmployeeProjectAssignment"("id","projectId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "EmployeeToolPermission" ADD CONSTRAINT "EmployeeToolPermission_tool_project_fkey" FOREIGN KEY ("projectToolId","projectId") REFERENCES "ProjectTool"("id","projectId") ON DELETE CASCADE ON UPDATE CASCADE;
