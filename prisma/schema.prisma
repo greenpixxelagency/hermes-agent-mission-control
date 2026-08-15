@@ -70,16 +70,38 @@ enum TaskActivityType {
   ASSIGNMENT_CHANGED
   DUE_DATE_CHANGED
   COMPLETED
+  RUNTIME_QUEUED
+  RUNTIME_STARTED
+  RUNTIME_SUCCEEDED
+  RUNTIME_FAILED
 }
+
+enum HermesRuntimeStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum HermesExecutionStatus {
+  QUEUED
+  DISPATCHING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
 enum EmployeeType {
   SYSTEM
   CUSTOM
 }
+
 enum EmployeeStatus {
   ACTIVE
   PAUSED
   ARCHIVED
 }
+
 enum BrainSourceType {
   HUMAN
   THREAD
@@ -90,10 +112,12 @@ enum BrainSourceType {
   INTEGRATION
   SYSTEM
 }
+
 enum BrainRecordStatus {
   ACTIVE
   ARCHIVED
 }
+
 enum MemoryType {
   FACT
   PREFERENCE
@@ -102,21 +126,25 @@ enum MemoryType {
   ENTITY
   OBSERVATION
 }
+
 enum SOPStatus {
   DRAFT
   ACTIVE
   ARCHIVED
 }
+
 enum PolicyStatus {
   DRAFT
   ACTIVE
   ARCHIVED
 }
+
 enum PolicyEnforcement {
   ADVISORY
   REQUIRE_APPROVAL
   BLOCK
 }
+
 enum PolicyType {
   ACTION
   SPEND
@@ -125,12 +153,14 @@ enum PolicyType {
   COMMUNICATION
   CUSTOM
 }
+
 enum ProjectToolStatus {
   AVAILABLE
   CONNECTED
   DISCONNECTED
   DISABLED
 }
+
 enum PermissionLevel {
   NO_ACCESS
   READ
@@ -138,6 +168,7 @@ enum PermissionLevel {
   EXECUTE_WITH_APPROVAL
   FULL_EXECUTE
 }
+
 enum ApprovalStatus {
   PENDING
   APPROVED
@@ -145,6 +176,7 @@ enum ApprovalStatus {
   CANCELLED
   EXPIRED
 }
+
 enum AuditActorType {
   HUMAN
   EMPLOYEE
@@ -178,23 +210,23 @@ model Session {
 }
 
 model User {
-  id                      String               @id @default(cuid())
-  name                    String?
-  email                   String?              @unique
-  emailVerified           DateTime?
-  image                   String?
-  accounts                Account[]
-  sessions                Session[]
-  organizationMemberships OrganizationMember[]
-  createdConversations    Conversation[]         @relation("ConversationCreator")
+  id                       String                    @id @default(cuid())
+  name                     String?
+  email                    String?                   @unique
+  emailVerified            DateTime?
+  image                    String?
+  accounts                 Account[]
+  sessions                 Session[]
+  organizationMemberships  OrganizationMember[]
+  createdConversations     Conversation[]            @relation("ConversationCreator")
   conversationParticipants ConversationParticipant[]
-  messages                Message[]              @relation("MessageAuthor")
-  taskActivities          TaskActivity[]         @relation("TaskActivityActor")
-  brainSources            KnowledgeSource[]
-  knowledgeItems          KnowledgeItem[]
-  decisions               Decision[]
-  credential              UserCredential?
-  passwordResetTokens     PasswordResetToken[]
+  messages                 Message[]                 @relation("MessageAuthor")
+  taskActivities           TaskActivity[]            @relation("TaskActivityActor")
+  brainSources             KnowledgeSource[]
+  knowledgeItems           KnowledgeItem[]
+  decisions                Decision[]
+  credential               UserCredential?
+  passwordResetTokens      PasswordResetToken[]
 }
 
 model UserCredential {
@@ -208,13 +240,13 @@ model UserCredential {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
 }
@@ -247,36 +279,38 @@ model OrganizationMember {
 }
 
 model Project {
-  id               String             @id @default(cuid())
-  organizationId   String
-  name             String
-  slug             String
-  status           ProjectStatus      @default(ACTIVE)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  members          ProjectMember[]
-  agentRequests    AgentRequest[]
-  agentEvents      AgentEvent[]
-  hermesTasks      HermesTask[]
-  hermesMemories   HermesMemory[]
-  dataStoreEntries ProjectDataStore[]
-  conversations    Conversation[]
-  messages         Message[]
-  threads          Thread[]
-  tasks            Task[]
-  employeeAssignments EmployeeProjectAssignment[]
-  constitution ProjectConstitution?
-  knowledgeItems KnowledgeItem[]
-  decisions Decision[]
-  memories ProjectMemory[]
-  knowledgeSources KnowledgeSource[]
-  sops SOP[]
-  policies Policy[]
-  taskSops TaskSOP[]
-  tools ProjectTool[]
-  approvalRequests ApprovalRequest[]
-  auditEvents AuditEvent[]
+  id                       String                      @id @default(cuid())
+  organizationId           String
+  name                     String
+  slug                     String
+  status                   ProjectStatus               @default(ACTIVE)
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
+  organization             Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members                  ProjectMember[]
+  agentRequests            AgentRequest[]
+  agentEvents              AgentEvent[]
+  hermesTasks              HermesTask[]
+  hermesMemories           HermesMemory[]
+  dataStoreEntries         ProjectDataStore[]
+  conversations            Conversation[]
+  messages                 Message[]
+  threads                  Thread[]
+  tasks                    Task[]
+  employeeAssignments      EmployeeProjectAssignment[]
+  constitution             ProjectConstitution?
+  knowledgeItems           KnowledgeItem[]
+  decisions                Decision[]
+  memories                 ProjectMemory[]
+  knowledgeSources         KnowledgeSource[]
+  sops                     SOP[]
+  policies                 Policy[]
+  taskSops                 TaskSOP[]
+  tools                    ProjectTool[]
+  approvalRequests         ApprovalRequest[]
+  auditEvents              AuditEvent[]
+  hermesRuntimeAssignments HermesRuntimeAssignment[]
+  hermesExecutions         HermesExecution[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -284,266 +318,285 @@ model Project {
 }
 
 model ToolDefinition {
-  id String @id @default(cuid())
-  key String @unique
-  name String
-  description String?
-  category String @default("GENERAL")
-  builtIn Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String           @id @default(cuid())
+  key          String           @unique
+  name         String
+  description  String?
+  category     String           @default("GENERAL")
+  builtIn      Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
   capabilities ToolCapability[]
   projectTools ProjectTool[]
 }
+
 model ToolCapability {
-  id String @id @default(cuid())
+  id               String         @id @default(cuid())
   toolDefinitionId String
-  key String
-  name String
-  description String?
-  tool ToolDefinition @relation(fields:[toolDefinitionId],references:[id],onDelete:Cascade)
-  @@unique([toolDefinitionId,key])
+  key              String
+  name             String
+  description      String?
+  tool             ToolDefinition @relation(fields: [toolDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([toolDefinitionId, key])
 }
+
 model ProjectTool {
-  id String @id @default(cuid())
-  projectId String
+  id               String                   @id @default(cuid())
+  projectId        String
   toolDefinitionId String
-  displayName String?
-  status ProjectToolStatus @default(DISCONNECTED)
-  credentialRef String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
-  tool ToolDefinition @relation(fields:[toolDefinitionId],references:[id],onDelete:Restrict)
-  permissions EmployeeToolPermission[]
+  displayName      String?
+  status           ProjectToolStatus        @default(DISCONNECTED)
+  credentialRef    String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  project          Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tool             ToolDefinition           @relation(fields: [toolDefinitionId], references: [id], onDelete: Restrict)
+  permissions      EmployeeToolPermission[]
   approvalRequests ApprovalRequest[]
-  auditEvents AuditEvent[]
-  @@unique([projectId,toolDefinitionId])
-  @@unique([id,projectId])
-  @@index([projectId,status])
+  auditEvents      AuditEvent[]
+
+  @@unique([projectId, toolDefinitionId])
+  @@unique([id, projectId])
+  @@index([projectId, status])
 }
+
 model EmployeeToolPermission {
-  id String @id @default(cuid())
-  projectId String
+  id                          String                    @id @default(cuid())
+  projectId                   String
   employeeProjectAssignmentId String
-  projectToolId String
-  level PermissionLevel @default(NO_ACCESS)
-  capabilityKey String @default("*")
-  grantedById String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  employeeAssignment EmployeeProjectAssignment @relation(fields:[employeeProjectAssignmentId,projectId],references:[id,projectId],onDelete:Cascade)
-  projectTool ProjectTool @relation(fields:[projectToolId,projectId],references:[id,projectId],onDelete:Cascade)
-  @@unique([employeeProjectAssignmentId,projectToolId,capabilityKey])
-  @@index([projectId,projectToolId])
+  projectToolId               String
+  level                       PermissionLevel           @default(NO_ACCESS)
+  capabilityKey               String                    @default("*")
+  grantedById                 String?
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime                  @updatedAt
+  employeeAssignment          EmployeeProjectAssignment @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Cascade)
+  projectTool                 ProjectTool               @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Cascade)
+
+  @@unique([employeeProjectAssignmentId, projectToolId, capabilityKey])
+  @@index([projectId, projectToolId])
 }
 
 // Governance records are always anchored to a Project. Optional provenance
 // relations deliberately use Restrict: projectId remains required, so SetNull
 // would make a composite foreign key invalid and weaken project ownership.
 model ApprovalRequest {
-  id String @id @default(cuid())
-  projectId String
-  status ApprovalStatus @default(PENDING)
+  id                              String                     @id @default(cuid())
+  projectId                       String
+  status                          ApprovalStatus             @default(PENDING)
   requestedByEmployeeAssignmentId String?
-  requestedByProjectMemberId String?
-  taskId String?
-  threadId String?
-  projectToolId String
-  capabilityKey String @default("*")
-  actionKey String
-  summary String
-  actionContext Json
-  authorizationSnapshot Json
-  policySnapshot Json
-  permissionLevel PermissionLevel?
-  requestedAt DateTime @default(now())
-  expiresAt DateTime?
-  decidedAt DateTime?
-  decidedByProjectMemberId String?
-  decisionNote String? @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
-  requestedByEmployee EmployeeProjectAssignment? @relation(fields:[requestedByEmployeeAssignmentId,projectId],references:[id,projectId],onDelete:Restrict)
-  requestedByMember ProjectMember? @relation("ApprovalRequester",fields:[requestedByProjectMemberId,projectId],references:[id,projectId],onDelete:Restrict)
-  task Task? @relation(fields:[taskId,projectId],references:[id,projectId],onDelete:Restrict)
-  thread Thread? @relation(fields:[threadId,projectId],references:[id,projectId],onDelete:Restrict)
-  projectTool ProjectTool @relation(fields:[projectToolId,projectId],references:[id,projectId],onDelete:Restrict)
-  decidedBy ProjectMember? @relation("ApprovalDecider",fields:[decidedByProjectMemberId,projectId],references:[id,projectId],onDelete:Restrict)
-  auditEvents AuditEvent[]
-  @@unique([id,projectId])
-  @@index([projectId,status,requestedAt])
-  @@index([projectId,projectToolId])
+  requestedByProjectMemberId      String?
+  taskId                          String?
+  threadId                        String?
+  projectToolId                   String
+  capabilityKey                   String                     @default("*")
+  actionKey                       String
+  summary                         String
+  actionContext                   Json
+  authorizationSnapshot           Json
+  policySnapshot                  Json
+  permissionLevel                 PermissionLevel?
+  requestedAt                     DateTime                   @default(now())
+  expiresAt                       DateTime?
+  decidedAt                       DateTime?
+  decidedByProjectMemberId        String?
+  decisionNote                    String?                    @db.Text
+  createdAt                       DateTime                   @default(now())
+  updatedAt                       DateTime                   @updatedAt
+  project                         Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedByEmployee             EmployeeProjectAssignment? @relation(fields: [requestedByEmployeeAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  requestedByMember               ProjectMember?             @relation("ApprovalRequester", fields: [requestedByProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
+  task                            Task?                      @relation(fields: [taskId, projectId], references: [id, projectId], onDelete: Restrict)
+  thread                          Thread?                    @relation(fields: [threadId, projectId], references: [id, projectId], onDelete: Restrict)
+  projectTool                     ProjectTool                @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Restrict)
+  decidedBy                       ProjectMember?             @relation("ApprovalDecider", fields: [decidedByProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
+  auditEvents                     AuditEvent[]
+
+  @@unique([id, projectId])
+  @@index([projectId, status, requestedAt])
+  @@index([projectId, projectToolId])
 }
 
 model AuditEvent {
-  id String @id @default(cuid())
-  projectId String
-  eventType String
-  actorType AuditActorType
-  actorProjectMemberId String?
+  id                        String                     @id @default(cuid())
+  projectId                 String
+  eventType                 String
+  actorType                 AuditActorType
+  actorProjectMemberId      String?
   actorEmployeeAssignmentId String?
-  targetType String
-  targetId String?
-  taskId String?
-  approvalRequestId String?
-  projectToolId String?
-  summary String
-  metadata Json
-  createdAt DateTime @default(now())
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
-  actorProjectMember ProjectMember? @relation(fields:[actorProjectMemberId,projectId],references:[id,projectId],onDelete:Restrict)
-  actorEmployeeAssignment EmployeeProjectAssignment? @relation(fields:[actorEmployeeAssignmentId,projectId],references:[id,projectId],onDelete:Restrict)
-  task Task? @relation(fields:[taskId,projectId],references:[id,projectId],onDelete:Restrict)
-  approvalRequest ApprovalRequest? @relation(fields:[approvalRequestId,projectId],references:[id,projectId],onDelete:Restrict)
-  projectTool ProjectTool? @relation(fields:[projectToolId,projectId],references:[id,projectId],onDelete:Restrict)
-  @@index([projectId,createdAt])
-  @@index([projectId,eventType,createdAt])
+  targetType                String
+  targetId                  String?
+  taskId                    String?
+  approvalRequestId         String?
+  projectToolId             String?
+  summary                   String
+  metadata                  Json
+  createdAt                 DateTime                   @default(now())
+  project                   Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorProjectMember        ProjectMember?             @relation(fields: [actorProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
+  actorEmployeeAssignment   EmployeeProjectAssignment? @relation(fields: [actorEmployeeAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  task                      Task?                      @relation(fields: [taskId, projectId], references: [id, projectId], onDelete: Restrict)
+  approvalRequest           ApprovalRequest?           @relation(fields: [approvalRequestId, projectId], references: [id, projectId], onDelete: Restrict)
+  projectTool               ProjectTool?               @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@index([projectId, createdAt])
+  @@index([projectId, eventType, createdAt])
 }
 
 model SOP {
-  id String @id @default(cuid())
-  projectId String
-  title String
-  description String? @db.Text
-  category String @default("GENERAL")
-  tags String[] @default([])
-  appliesToRole String?
-  status SOPStatus @default(DRAFT)
+  id              String       @id @default(cuid())
+  projectId       String
+  title           String
+  description     String?      @db.Text
+  category        String       @default("GENERAL")
+  tags            String[]     @default([])
+  appliesToRole   String?
+  status          SOPStatus    @default(DRAFT)
   activeVersionId String?
-  createdById String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
-  versions SOPVersion[] @relation("SOPVersions")
-  activeVersion SOPVersion? @relation("ActiveSOPVersion",fields:[activeVersionId,projectId],references:[id,projectId],onDelete:Restrict)
-  taskLinks TaskSOP[]
-  @@unique([id,projectId])
-  @@index([projectId,status,updatedAt])
+  createdById     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  project         Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions        SOPVersion[] @relation("SOPVersions")
+  activeVersion   SOPVersion?  @relation("ActiveSOPVersion", fields: [activeVersionId, projectId], references: [id, projectId], onDelete: Restrict)
+  taskLinks       TaskSOP[]
+
+  @@unique([id, projectId])
+  @@index([projectId, status, updatedAt])
 }
+
 model SOPVersion {
-  id String @id @default(cuid())
-  sopId String
-  projectId String
-  version Int
-  content String @db.Text
+  id            String   @id @default(cuid())
+  sopId         String
+  projectId     String
+  version       Int
+  content       String   @db.Text
   changeSummary String?
-  createdById String?
-  createdAt DateTime @default(now())
-  sop SOP @relation("SOPVersions",fields:[sopId,projectId],references:[id,projectId],onDelete:Cascade)
-  activeFor SOP[] @relation("ActiveSOPVersion")
-  @@unique([sopId,version])
-  @@unique([id,projectId])
+  createdById   String?
+  createdAt     DateTime @default(now())
+  sop           SOP      @relation("SOPVersions", fields: [sopId, projectId], references: [id, projectId], onDelete: Cascade)
+  activeFor     SOP[]    @relation("ActiveSOPVersion")
+
+  @@unique([sopId, version])
+  @@unique([id, projectId])
 }
+
 model Policy {
-  id String @id @default(cuid())
-  projectId String
-  title String
-  description String @db.Text
-  type PolicyType @default(CUSTOM)
-  status PolicyStatus @default(DRAFT)
+  id          String            @id @default(cuid())
+  projectId   String
+  title       String
+  description String            @db.Text
+  type        PolicyType        @default(CUSTOM)
+  status      PolicyStatus      @default(DRAFT)
   enforcement PolicyEnforcement @default(ADVISORY)
-  rule Json
+  rule        Json
   createdById String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
-  @@index([projectId,status,type])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status, type])
 }
+
 model TaskSOP {
-  id String @id @default(cuid())
+  id        String   @id @default(cuid())
   projectId String
-  taskId String
-  sopId String
+  taskId    String
+  sopId     String
   createdAt DateTime @default(now())
-  task Task @relation(fields:[taskId,projectId],references:[id,projectId],onDelete:Cascade)
-  sop SOP @relation(fields:[sopId,projectId],references:[id,projectId],onDelete:Cascade)
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
-  @@unique([taskId,sopId])
-  @@index([projectId,sopId])
+  task      Task     @relation(fields: [taskId, projectId], references: [id, projectId], onDelete: Cascade)
+  sop       SOP      @relation(fields: [sopId, projectId], references: [id, projectId], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, sopId])
+  @@index([projectId, sopId])
 }
 
 model KnowledgeSource {
-  id String @id @default(cuid())
-  projectId String
-  type BrainSourceType
-  label String
-  reference String?
-  occurredAt DateTime?
-  createdById String?
-  createdAt DateTime @default(now())
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
-  createdBy User? @relation(fields:[createdById],references:[id],onDelete:SetNull)
+  id             String          @id @default(cuid())
+  projectId      String
+  type           BrainSourceType
+  label          String
+  reference      String?
+  occurredAt     DateTime?
+  createdById    String?
+  createdAt      DateTime        @default(now())
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy      User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
   knowledgeItems KnowledgeItem[]
-  decisions Decision[]
-  memories ProjectMemory[]
-  @@unique([id,projectId])
-  @@index([projectId,type,createdAt])
+  decisions      Decision[]
+  memories       ProjectMemory[]
+
+  @@unique([id, projectId])
+  @@index([projectId, type, createdAt])
 }
 
 model ProjectConstitution {
-  id String @id @default(cuid())
-  projectId String @unique
-  title String @default("Project Constitution")
-  content String @db.Text
-  status BrainRecordStatus @default(ACTIVE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  id        String            @id @default(cuid())
+  projectId String            @unique
+  title     String            @default("Project Constitution")
+  content   String            @db.Text
+  status    BrainRecordStatus @default(ACTIVE)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model KnowledgeItem {
-  id String @id @default(cuid())
-  projectId String
-  sourceId String?
-  title String
-  content String @db.Text
-  category String @default("GENERAL")
-  status BrainRecordStatus @default(ACTIVE)
+  id          String            @id @default(cuid())
+  projectId   String
+  sourceId    String?
+  title       String
+  content     String            @db.Text
+  category    String            @default("GENERAL")
+  status      BrainRecordStatus @default(ACTIVE)
   createdById String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
-  source KnowledgeSource? @relation(fields:[sourceId,projectId],references:[id,projectId],onDelete:Restrict)
-  createdBy User? @relation(fields:[createdById],references:[id],onDelete:SetNull)
-  @@index([projectId,status,updatedAt])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  source      KnowledgeSource?  @relation(fields: [sourceId, projectId], references: [id, projectId], onDelete: Restrict)
+  createdBy   User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status, updatedAt])
 }
 
 model Decision {
-  id String @id @default(cuid())
-  projectId String
-  sourceId String?
-  title String
-  decision String @db.Text
-  rationale String? @db.Text
-  status BrainRecordStatus @default(ACTIVE)
-  decidedAt DateTime @default(now())
+  id          String            @id @default(cuid())
+  projectId   String
+  sourceId    String?
+  title       String
+  decision    String            @db.Text
+  rationale   String?           @db.Text
+  status      BrainRecordStatus @default(ACTIVE)
+  decidedAt   DateTime          @default(now())
   decidedById String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
-  source KnowledgeSource? @relation(fields:[sourceId,projectId],references:[id,projectId],onDelete:Restrict)
-  decidedBy User? @relation(fields:[decidedById],references:[id],onDelete:SetNull)
-  @@index([projectId,status,decidedAt])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  source      KnowledgeSource?  @relation(fields: [sourceId, projectId], references: [id, projectId], onDelete: Restrict)
+  decidedBy   User?             @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status, decidedAt])
 }
 
 model ProjectMemory {
-  id String @id @default(cuid())
-  projectId String
-  sourceId String?
-  title String
-  content String @db.Text
-  type MemoryType @default(FACT)
+  id         String            @id @default(cuid())
+  projectId  String
+  sourceId   String?
+  title      String
+  content    String            @db.Text
+  type       MemoryType        @default(FACT)
   confidence String?
-  importance Int @default(3)
-  status BrainRecordStatus @default(ACTIVE)
-  learnedAt DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
-  source KnowledgeSource? @relation(fields:[sourceId,projectId],references:[id,projectId],onDelete:Restrict)
-  @@index([projectId,type,status,updatedAt])
+  importance Int               @default(3)
+  status     BrainRecordStatus @default(ACTIVE)
+  learnedAt  DateTime          @default(now())
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  source     KnowledgeSource?  @relation(fields: [sourceId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@index([projectId, type, status, updatedAt])
 }
 
 model ProjectMember {
@@ -557,14 +610,14 @@ model ProjectMember {
   project              Project            @relation(fields: [projectId, organizationId], references: [id, organizationId], onDelete: Cascade)
   organizationMember   OrganizationMember @relation(fields: [organizationMemberId, organizationId], references: [id, organizationId], onDelete: Cascade)
   taskAssignments      TaskAssignment[]
-  requestedApprovals   ApprovalRequest[] @relation("ApprovalRequester")
-  decidedApprovals     ApprovalRequest[] @relation("ApprovalDecider")
+  requestedApprovals   ApprovalRequest[]  @relation("ApprovalRequester")
+  decidedApprovals     ApprovalRequest[]  @relation("ApprovalDecider")
   auditEvents          AuditEvent[]
 
   @@unique([projectId, organizationMemberId])
+  @@unique([id, projectId])
   @@index([organizationId])
   @@index([organizationMemberId])
-  @@unique([id, projectId])
 }
 
 // ─── RogerOS Team ──────────────────────────────────────────────
@@ -572,20 +625,20 @@ model ProjectMember {
 // A conversation is explicitly project-owned. The composite id/project key
 // lets child records enforce that they cannot point at another project's row.
 model Conversation {
-  id            String           @id @default(cuid())
-  projectId     String
-  type          ConversationType
-  slug          String?
-  title         String?
-  createdById   String?
-  archivedAt    DateTime?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy     User?            @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  participants  ConversationParticipant[]
-  messages      Message[]
-  threads       Thread[]
+  id           String                    @id @default(cuid())
+  projectId    String
+  type         ConversationType
+  slug         String?
+  title        String?
+  createdById  String?
+  archivedAt   DateTime?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  project      Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User?                     @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  participants ConversationParticipant[]
+  messages     Message[]
+  threads      Thread[]
 
   @@unique([id, projectId])
   @@unique([projectId, slug])
@@ -595,16 +648,16 @@ model Conversation {
 // Human participants use userId. systemIdentity is a deliberately small,
 // migratable bridge for M6 system employees (for example chief-of-staff).
 model ConversationParticipant {
-  id             String       @id @default(cuid())
-  projectId      String
-  conversationId String
-  userId         String?
-  systemIdentity String?
+  id                          String                     @id @default(cuid())
+  projectId                   String
+  conversationId              String
+  userId                      String?
+  systemIdentity              String?
   employeeProjectAssignmentId String?
-  createdAt      DateTime     @default(now())
-  conversation   Conversation @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
-  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  employeeProjectAssignment EmployeeProjectAssignment? @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Cascade)
+  createdAt                   DateTime                   @default(now())
+  conversation                Conversation               @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
+  user                        User?                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeProjectAssignment   EmployeeProjectAssignment? @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Cascade)
 
   @@unique([conversationId, userId])
   @@unique([conversationId, systemIdentity])
@@ -613,22 +666,22 @@ model ConversationParticipant {
 }
 
 model Message {
-  id                   String    @id @default(cuid())
+  id                   String       @id @default(cuid())
   projectId            String
   conversationId       String
   threadId             String?
   authorUserId         String?
   authorSystemIdentity String?
-  body                 String    @db.Text
-  kind                 String    @default("MESSAGE")
+  body                 String       @db.Text
+  kind                 String       @default("MESSAGE")
   editedAt             DateTime?
   deletedAt            DateTime?
-  createdAt            DateTime  @default(now())
-  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt            DateTime     @default(now())
+  project              Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   conversation         Conversation @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
-  author               User?     @relation("MessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
-  thread               Thread?   @relation("ThreadReplies", fields: [threadId, projectId], references: [id, projectId], onDelete: Cascade)
-  rootForThread        Thread?   @relation("ThreadRootMessage")
+  author               User?        @relation("MessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  thread               Thread?      @relation("ThreadReplies", fields: [threadId, projectId], references: [id, projectId], onDelete: Cascade)
+  rootForThread        Thread?      @relation("ThreadRootMessage")
 
   @@unique([id, projectId, conversationId])
   @@index([projectId, conversationId, createdAt])
@@ -636,19 +689,19 @@ model Message {
 }
 
 model Thread {
-  id            String       @id @default(cuid())
-  projectId     String
-  conversationId String
-  rootMessageId String
-  title         String?
-  status        ThreadStatus @default(OPEN)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  conversation  Conversation @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
-  rootMessage   Message      @relation("ThreadRootMessage", fields: [rootMessageId, projectId, conversationId], references: [id, projectId, conversationId], onDelete: Restrict)
-  replies       Message[]    @relation("ThreadReplies")
-  relatedTasks  Task[]       @relation("TaskThread")
+  id               String            @id @default(cuid())
+  projectId        String
+  conversationId   String
+  rootMessageId    String
+  title            String?
+  status           ThreadStatus      @default(OPEN)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  conversation     Conversation      @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
+  rootMessage      Message           @relation("ThreadRootMessage", fields: [rootMessageId, projectId, conversationId], references: [id, projectId, conversationId], onDelete: Restrict)
+  replies          Message[]         @relation("ThreadReplies")
+  relatedTasks     Task[]            @relation("TaskThread")
   approvalRequests ApprovalRequest[]
 
   @@unique([id, projectId])
@@ -662,32 +715,33 @@ model Thread {
 // Task is the authoritative RogerOS work record. HermesTask remains a
 // separate execution adapter and is deliberately not used as this model.
 model Task {
-  id                   String       @id @default(cuid())
-  projectId            String
-  parentTaskId         String?
-  relatedThreadId      String?
-  title                String
-  description          String?      @db.Text
-  status               TaskStatus   @default(TODO)
-  priority             TaskPriority @default(MEDIUM)
-  createdById          String
-  dueAt                DateTime?
-  startedAt            DateTime?
-  completedAt          DateTime?
-  resultSummary        String?      @db.Text
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
-  project              Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parentTask           Task?        @relation("TaskHierarchy", fields: [parentTaskId, projectId], references: [id, projectId], onDelete: Restrict)
-  subtasks             Task[]       @relation("TaskHierarchy")
-  relatedThread        Thread?      @relation("TaskThread", fields: [relatedThreadId, projectId], references: [id, projectId], onDelete: Restrict)
-  assignments          TaskAssignment[]
-  activities           TaskActivity[]
-  dependencies         TaskDependency[] @relation("TaskDependencies")
-  dependedOnBy         TaskDependency[] @relation("TaskDependents")
-  sopLinks             TaskSOP[]
-  approvalRequests     ApprovalRequest[]
-  auditEvents          AuditEvent[]
+  id               String            @id @default(cuid())
+  projectId        String
+  parentTaskId     String?
+  relatedThreadId  String?
+  title            String
+  description      String?           @db.Text
+  status           TaskStatus        @default(TODO)
+  priority         TaskPriority      @default(MEDIUM)
+  createdById      String
+  dueAt            DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  resultSummary    String?           @db.Text
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentTask       Task?             @relation("TaskHierarchy", fields: [parentTaskId, projectId], references: [id, projectId], onDelete: Restrict)
+  subtasks         Task[]            @relation("TaskHierarchy")
+  relatedThread    Thread?           @relation("TaskThread", fields: [relatedThreadId, projectId], references: [id, projectId], onDelete: Restrict)
+  assignments      TaskAssignment[]
+  activities       TaskActivity[]
+  dependencies     TaskDependency[]  @relation("TaskDependencies")
+  dependedOnBy     TaskDependency[]  @relation("TaskDependents")
+  sopLinks         TaskSOP[]
+  approvalRequests ApprovalRequest[]
+  auditEvents      AuditEvent[]
+  hermesExecutions HermesExecution[]
 
   @@unique([id, projectId])
   @@index([projectId, status, updatedAt])
@@ -698,68 +752,131 @@ model Task {
 // authorized for this project. systemIdentity is the small M6-migratable path
 // for future system/employee assignment.
 model TaskAssignment {
-  id              String        @id @default(cuid())
-  projectId       String
-  taskId          String
-  projectMemberId String?
-  systemIdentity  String?
+  id                          String                     @id @default(cuid())
+  projectId                   String
+  taskId                      String
+  projectMemberId             String?
+  systemIdentity              String?
   employeeProjectAssignmentId String?
-  createdAt       DateTime      @default(now())
-  task            Task          @relation(fields: [taskId, projectId], references: [id, projectId], onDelete: Cascade)
-  projectMember   ProjectMember? @relation(fields: [projectMemberId, projectId], references: [id, projectId], onDelete: Cascade)
-  employeeProjectAssignment EmployeeProjectAssignment? @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Cascade)
+  createdAt                   DateTime                   @default(now())
+  task                        Task                       @relation(fields: [taskId, projectId], references: [id, projectId], onDelete: Cascade)
+  projectMember               ProjectMember?             @relation(fields: [projectMemberId, projectId], references: [id, projectId], onDelete: Cascade)
+  employeeProjectAssignment   EmployeeProjectAssignment? @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Cascade)
 
   @@unique([taskId, projectMemberId])
   @@unique([taskId, systemIdentity])
-  @@index([projectId, projectMemberId])
   @@unique([taskId, employeeProjectAssignmentId])
+  @@index([projectId, projectMemberId])
   @@index([projectId, employeeProjectAssignmentId])
 }
 
 model Employee {
-  id String @id @default(cuid())
-  systemKey String? @unique
-  name String
-  role String
-  description String? @db.Text
-  soulSummary String? @db.Text
-  type EmployeeType @default(CUSTOM)
-  status EmployeeStatus @default(ACTIVE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String                      @id @default(cuid())
+  systemKey          String?                     @unique
+  name               String
+  role               String
+  description        String?                     @db.Text
+  soulSummary        String?                     @db.Text
+  type               EmployeeType                @default(CUSTOM)
+  status             EmployeeStatus              @default(ACTIVE)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
   projectAssignments EmployeeProjectAssignment[]
 }
 
 model EmployeeProjectAssignment {
-  id String @id @default(cuid())
-  employeeId String
-  projectId String
-  status EmployeeStatus @default(ACTIVE)
-  roleOverride String?
-  joinedAt DateTime @default(now())
-  pausedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  employee Employee @relation(fields:[employeeId],references:[id],onDelete:Cascade)
-  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  id                       String                    @id @default(cuid())
+  employeeId               String
+  projectId                String
+  status                   EmployeeStatus            @default(ACTIVE)
+  roleOverride             String?
+  joinedAt                 DateTime                  @default(now())
+  pausedAt                 DateTime?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  employee                 Employee                  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project                  Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   conversationParticipants ConversationParticipant[]
-  taskAssignments TaskAssignment[]
-  toolPermissions EmployeeToolPermission[]
-  approvalRequests ApprovalRequest[]
-  auditEvents AuditEvent[]
-  @@unique([employeeId,projectId])
-  @@unique([id,projectId])
-  @@index([projectId,status])
+  taskAssignments          TaskAssignment[]
+  toolPermissions          EmployeeToolPermission[]
+  runtimeAssignments       HermesRuntimeAssignment[]
+  approvalRequests         ApprovalRequest[]
+  auditEvents              AuditEvent[]
+
+  @@unique([employeeId, projectId])
+  @@unique([id, projectId])
+  @@index([projectId, status])
+}
+
+// M11: Hermes is an execution runtime only. Project-scoped assignments keep
+// RogerOS tenancy and task ownership authoritative.
+model HermesRuntime {
+  id          String                    @id @default(cuid())
+  key         String                    @unique
+  name        String
+  status      HermesRuntimeStatus       @default(ACTIVE)
+  endpoint    String?
+  profileKey  String?
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  assignments HermesRuntimeAssignment[]
+  executions  HermesExecution[]
+}
+
+model HermesRuntimeAssignment {
+  id                          String                     @id @default(cuid())
+  projectId                   String
+  runtimeId                   String
+  employeeProjectAssignmentId String?
+  profileKey                  String
+  active                      Boolean                    @default(true)
+  createdAt                   DateTime                   @default(now())
+  updatedAt                   DateTime                   @updatedAt
+  project                     Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runtime                     HermesRuntime              @relation(fields: [runtimeId], references: [id], onDelete: Restrict)
+  employeeAssignment          EmployeeProjectAssignment? @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  executions                  HermesExecution[]
+
+  @@unique([projectId, runtimeId])
+  @@unique([id, projectId])
+  @@index([projectId, active])
+}
+
+model HermesExecution {
+  id                  String                  @id @default(cuid())
+  projectId           String
+  taskId              String
+  runtimeId           String
+  runtimeAssignmentId String
+  status              HermesExecutionStatus   @default(QUEUED)
+  // Adapter execution IDs are authoritative only for lifecycle synchronization.
+  // They never grant a runtime or tool permission.
+  externalExecutionId String?                 @unique
+  prompt              String                  @db.Text
+  resultText          String?                 @db.Text
+  errorMessage        String?                 @db.Text
+  startedAt           DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  project             Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task                Task                    @relation(fields: [taskId, projectId], references: [id, projectId], onDelete: Restrict)
+  runtime             HermesRuntime           @relation(fields: [runtimeId], references: [id], onDelete: Restrict)
+  runtimeAssignment   HermesRuntimeAssignment @relation(fields: [runtimeAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([taskId, status])
+  @@index([projectId, status, createdAt])
+  @@index([projectId, taskId, createdAt])
 }
 
 model TaskDependency {
-  id               String   @id @default(cuid())
-  projectId        String
-  taskId           String
-  dependsOnTaskId  String
-  createdAt        DateTime @default(now())
-  task             Task     @relation("TaskDependencies", fields: [taskId, projectId], references: [id, projectId], onDelete: Cascade)
-  dependsOnTask    Task     @relation("TaskDependents", fields: [dependsOnTaskId, projectId], references: [id, projectId], onDelete: Cascade)
+  id              String   @id @default(cuid())
+  projectId       String
+  taskId          String
+  dependsOnTaskId String
+  createdAt       DateTime @default(now())
+  task            Task     @relation("TaskDependencies", fields: [taskId, projectId], references: [id, projectId], onDelete: Cascade)
+  dependsOnTask   Task     @relation("TaskDependents", fields: [dependsOnTaskId, projectId], references: [id, projectId], onDelete: Cascade)
 
   @@unique([taskId, dependsOnTaskId])
   @@index([projectId, dependsOnTaskId])
