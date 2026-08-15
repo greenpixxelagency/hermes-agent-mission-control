@@ -138,6 +138,18 @@ enum PermissionLevel {
   EXECUTE_WITH_APPROVAL
   FULL_EXECUTE
 }
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+enum AuditActorType {
+  HUMAN
+  EMPLOYEE
+  SYSTEM
+}
 
 model Account {
   id                String  @id @default(cuid())
@@ -263,6 +275,8 @@ model Project {
   policies Policy[]
   taskSops TaskSOP[]
   tools ProjectTool[]
+  approvalRequests ApprovalRequest[]
+  auditEvents AuditEvent[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -302,6 +316,8 @@ model ProjectTool {
   project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
   tool ToolDefinition @relation(fields:[toolDefinitionId],references:[id],onDelete:Restrict)
   permissions EmployeeToolPermission[]
+  approvalRequests ApprovalRequest[]
+  auditEvents AuditEvent[]
   @@unique([projectId,toolDefinitionId])
   @@unique([id,projectId])
   @@index([projectId,status])
@@ -320,6 +336,70 @@ model EmployeeToolPermission {
   projectTool ProjectTool @relation(fields:[projectToolId,projectId],references:[id,projectId],onDelete:Cascade)
   @@unique([employeeProjectAssignmentId,projectToolId,capabilityKey])
   @@index([projectId,projectToolId])
+}
+
+// Governance records are always anchored to a Project. Optional provenance
+// relations deliberately use Restrict: projectId remains required, so SetNull
+// would make a composite foreign key invalid and weaken project ownership.
+model ApprovalRequest {
+  id String @id @default(cuid())
+  projectId String
+  status ApprovalStatus @default(PENDING)
+  requestedByEmployeeAssignmentId String?
+  requestedByProjectMemberId String?
+  taskId String?
+  threadId String?
+  projectToolId String
+  capabilityKey String @default("*")
+  actionKey String
+  summary String
+  actionContext Json
+  authorizationSnapshot Json
+  policySnapshot Json
+  permissionLevel PermissionLevel?
+  requestedAt DateTime @default(now())
+  expiresAt DateTime?
+  decidedAt DateTime?
+  decidedByProjectMemberId String?
+  decisionNote String? @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  requestedByEmployee EmployeeProjectAssignment? @relation(fields:[requestedByEmployeeAssignmentId,projectId],references:[id,projectId],onDelete:Restrict)
+  requestedByMember ProjectMember? @relation("ApprovalRequester",fields:[requestedByProjectMemberId,projectId],references:[id,projectId],onDelete:Restrict)
+  task Task? @relation(fields:[taskId,projectId],references:[id,projectId],onDelete:Restrict)
+  thread Thread? @relation(fields:[threadId,projectId],references:[id,projectId],onDelete:Restrict)
+  projectTool ProjectTool @relation(fields:[projectToolId,projectId],references:[id,projectId],onDelete:Restrict)
+  decidedBy ProjectMember? @relation("ApprovalDecider",fields:[decidedByProjectMemberId,projectId],references:[id,projectId],onDelete:Restrict)
+  auditEvents AuditEvent[]
+  @@unique([id,projectId])
+  @@index([projectId,status,requestedAt])
+  @@index([projectId,projectToolId])
+}
+
+model AuditEvent {
+  id String @id @default(cuid())
+  projectId String
+  eventType String
+  actorType AuditActorType
+  actorProjectMemberId String?
+  actorEmployeeAssignmentId String?
+  targetType String
+  targetId String?
+  taskId String?
+  approvalRequestId String?
+  projectToolId String?
+  summary String
+  metadata Json
+  createdAt DateTime @default(now())
+  project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+  actorProjectMember ProjectMember? @relation(fields:[actorProjectMemberId,projectId],references:[id,projectId],onDelete:Restrict)
+  actorEmployeeAssignment EmployeeProjectAssignment? @relation(fields:[actorEmployeeAssignmentId,projectId],references:[id,projectId],onDelete:Restrict)
+  task Task? @relation(fields:[taskId,projectId],references:[id,projectId],onDelete:Restrict)
+  approvalRequest ApprovalRequest? @relation(fields:[approvalRequestId,projectId],references:[id,projectId],onDelete:Restrict)
+  projectTool ProjectTool? @relation(fields:[projectToolId,projectId],references:[id,projectId],onDelete:Restrict)
+  @@index([projectId,createdAt])
+  @@index([projectId,eventType,createdAt])
 }
 
 model SOP {
@@ -477,6 +557,9 @@ model ProjectMember {
   project              Project            @relation(fields: [projectId, organizationId], references: [id, organizationId], onDelete: Cascade)
   organizationMember   OrganizationMember @relation(fields: [organizationMemberId, organizationId], references: [id, organizationId], onDelete: Cascade)
   taskAssignments      TaskAssignment[]
+  requestedApprovals   ApprovalRequest[] @relation("ApprovalRequester")
+  decidedApprovals     ApprovalRequest[] @relation("ApprovalDecider")
+  auditEvents          AuditEvent[]
 
   @@unique([projectId, organizationMemberId])
   @@index([organizationId])
@@ -566,6 +649,7 @@ model Thread {
   rootMessage   Message      @relation("ThreadRootMessage", fields: [rootMessageId, projectId, conversationId], references: [id, projectId, conversationId], onDelete: Restrict)
   replies       Message[]    @relation("ThreadReplies")
   relatedTasks  Task[]       @relation("TaskThread")
+  approvalRequests ApprovalRequest[]
 
   @@unique([id, projectId])
   @@unique([projectId, rootMessageId])
@@ -602,6 +686,8 @@ model Task {
   dependencies         TaskDependency[] @relation("TaskDependencies")
   dependedOnBy         TaskDependency[] @relation("TaskDependents")
   sopLinks             TaskSOP[]
+  approvalRequests     ApprovalRequest[]
+  auditEvents          AuditEvent[]
 
   @@unique([id, projectId])
   @@index([projectId, status, updatedAt])
@@ -659,6 +745,8 @@ model EmployeeProjectAssignment {
   conversationParticipants ConversationParticipant[]
   taskAssignments TaskAssignment[]
   toolPermissions EmployeeToolPermission[]
+  approvalRequests ApprovalRequest[]
+  auditEvents AuditEvent[]
   @@unique([employeeId,projectId])
   @@unique([id,projectId])
   @@index([projectId,status])

@@ -1,0 +1,7 @@
+import { NextResponse } from 'next/server'
+import { ApprovalStatus } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
+import { projectScopeErrorResponse, requireProjectContextForBody, requireProjectContextForRequest } from '@/lib/project-scope'
+
+export async function GET(request: Request) { try { const context = await requireProjectContextForRequest(request); const status = new URL(request.url).searchParams.get('status'); const approvals = await prisma.approvalRequest.findMany({ where: { projectId: context.project.id, ...(status && Object.values(ApprovalStatus).includes(status as ApprovalStatus) ? { status: status as ApprovalStatus } : {}) }, include: { requestedByEmployee: { include: { employee: true } }, requestedByMember: { include: { organizationMember: { include: { user: true } } } }, decidedBy: { include: { organizationMember: { include: { user: true } } } }, projectTool: { include: { tool: true } }, task: true, thread: true, auditEvents: { orderBy: { createdAt: 'asc' } } }, orderBy: { requestedAt: 'desc' } }); return NextResponse.json({ approvals }) } catch (error) { return projectScopeErrorResponse(error) } }
+export async function POST(request: Request) { try { const body = await request.json() as Record<string, unknown>; await requireProjectContextForBody(body); return NextResponse.json({ error: 'Approval requests are created only by trusted authorization flows.' }, { status: 403 }) } catch (error) { return projectScopeErrorResponse(error) } }
