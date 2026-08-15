@@ -17,7 +17,7 @@ export async function createApprovalRequestFromAuthorization(input: CreateInput)
     input.threadId ? prisma.thread.findFirst({ where: { id: input.threadId, projectId: input.projectId }, select: { id: true } }) : null,
   ])
   if ((input.employeeProjectAssignmentId && !assignment) || (input.requestedByProjectMemberId && !requester) || !tool || (input.taskId && !task) || (input.threadId && !thread)) throw new Error('PROJECT_RESOURCE_NOT_FOUND')
-  const decision = input.employeeProjectAssignmentId ? await resolveToolAuthorization({ projectId: input.projectId, assignmentId: input.employeeProjectAssignmentId, projectToolId: input.projectToolId, action: input.action }) : 'DENY'
+  const decision = input.employeeProjectAssignmentId ? await resolveToolAuthorization({ projectId: input.projectId, assignmentId: input.employeeProjectAssignmentId, projectToolId: input.projectToolId, action: input.action, capabilityKey: input.capabilityKey }) : 'DENY'
   if (decision !== 'REQUIRE_APPROVAL') throw new Error('APPROVAL_NOT_AUTHORIZED')
   const [permission, policies] = await Promise.all([
     prisma.employeeToolPermission.findFirst({ where: { projectId: input.projectId, employeeProjectAssignmentId: input.employeeProjectAssignmentId!, projectToolId: input.projectToolId }, select: { level: true, capabilityKey: true } }),

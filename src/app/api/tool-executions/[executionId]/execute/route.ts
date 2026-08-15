@@ -1,0 +1,4 @@
+import { NextResponse } from 'next/server'
+import { executeApprovedToolAction, ToolExecutionError } from '@/lib/tool-execution'
+import { projectScopeErrorResponse, requireProjectContextForBody } from '@/lib/project-scope'
+export async function POST(request: Request, { params }: { params: Promise<{ executionId: string }> }) { try { const body = await request.json() as Record<string, unknown>; const context = await requireProjectContextForBody(body); const { executionId } = await params; const execution = await executeApprovedToolAction({ projectId: context.project.id, executionId }); return NextResponse.json({ execution: { id: execution.id, status: execution.status, resultText: execution.resultText } }) } catch (error) { if (error instanceof ToolExecutionError) return NextResponse.json({ error: error.code }, { status: 400 }); return projectScopeErrorResponse(error) } }

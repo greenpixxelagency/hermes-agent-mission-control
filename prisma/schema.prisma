@@ -161,6 +161,22 @@ enum ProjectToolStatus {
   DISABLED
 }
 
+enum ConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  NEEDS_ATTENTION
+  DISABLED
+}
+
+enum ToolExecutionStatus {
+  REQUESTED
+  PENDING_APPROVAL
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
 enum PermissionLevel {
   NO_ACCESS
   READ
@@ -307,6 +323,8 @@ model Project {
   policies                 Policy[]
   taskSops                 TaskSOP[]
   tools                    ProjectTool[]
+  connections              ProjectConnection[]
+  toolExecutions           ToolExecution[]
   approvalRequests         ApprovalRequest[]
   auditEvents              AuditEvent[]
   hermesRuntimeAssignments HermesRuntimeAssignment[]
@@ -355,10 +373,67 @@ model ProjectTool {
   permissions      EmployeeToolPermission[]
   approvalRequests ApprovalRequest[]
   auditEvents      AuditEvent[]
+  connections      ProjectConnection[]
+  executions       ToolExecution[]
 
   @@unique([projectId, toolDefinitionId])
   @@unique([id, projectId])
   @@index([projectId, status])
+}
+
+// M12: a project-owned connection references a server-side credential handle
+// only. It never persists the credential value or exposes it to a client.
+model ProjectConnection {
+  id            String           @id @default(cuid())
+  projectId     String
+  projectToolId String
+  name          String
+  status        ConnectionStatus @default(DISCONNECTED)
+  enabled       Boolean          @default(true)
+  credentialRef String?
+  metadata      Json             @default("{}")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectTool   ProjectTool      @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Restrict)
+  executions    ToolExecution[]
+
+  @@unique([projectId, projectToolId])
+  @@unique([id, projectId])
+  @@index([projectId, status])
+}
+
+// M12: ToolExecution records governed capability work. HermesExecution remains
+// the runtime record and can never substitute for this authorization boundary.
+model ToolExecution {
+  id                          String                    @id @default(cuid())
+  projectId                   String
+  employeeProjectAssignmentId String
+  projectToolId               String
+  projectConnectionId         String
+  approvalRequestId           String?
+  capabilityKey               String
+  actionKey                   String
+  requestFingerprint          String
+  status                      ToolExecutionStatus       @default(REQUESTED)
+  requestMetadata             Json                      @default("{}")
+  resultMetadata              Json                      @default("{}")
+  resultText                  String?                   @db.Text
+  errorMessage                String?                   @db.Text
+  startedAt                   DateTime?
+  completedAt                 DateTime?
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime                  @updatedAt
+  project                     Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employeeAssignment          EmployeeProjectAssignment @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  projectTool                 ProjectTool               @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Restrict)
+  connection                  ProjectConnection         @relation(fields: [projectConnectionId, projectId], references: [id, projectId], onDelete: Restrict)
+  approvalRequest             ApprovalRequest?          @relation(fields: [approvalRequestId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([id, projectId])
+  @@index([projectId, status, createdAt])
+  @@index([projectId, employeeProjectAssignmentId, createdAt])
+  @@index([projectId, approvalRequestId])
 }
 
 model EmployeeToolPermission {
@@ -412,6 +487,7 @@ model ApprovalRequest {
   projectTool                     ProjectTool                @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Restrict)
   decidedBy                       ProjectMember?             @relation("ApprovalDecider", fields: [decidedByProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
   auditEvents                     AuditEvent[]
+  toolExecutions                  ToolExecution[]
 
   @@unique([id, projectId])
   @@index([projectId, status, requestedAt])
@@ -802,6 +878,7 @@ model EmployeeProjectAssignment {
   runtimeAssignments       HermesRuntimeAssignment[]
   approvalRequests         ApprovalRequest[]
   auditEvents              AuditEvent[]
+  toolExecutions           ToolExecution[]
 
   @@unique([employeeId, projectId])
   @@unique([id, projectId])
