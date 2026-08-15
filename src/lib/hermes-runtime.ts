@@ -4,6 +4,7 @@ import {
   Prisma,
   TaskActivityType,
 } from '@prisma/client'
+import { randomUUID } from 'node:crypto'
 
 import { recordAuditEvent } from '@/lib/audit'
 import type { HermesAdapterExecution, HermesRuntimeAdapter } from '@/lib/hermes-runtime-adapter'
@@ -105,6 +106,7 @@ async function persistAdapterStatus(context: ProjectContext, memberId: string, e
   const adapter = validateAdapterExecution(response)
   const current = await prisma.hermesExecution.findFirst({ where: { id: executionId, projectId: context.project.id } })
   if (!current) throw new HermesRuntimeError('EXECUTION_NOT_FOUND')
+  if (current.externalExecutionId && current.externalExecutionId !== adapter.externalExecutionId) throw new HermesRuntimeError('ADAPTER_MALFORMED_RESPONSE')
   const common = { externalExecutionId: adapter.externalExecutionId.slice(0, 200), startedAt: asDate(adapter.startedAt) ?? current.startedAt ?? new Date() }
 
   if (adapter.status === 'SUCCEEDED') {
@@ -178,6 +180,10 @@ export async function dispatchTaskToHermes(context: ProjectContext, taskId: stri
         taskId,
         runtimeId: runtimeAssignment.runtimeId,
         runtimeAssignmentId: runtimeAssignment.id,
+        // The adapter accepts UUID idempotency keys while RogerOS uses CUIDs.
+        // Store the UUID before the network call so retries can never create
+        // an uncontrolled second external execution.
+        externalExecutionId: randomUUID(),
         prompt: task.description || task.title,
       },
     })
@@ -188,7 +194,7 @@ export async function dispatchTaskToHermes(context: ProjectContext, taskId: stri
   try {
     await prisma.hermesExecution.update({ where: { id: prepared.execution.id }, data: { status: HermesExecutionStatus.DISPATCHING, startedAt: new Date() } })
     const response = await adapter.dispatchExecution({
-      executionId: prepared.execution.id,
+      executionId: prepared.execution.externalExecutionId!,
       projectKey: 'rogeros-vhalam',
       runtimeProfileKey: prepared.runtimeAssignment.profileKey as 'rogeros-vhalam-chief-of-staff',
       employeeKey: 'chief-of-staff',

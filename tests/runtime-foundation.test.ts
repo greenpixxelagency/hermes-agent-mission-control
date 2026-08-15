@@ -18,7 +18,7 @@ function hasCode(error: unknown, code: string) {
 const completedAdapter: HermesRuntimeAdapter = {
   health: async () => ({ adapter: 'ok', hermesReachable: true, hermesVersion: 'test', runtimeIdentity: 'test', timestamp }),
   ensureProfile: async () => ({ status: 'READY' }),
-  dispatchExecution: async ({ executionId }) => ({ externalExecutionId: `external-${executionId}`, status: 'SUCCEEDED', startedAt: timestamp, completedAt: timestamp, result: 'ROGEROS_HERMES_M11_OK test result' }),
+  dispatchExecution: async ({ executionId }) => ({ externalExecutionId: executionId, status: 'SUCCEEDED', startedAt: timestamp, completedAt: timestamp, result: 'ROGEROS_HERMES_M11_OK test result' }),
   getExecutionStatus: async executionId => ({ externalExecutionId: executionId, status: 'SUCCEEDED', startedAt: timestamp, completedAt: timestamp, result: 'ROGEROS_HERMES_M11_OK test result' }),
 }
 
@@ -95,7 +95,7 @@ test('M11 runtime preserves project isolation, default-deny roles, and execution
   assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: noRuntimeTask.id } })).status, 'TODO')
 
   // Concurrent dispatch has one active winner due to the transaction advisory lock.
-  const running: HermesRuntimeAdapter = { ...completedAdapter, dispatchExecution: async ({ executionId }) => ({ externalExecutionId: `running-${executionId}`, status: 'RUNNING', startedAt: timestamp, completedAt: null }), getExecutionStatus: async executionId => ({ externalExecutionId: executionId, status: 'RUNNING', startedAt: timestamp, completedAt: null }) }
+  const running: HermesRuntimeAdapter = { ...completedAdapter, dispatchExecution: async ({ executionId }) => ({ externalExecutionId: executionId, status: 'RUNNING', startedAt: timestamp, completedAt: null }), getExecutionStatus: async executionId => ({ externalExecutionId: executionId, status: 'RUNNING', startedAt: timestamp, completedAt: null }) }
   const results = await Promise.allSettled([dispatchTaskToHermes(context(0), duplicateTask.id, running), dispatchTaskToHermes(context(1), duplicateTask.id, running)])
   assert.equal(results.filter(result => result.status === 'fulfilled').length, 1)
   assert.equal(results.filter(result => result.status === 'rejected').length, 1)
