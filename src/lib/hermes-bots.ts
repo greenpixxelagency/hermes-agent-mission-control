@@ -130,10 +130,19 @@ export async function reconcileHermesBotAssignment(context: ProjectContext, empl
   try {
     if (drifted) {
       const ensured = await adapter.ensureBot({ profileId: desired.profileId }); validateProfile(ensured.profileId, desired.profileId)
+      await audit(context, member.id, 'runtime.bot.ensured', current.id, 'Hermes Bot profile adopted or ensured', { profileId: desired.profileId })
       const identity = await adapter.updateBotIdentity(desired.profileId, { displayName: desired.displayName, description: desired.description }); validateProfile(identity.profileId, desired.profileId)
+      await audit(context, member.id, 'runtime.bot.identity.updated', current.id, 'Hermes Bot identity synchronized', { profileId: desired.profileId })
       const projected = await adapter.updateBotSoul(desired.profileId, desired.soul); validateProfile(projected.profileId, desired.profileId)
-      if (model.explicitlyConfigured) { const configured = await adapter.updateBotRuntimeConfig(desired.profileId, desired.runtime); validateProfile(configured.profileId, desired.profileId) }
-      if (current.desiredSkillRevision > 0) await adapter.reconcileBotSkills(desired.profileId, desired.approvedSkills)
+      await audit(context, member.id, 'runtime.bot.soul.updated', current.id, 'Hermes Bot SOUL projection synchronized', { profileId: desired.profileId, soulRevision: desired.soul.revision, soulHash: desired.soul.hash })
+      if (model.explicitlyConfigured) {
+        const configured = await adapter.updateBotRuntimeConfig(desired.profileId, desired.runtime); validateProfile(configured.profileId, desired.profileId)
+        await audit(context, member.id, 'runtime.bot.config.updated', current.id, 'Hermes Bot model policy synchronized', { profileId: desired.profileId, provider: desired.runtime.provider, modelId: desired.runtime.modelId })
+      }
+      if (current.desiredSkillRevision > 0) {
+        const reconciledSkills = await adapter.reconcileBotSkills(desired.profileId, desired.approvedSkills)
+        await audit(context, member.id, 'runtime.bot.skills.reconciled', current.id, 'Hermes Bot approved skills synchronized', { profileId: desired.profileId, skillCount: reconciledSkills.length, skillRevision: current.desiredSkillRevision })
+      }
     }
     const [bot, status, skills, routines, sessions, capability] = await Promise.all([
       adapter.getBot(desired.profileId), adapter.getBotRuntimeStatus(desired.profileId), adapter.listBotSkills(desired.profileId), adapter.listBotRoutines(desired.profileId), adapter.listBotSessions(desired.profileId), adapter.getBotCapabilityFingerprint(desired.profileId),
@@ -146,6 +155,7 @@ export async function reconcileHermesBotAssignment(context: ProjectContext, empl
     if (!Array.isArray(sessions)) throw new HermesBotError('ADAPTER_MALFORMED_SESSIONS_RESPONSE')
     const capabilityFingerprint = capability?.fingerprint || capability?.capabilityFingerprint
     if (!capabilityFingerprint) throw new HermesBotError('ADAPTER_MALFORMED_CAPABILITY_RESPONSE')
+    await audit(context, member.id, 'runtime.bot.capability.refreshed', current.id, 'Hermes Bot capability observation refreshed', { profileId: desired.profileId, capabilityFingerprint })
     const saved = await prisma.hermesRuntimeAssignment.update({ where: { id: current.id }, data: {
       runtimeKind: HermesRuntimeKind.HERMES_BOT, provisioningState: 'READY', reconciliationState: 'IN_SYNC', assignmentState: status.state, active: status.state === 'ACTIVE',
       desiredDisplayName: desired.displayName, desiredDescription: desired.description, desiredSoulHash: desired.soul.hash, desiredModelProvider: desired.runtime.provider, desiredModelId: desired.runtime.modelId,
