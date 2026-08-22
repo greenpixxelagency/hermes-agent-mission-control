@@ -69,7 +69,10 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   listBotRoutines: profileId => request(botPath(profileId, '/routines')),
   listBotSessions: profileId => request(botPath(profileId, '/sessions')),
   getBotCapabilityFingerprint: profileId => request(botPath(profileId, '/capabilities')),
-  ensureBot: spec => request('/bots/ensure', { method: 'POST', body: JSON.stringify({ profileId: spec.profileId }) }),
+  ensureBot: async spec => {
+    await request('/profiles/ensure', { method: 'POST', body: JSON.stringify({ projectKey: spec.projectKey, runtimeProfileKey: spec.profileId, employeeKey: spec.employeeKey }) })
+    return request(botPath(spec.profileId))
+  },
   updateBotIdentity: (profileId, metadata) => request(botPath(profileId, '/identity'), { method: 'PUT', body: JSON.stringify(metadata) }),
   updateBotSoul: (profileId, soul) => request(botPath(profileId, '/soul'), { method: 'PUT', body: JSON.stringify(soul) }),
   updateBotRuntimeConfig: (profileId, configValue) => request(botPath(profileId, '/runtime'), { method: 'PUT', body: JSON.stringify(configValue) }),
