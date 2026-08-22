@@ -107,6 +107,16 @@ enum HermesRuntimeAssignmentState {
   RETIRED
 }
 
+enum SkillTrustStatus {
+  TRUSTED
+  UNTRUSTED
+}
+
+enum EmployeeSkillAssignmentState {
+  ACTIVE
+  REMOVED
+}
+
 enum HermesExecutionStatus {
   QUEUED
   DISPATCHING
@@ -289,6 +299,7 @@ model User {
   credential               UserCredential?
   passwordResetTokens      PasswordResetToken[]
   driveOAuthStates         DriveOAuthState[]
+  assignedEmployeeSkills   EmployeeSkillAssignment[] @relation("SkillAssignedBy")
 }
 
 model UserCredential {
@@ -1025,10 +1036,52 @@ model EmployeeProjectAssignment {
   approvalRequests         ApprovalRequest[]
   auditEvents              AuditEvent[]
   toolExecutions           ToolExecution[]
+  skillAssignments         EmployeeSkillAssignment[]
 
   @@unique([employeeId, projectId])
   @@unique([id, projectId])
   @@index([projectId, status])
+}
+
+// M15: RogerOS owns the trusted catalog; Hermes receives only this managed overlay.
+model Skill {
+  id               String                    @id @default(cuid())
+  slug             String                    @unique
+  name             String
+  description      String                    @db.Text
+  category         String
+  sourceType       String                    @default("SYSTEM")
+  sourceIdentifier String                    @unique
+  version          String                    @default("1.0.0")
+  trustStatus      SkillTrustStatus          @default(TRUSTED)
+  isEnabled        Boolean                   @default(true)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  assignments      EmployeeSkillAssignment[]
+}
+
+model EmployeeSkillAssignment {
+  id                          String                       @id @default(cuid())
+  projectId                   String
+  employeeProjectAssignmentId String
+  skillId                     String
+  state                       EmployeeSkillAssignmentState @default(ACTIVE)
+  assignedByUserId            String?
+  desiredVersion              String
+  assignedAt                  DateTime                     @default(now())
+  removedAt                   DateTime?
+  lastReconciledAt            DateTime?
+  reconciliationStatus        HermesReconciliationState    @default(DRIFTED)
+  reconciliationError         String?                      @db.Text
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  employeeProjectAssignment   EmployeeProjectAssignment    @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Cascade)
+  skill                       Skill                        @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  assignedBy                  User?                        @relation("SkillAssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([employeeProjectAssignmentId, skillId])
+  @@index([projectId, state])
+  @@index([skillId, state])
 }
 
 // M11: Hermes is an execution runtime only. Project-scoped assignments keep
@@ -1047,37 +1100,37 @@ model HermesRuntime {
 }
 
 model HermesRuntimeAssignment {
-  id                          String                     @id @default(cuid())
+  id                          String                       @id @default(cuid())
   projectId                   String
   runtimeId                   String
   employeeProjectAssignmentId String?
   profileKey                  String
-  active                      Boolean                    @default(true)
-  runtimeKind                 HermesRuntimeKind          @default(HERMES_PROFILE)
+  active                      Boolean                      @default(true)
+  runtimeKind                 HermesRuntimeKind            @default(HERMES_PROFILE)
   assignmentState             HermesRuntimeAssignmentState @default(ACTIVE)
-  provisioningState           HermesProvisioningState    @default(UNPROVISIONED)
-  reconciliationState         HermesReconciliationState  @default(DRIFTED)
+  provisioningState           HermesProvisioningState      @default(UNPROVISIONED)
+  reconciliationState         HermesReconciliationState    @default(DRIFTED)
   desiredDisplayName          String?
-  desiredDescription          String?                    @db.Text
-  desiredSoulRevision         Int                        @default(1)
+  desiredDescription          String?                      @db.Text
+  desiredSoulRevision         Int                          @default(1)
   desiredSoulHash             String?
   desiredModelProvider        String?
   desiredModelId              String?
-  desiredSkillRevision        Int                        @default(0)
-  desiredRoutineRevision      Int                        @default(0)
+  desiredSkillRevision        Int                          @default(0)
+  desiredRoutineRevision      Int                          @default(0)
   lastObservedHermesVersion   String?
   capabilityFingerprint       String?
   lastReconciledAt            DateTime?
-  lastReconcileError          String?                    @db.Text
+  lastReconcileError          String?                      @db.Text
   runtimeStatus               String?
   suspendedAt                 DateTime?
   retiredAt                   DateTime?
   externalRuntimeMetadata     Json?
-  createdAt                   DateTime                   @default(now())
-  updatedAt                   DateTime                   @updatedAt
-  project                     Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  runtime                     HermesRuntime              @relation(fields: [runtimeId], references: [id], onDelete: Restrict)
-  employeeAssignment          EmployeeProjectAssignment? @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  project                     Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runtime                     HermesRuntime                @relation(fields: [runtimeId], references: [id], onDelete: Restrict)
+  employeeAssignment          EmployeeProjectAssignment?   @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
   executions                  HermesExecution[]
 
   @@unique([projectId, employeeProjectAssignmentId])

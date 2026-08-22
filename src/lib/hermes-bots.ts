@@ -57,7 +57,12 @@ type LoadedAssignment = Awaited<ReturnType<typeof loadAssignment>>
 async function loadAssignment(projectId: string, employeeProjectAssignmentId: string) {
   const assignment = await prisma.employeeProjectAssignment.findFirst({
     where: { id: employeeProjectAssignmentId, projectId },
-    include: { employee: true, project: true, runtimeAssignments: { include: { runtime: true } } },
+    include: {
+      employee: true,
+      project: true,
+      skillAssignments: { where: { state: 'ACTIVE', skill: { isEnabled: true, trustStatus: 'TRUSTED' } }, include: { skill: true }, orderBy: { skill: { slug: 'asc' } } },
+      runtimeAssignments: { include: { runtime: true } },
+    },
   })
   if (!assignment) throw new HermesBotError('RUNTIME_ASSIGNMENT_NOT_FOUND')
   const runtimeAssignment = assignment.runtimeAssignments[0]
@@ -82,7 +87,7 @@ export function compileHermesBotDesiredState(loaded: LoadedAssignment): HermesBo
     description: loaded.assignment.employee.description || `${loaded.assignment.employee.role} assigned to ${loaded.assignment.project.name}`,
     soul: { revision: loaded.runtimeAssignment.desiredSoulRevision, hash: projectedSoul.hash, content: projectedSoul.content },
     runtime: { provider: model.provider, modelId: model.modelId },
-    approvedSkills: [],
+    approvedSkills: loaded.assignment.skillAssignments.map(assignment => assignment.skill.sourceIdentifier),
   }
 }
 
