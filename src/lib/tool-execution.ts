@@ -10,6 +10,12 @@ import { upsertDriveBrainSource } from '@/lib/drive-brain'
 type Request = { projectId: string; employeeProjectAssignmentId: string; projectToolId: string; capabilityKey: string; actionKey: 'read' | 'execute'; request?: Record<string, unknown>; summary: string }
 export class ToolExecutionError extends Error { constructor(public readonly code: string) { super(code); this.name = 'ToolExecutionError' } }
 
+function safeExecutionError(error: unknown) {
+  if (error instanceof ToolExecutionError) return error.code
+  if (error instanceof Error && ['DRIVE_SCOPE_DENIED', 'DRIVE_FILE_UNSUPPORTED', 'UNSUPPORTED_DRIVE_CAPABILITY'].includes(error.message)) return error.message
+  return 'ADAPTER_FAILURE'
+}
+
 function fingerprint(value: unknown) { return createHash('sha256').update(JSON.stringify(safeMetadata(value))).digest('hex') }
 function safeRequest(value: Record<string, unknown> | undefined) { return safeMetadata(value ?? {}) as Record<string, unknown> }
 async function employee(input: Request) {
@@ -47,7 +53,7 @@ async function executeStored(executionId: string) {
     await audit({ projectId: execution.projectId, assignmentId: execution.employeeProjectAssignmentId, executionId: execution.id, projectToolId: execution.projectToolId, approvalRequestId: execution.approvalRequestId ?? undefined, event: 'tool.execution.succeeded', summary: 'Governed tool execution succeeded' })
     return saved
   } catch (error) {
-    const saved = await prisma.toolExecution.update({ where: { id: execution.id }, data: { status: ToolExecutionStatus.FAILED, errorMessage: error instanceof ToolExecutionError ? error.code : 'ADAPTER_FAILURE', completedAt: new Date() } })
+    const saved = await prisma.toolExecution.update({ where: { id: execution.id }, data: { status: ToolExecutionStatus.FAILED, errorMessage: safeExecutionError(error), completedAt: new Date() } })
     await audit({ projectId: execution.projectId, assignmentId: execution.employeeProjectAssignmentId, executionId: execution.id, projectToolId: execution.projectToolId, approvalRequestId: execution.approvalRequestId ?? undefined, event: 'tool.execution.failed', summary: 'Governed tool execution failed safely' })
     return saved
   }
