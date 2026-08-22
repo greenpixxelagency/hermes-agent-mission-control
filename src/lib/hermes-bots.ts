@@ -112,7 +112,7 @@ export async function reconcileHermesBotAssignment(context: ProjectContext, empl
   await audit(context, member.id, 'runtime.bot.reconcile.requested', current.id, 'Hermes Bot reconciliation requested', { profileId: desired.profileId, drifted })
   try {
     if (drifted) {
-      const ensured = await adapter.ensureBot({ profileId: desired.profileId, displayName: desired.displayName }); validateProfile(ensured.profileId, desired.profileId)
+      const ensured = await adapter.ensureBot({ profileId: desired.profileId }); validateProfile(ensured.profileId, desired.profileId)
       const identity = await adapter.updateBotIdentity(desired.profileId, { displayName: desired.displayName, description: desired.description }); validateProfile(identity.profileId, desired.profileId)
       const projected = await adapter.updateBotSoul(desired.profileId, desired.soul); validateProfile(projected.profileId, desired.profileId)
       if (model.explicitlyConfigured) { const configured = await adapter.updateBotRuntimeConfig(desired.profileId, desired.runtime); validateProfile(configured.profileId, desired.profileId) }

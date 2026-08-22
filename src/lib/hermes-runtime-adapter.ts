@@ -10,7 +10,7 @@ export type HermesBotRoutine = { id: string; name: string; enabled: boolean }
 export type HermesBotSession = { id: string; status: string; updatedAt?: string | null }
 export type HermesBotCapability = { fingerprint: string; skillCount: number; botChatAvailable: boolean; routinesAvailable: boolean }
 export type HermesBotSpec = { profileId: string; projectKey: string; employeeKey: string; displayName: string; description: string; soul: { revision: number; hash: string; content: string }; runtime: { provider: string; modelId: string }; approvedSkills: string[] }
-export type HermesBotIdentitySpec = Pick<HermesBotSpec, 'profileId' | 'displayName'>
+export type HermesBotIdentitySpec = Pick<HermesBotSpec, 'profileId'>
 export type HermesBotMessageResult = { correlationId: string; profileId: string; result: string; sessionId?: string | null; completedAt: string }
 
 export type HermesExecutionRuntimeAdapter = {
@@ -73,10 +73,9 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   listBotRoutines: profileId => request(botPath(profileId, '/routines')),
   listBotSessions: profileId => request(botPath(profileId, '/sessions')),
   getBotCapabilityFingerprint: profileId => request(botPath(profileId, '/capabilities')),
-  ensureBot: spec => request('/bots/ensure', {
-    method: 'POST',
-    body: JSON.stringify({ profileId: spec.profileId, displayName: spec.displayName }),
-  }),
+  // M14B adopts the deterministic profile already provisioned and verified by M14A.
+  // A read through the typed Bot endpoint proves its existence without risking a duplicate.
+  ensureBot: spec => request(botPath(spec.profileId)),
   updateBotIdentity: (profileId, metadata) => request(botPath(profileId, '/identity'), { method: 'PUT', body: JSON.stringify(metadata) }),
   updateBotSoul: (profileId, soul) => request(botPath(profileId, '/soul'), { method: 'PUT', body: JSON.stringify(soul) }),
   updateBotRuntimeConfig: (profileId, configValue) => request(botPath(profileId, '/runtime'), { method: 'PUT', body: JSON.stringify(configValue) }),
