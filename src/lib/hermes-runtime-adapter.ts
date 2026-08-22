@@ -73,6 +73,10 @@ function adapterOperation(path: string) {
 }
 async function request<T>(path: string, init?: RequestInit): Promise<T> { const c = config(); const response = await fetch(`${c.base}${path}`, { ...init, headers: { ...c.headers, ...init?.headers }, cache: 'no-store' }); if (!response.ok) { const payload=await response.json().catch(()=>null) as null|Record<string,unknown>;const hint=safeAdapterErrorHint(payload);throw new Error(`HERMES_ADAPTER_${response.status}_${adapterOperation(path)}${hint?`_${hint}`:''}`) } return response.json() as Promise<T> }
 const botPath = (profileId: string, suffix = '') => `/bots/${encodeURIComponent(profileId)}${suffix}`
+function unwrap<T>(value: unknown, key: string): T {
+  if (value && typeof value === 'object' && !Array.isArray(value) && key in value) return (value as Record<string, T>)[key]
+  return value as T
+}
 
 export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   health: () => request('/health', { headers: {} }),
@@ -80,12 +84,12 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   dispatchExecution: input => request('/executions', { method: 'POST', body: JSON.stringify(input) }),
   getExecutionStatus: executionId => request(`/executions/${encodeURIComponent(executionId)}`),
   listBots: () => request('/bots'),
-  getBot: profileId => request(botPath(profileId)),
-  getBotRuntimeStatus: profileId => request(botPath(profileId, '/status')),
-  listBotSkills: profileId => request(botPath(profileId, '/skills')),
-  listBotRoutines: profileId => request(botPath(profileId, '/routines')),
-  listBotSessions: profileId => request(botPath(profileId, '/sessions')),
-  getBotCapabilityFingerprint: profileId => request(botPath(profileId, '/capability-fingerprint')),
+  getBot: async profileId => unwrap<HermesBot>(await request<unknown>(botPath(profileId)), 'bot'),
+  getBotRuntimeStatus: async profileId => unwrap<HermesBotRuntimeStatus>(await request<unknown>(botPath(profileId, '/status')), 'status'),
+  listBotSkills: async profileId => unwrap<HermesBotSkill[]>(await request<unknown>(botPath(profileId, '/skills')), 'skills'),
+  listBotRoutines: async profileId => unwrap<HermesBotRoutine[]>(await request<unknown>(botPath(profileId, '/routines')), 'routines'),
+  listBotSessions: async profileId => unwrap<HermesBotSession[]>(await request<unknown>(botPath(profileId, '/sessions')), 'sessions'),
+  getBotCapabilityFingerprint: async profileId => unwrap<HermesBotCapability>(await request<unknown>(botPath(profileId, '/capability-fingerprint')), 'capability'),
   // M14B adopts the deterministic profile already provisioned and verified by M14A.
   // A read through the typed Bot endpoint proves its existence without risking a duplicate.
   ensureBot: spec => request(botPath(spec.profileId)),
