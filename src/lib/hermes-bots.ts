@@ -9,6 +9,11 @@ import { prisma } from '@/lib/prisma'
 const operateRoles = new Set<ProjectRole>(['OWNER', 'ADMIN', 'OPERATOR'])
 const administerRoles = new Set<ProjectRole>(['OWNER', 'ADMIN'])
 const systemIdentity = (profileId: string) => `hermes:${profileId}`
+const provisionableHermesSkillIds = new Set(['one-three-one-rule'])
+
+export function isProvisionableHermesSkillId(value: string) {
+  return provisionableHermesSkillIds.has(value)
+}
 
 export class HermesBotError extends Error {
   constructor(public readonly code: string) { super(code); this.name = 'HermesBotError' }
@@ -79,6 +84,10 @@ export function compileHermesBotDesiredState(loaded: LoadedAssignment): HermesBo
   if (loaded.runtimeAssignment.profileKey !== profileId) throw new HermesBotError('INVALID_RUNTIME_IDENTITY')
   const projectedSoul = compileHermesSoul({ employee: loaded.assignment.employee, assignment: loaded.assignment, project: loaded.assignment.project })
   const model = approvedRuntimeConfig()
+  const approvedSkills = loaded.assignment.skillAssignments.map(assignment => {
+    if (assignment.skill.sourceType !== 'SYSTEM' || !isProvisionableHermesSkillId(assignment.skill.sourceIdentifier)) throw new HermesBotError('UNAPPROVED_RUNTIME_SKILL')
+    return assignment.skill.sourceIdentifier
+  })
   return {
     profileId,
     projectKey: `rogeros-${runtimeSlug(loaded.assignment.project.slug)}`,
@@ -87,7 +96,7 @@ export function compileHermesBotDesiredState(loaded: LoadedAssignment): HermesBo
     description: loaded.assignment.employee.description || `${loaded.assignment.employee.role} assigned to ${loaded.assignment.project.name}`,
     soul: { revision: loaded.runtimeAssignment.desiredSoulRevision, hash: projectedSoul.hash, content: projectedSoul.content },
     runtime: { provider: model.provider, modelId: model.modelId },
-    approvedSkills: loaded.assignment.skillAssignments.map(assignment => assignment.skill.sourceIdentifier),
+    approvedSkills,
   }
 }
 
@@ -168,6 +177,11 @@ export async function reconcileHermesBotAssignment(context: ProjectContext, empl
         await audit(context, member.id, 'runtime.bot.config.updated', current.id, 'Hermes Bot model policy synchronized', { profileId: desired.profileId, provider: desired.runtime.provider, modelId: desired.runtime.modelId })
       }
       if (current.desiredSkillRevision > 0) {
+        for (const skillId of desired.approvedSkills) {
+          const provisioned = await adapter.provisionBotSkill(desired.profileId, skillId)
+          if (provisioned.skillId !== skillId || typeof provisioned.provisioned !== 'boolean') throw new HermesBotError('ADAPTER_MALFORMED_SKILL_PROVISION_RESPONSE')
+          await audit(context, member.id, 'runtime.bot.skill.provisioned', current.id, 'Trusted Hermes skill source ensured', { profileId: desired.profileId, skillId, provisioned: provisioned.provisioned, idempotent: provisioned.idempotent === true })
+        }
         const reconciledSkills = await adapter.reconcileBotSkills(desired.profileId, desired.approvedSkills)
         await audit(context, member.id, 'runtime.bot.skills.reconciled', current.id, 'Hermes Bot approved skills synchronized', { profileId: desired.profileId, skillCount: reconciledSkills.length, skillRevision: current.desiredSkillRevision })
       }

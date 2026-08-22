@@ -1,7 +1,7 @@
 import { AuditActorType, EmployeeSkillAssignmentState, HermesReconciliationState, ProjectRole } from '@prisma/client'
 
 import { recordAuditEvent } from '@/lib/audit'
-import { reconcileHermesBotAssignment } from '@/lib/hermes-bots'
+import { isProvisionableHermesSkillId, reconcileHermesBotAssignment } from '@/lib/hermes-bots'
 import { hermesRuntimeAdapter, type HermesRuntimeAdapter } from '@/lib/hermes-runtime-adapter'
 import type { ProjectContext } from '@/lib/project-context'
 import { prisma } from '@/lib/prisma'
@@ -48,13 +48,13 @@ export async function listAvailableSkills(context: ProjectContext, employeeProje
     const employee = await employeeAssignment(context, employeeProjectAssignmentId)
     installed = observedSkillKeys(employee.runtimeAssignments.find(runtime => runtime.active)?.externalRuntimeMetadata)
   }
-  return skills.map(({ sourceIdentifier, ...skill }) => ({ ...skill, assignable: installed ? installed.has(sourceIdentifier) : undefined }))
+  return skills.map(({ sourceIdentifier, ...skill }) => ({ ...skill, assignable: installed ? installed.has(sourceIdentifier) || isProvisionableHermesSkillId(sourceIdentifier) : undefined }))
 }
 
 export async function getSkill(context: ProjectContext, skillId: string) {
   void context
   const skill = await prisma.skill.findFirst({ where: { id: skillId, trustStatus: 'TRUSTED', isEnabled: true } })
-  if (!skill || skill.sourceType !== 'SYSTEM' || !safeRuntimeSkill.test(skill.sourceIdentifier)) throw new SkillLibraryError('SKILL_NOT_AVAILABLE')
+  if (!skill || skill.sourceType !== 'SYSTEM' || !safeRuntimeSkill.test(skill.sourceIdentifier) || !isProvisionableHermesSkillId(skill.sourceIdentifier)) throw new SkillLibraryError('SKILL_NOT_AVAILABLE')
   return skill
 }
 
@@ -81,7 +81,6 @@ async function reconcileSkillChange(context: ProjectContext, memberId: string, a
 export async function assignSkill(context: ProjectContext, employeeProjectAssignmentId: string, skillId: string, adapter: HermesRuntimeAdapter = hermesRuntimeAdapter) {
   if (!administerRoles.has(context.project.role)) throw new SkillLibraryError('FORBIDDEN')
   const [member, employee, skill] = await Promise.all([actor(context), employeeAssignment(context, employeeProjectAssignmentId), getSkill(context, skillId)])
-  if (!observedSkillKeys(employee.runtimeAssignments.find(runtime => runtime.active)?.externalRuntimeMetadata).has(skill.sourceIdentifier)) throw new SkillLibraryError('SKILL_NOT_INSTALLED')
   const existing = await prisma.employeeSkillAssignment.findUnique({ where: { employeeProjectAssignmentId_skillId: { employeeProjectAssignmentId, skillId } } })
   if (existing?.state === EmployeeSkillAssignmentState.ACTIVE) return prisma.employeeSkillAssignment.findUniqueOrThrow({ where: { id: existing.id }, include: { skill: true } })
   const assignment = await prisma.$transaction(async tx => {

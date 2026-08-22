@@ -6,6 +6,7 @@ export type HermesBotState = 'ACTIVE' | 'SUSPENDED'
 export type HermesBot = { profileId: string; displayName: string; description?: string | null; state: HermesBotState; soulHash?: string | null; modelProvider?: string | null; modelId?: string | null }
 export type HermesBotRuntimeStatus = { profileId: string; assignmentState?: HermesBotState; runtime?: string; state?: HermesBotState; healthy?: boolean; hermesVersion?: string; botModeAvailable?: boolean; botChatAvailable?: boolean; skillsAvailable?: boolean; routinesAvailable?: boolean }
 export type HermesBotSkill = { key: string; name: string; bundled?: boolean }
+export type HermesBotSkillProvision = { skillId: string; provisioned: boolean; idempotent?: boolean }
 export type HermesBotRoutine = { id: string; name: string; enabled: boolean }
 export type HermesBotSession = { id: string; status: string; updatedAt?: string | null }
 export type HermesBotCapability = { fingerprint?: string; capabilityFingerprint?: string; skillCount?: number; botChatAvailable?: boolean; routinesAvailable?: boolean }
@@ -33,6 +34,7 @@ export type HermesRuntimeAdapter = HermesExecutionRuntimeAdapter & {
   updateBotIdentity: (profileId: string, metadata: { displayName: string; description: string }) => Promise<HermesBot>
   updateBotSoul: (profileId: string, soul: { revision: number; content: string }) => Promise<HermesBot>
   updateBotRuntimeConfig: (profileId: string, config: { provider: string; modelId: string }) => Promise<HermesBot>
+  provisionBotSkill: (profileId: string, skillId: string) => Promise<HermesBotSkillProvision>
   reconcileBotSkills: (profileId: string, approvedSkills: string[]) => Promise<HermesBotSkill[]>
   suspendBotAssignment: (profileId: string) => Promise<{ profileId: string; state: 'SUSPENDED' }>
   resumeBotAssignment: (profileId: string) => Promise<{ profileId: string; state: 'ACTIVE' }>
@@ -64,6 +66,7 @@ function adapterOperation(path: string) {
   if (path.endsWith('/soul')) return 'SOUL'
   if (path.endsWith('/runtime')) return 'RUNTIME'
   if (path.endsWith('/skills')) return 'SKILLS'
+  if (path.endsWith('/skills/provision')) return 'SKILL_PROVISION'
   if (path.endsWith('/capability-fingerprint')) return 'CAPABILITIES'
   if (path.endsWith('/status')) return 'STATUS'
   if (path.endsWith('/routines')) return 'ROUTINES'
@@ -87,6 +90,17 @@ function unwrapList<T>(value: unknown, key: string): T[] {
     if (arrays.length === 1) return arrays[0] as T[]
   }
   return value as T[]
+}
+function unwrapSkillList(value: unknown): HermesBotSkill[] {
+  const items = unwrapList<unknown>(value, 'skills')
+  return items.flatMap(item => {
+    if (typeof item === 'string') return [{ key: item, name: item, bundled: false }]
+    if (!item || typeof item !== 'object') return []
+    const record = item as Record<string, unknown>
+    const key = typeof record.key === 'string' ? record.key : typeof record.skillId === 'string' ? record.skillId : null
+    if (!key) return []
+    return [{ key, name: typeof record.name === 'string' ? record.name : key, bundled: record.bundled === true }]
+  })
 }
 function unwrapRoutineList(value: unknown): HermesBotRoutine[] {
   const structured = unwrapList<HermesBotRoutine>(value, 'routines')
@@ -124,7 +138,7 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   listBots: () => request('/bots'),
   getBot: async profileId => unwrap<HermesBot>(await request<unknown>(botPath(profileId)), 'bot'),
   getBotRuntimeStatus: async profileId => unwrap<HermesBotRuntimeStatus>(await request<unknown>(botPath(profileId, '/status')), 'status'),
-  listBotSkills: async profileId => unwrapList<HermesBotSkill>(await request<unknown>(botPath(profileId, '/skills')), 'skills'),
+  listBotSkills: async profileId => unwrapSkillList(await request<unknown>(botPath(profileId, '/skills'))),
   listBotRoutines: async profileId => unwrapRoutineList(await request<unknown>(botPath(profileId, '/routines'))),
   listBotSessions: async profileId => unwrapList<HermesBotSession>(await request<unknown>(botPath(profileId, '/sessions')), 'sessions'),
   getBotCapabilityFingerprint: async profileId => unwrap<HermesBotCapability>(await request<unknown>(botPath(profileId, '/capability-fingerprint')), 'capability'),
@@ -134,7 +148,8 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   updateBotIdentity: (profileId, metadata) => request(botPath(profileId, '/identity'), { method: 'PUT', body: JSON.stringify(metadata) }),
   updateBotSoul: (profileId, soul) => request(botPath(profileId, '/soul'), { method: 'PUT', body: JSON.stringify({ revision: String(soul.revision), content: soul.content }) }),
   updateBotRuntimeConfig: (profileId, configValue) => request(botPath(profileId, '/runtime'), { method: 'PUT', body: JSON.stringify(configValue) }),
-  reconcileBotSkills: (profileId, approvedSkills) => request(botPath(profileId, '/skills'), { method: 'PUT', body: JSON.stringify({ approvedSkills }) }),
+  provisionBotSkill: (profileId, skillId) => request(botPath(profileId, '/skills/provision'), { method: 'POST', body: JSON.stringify({ skillId }) }),
+  reconcileBotSkills: async (profileId, approvedSkills) => unwrapSkillList(await request<unknown>(botPath(profileId, '/skills'), { method: 'PUT', body: JSON.stringify({ approvedSkills }) })),
   suspendBotAssignment: profileId => request(botPath(profileId, '/suspend'), { method: 'POST' }),
   resumeBotAssignment: profileId => request(botPath(profileId, '/resume'), { method: 'POST' }),
   sendBotMessage: async (profileId, message, correlationId) => normalizeHermesBotMessageResult(await request<RawHermesBotMessageResult>(botPath(profileId, '/messages'), { method: 'POST', body: JSON.stringify({ message, correlationId }) })),

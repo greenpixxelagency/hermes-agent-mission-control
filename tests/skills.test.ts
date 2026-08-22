@@ -15,6 +15,7 @@ function adapterHarness() {
   let bot: HermesBot | null = null
   let observed: HermesBotSkill[] = [{ key: 'bundled-core', name: 'Bundled core', bundled: true }]
   let reconcileCalls = 0
+  const provisioned: string[] = []
   const desired: string[][] = []
   const adapter: HermesRuntimeAdapter = {
     health: async()=>({adapter:'m15-test',hermesReachable:true,hermesVersion:'0.20.5',runtimeIdentity:'isolated-test',timestamp}),
@@ -22,9 +23,10 @@ function adapterHarness() {
     listBots:async()=>bot?[bot]:[], getBot:async profileId=>bot??{profileId,displayName:profileId,state:'ACTIVE'}, getBotRuntimeStatus:async profileId=>({profileId,assignmentState:'ACTIVE',healthy:true,skillsAvailable:true,botChatAvailable:true}),
     listBotSkills:async()=>observed, listBotRoutines:async()=>[], listBotSessions:async()=>[], getBotCapabilityFingerprint:async()=>({fingerprint:`m15-${reconcileCalls}`,skillCount:observed.length,botChatAvailable:true,routinesAvailable:true}),
     ensureBot:async(spec:HermesBotIdentitySpec)=>{bot={profileId:spec.profileId,displayName:spec.profileId,state:'ACTIVE'};return bot}, updateBotIdentity:async(profileId,metadata)=>({profileId,state:'ACTIVE',...metadata}), updateBotSoul:async profileId=>({profileId,displayName:profileId,state:'ACTIVE'}), updateBotRuntimeConfig:async(profileId,config)=>({profileId,displayName:profileId,state:'ACTIVE',modelProvider:config.provider,modelId:config.modelId}),
+    provisionBotSkill:async(_profileId,skillId)=>{const first=!provisioned.includes(skillId);if(first)provisioned.push(skillId);return{skillId,provisioned:first,idempotent:!first}},
     reconcileBotSkills:async(_profileId,approvedSkills)=>{reconcileCalls+=1;desired.push([...approvedSkills]);observed=[{key:'bundled-core',name:'Bundled core',bundled:true},...approvedSkills.map(key=>({key,name:key,bundled:false}))];return observed}, suspendBotAssignment:async profileId=>({profileId,state:'SUSPENDED'}),resumeBotAssignment:async profileId=>({profileId,state:'ACTIVE'}),sendBotMessage:async(profileId,_message,correlationId)=>({profileId,correlationId,result:'ROGEROS_M15_SKILL_OK',completedAt:timestamp}),
   }
-  return {adapter,desired,observed:()=>observed,reconcileCalls:()=>reconcileCalls}
+  return {adapter,desired,observed:()=>observed,reconcileCalls:()=>reconcileCalls,provisioned}
 }
 
 test('M15 governs trusted employee skills, isolation, reconciliation, removal, and audit', async t => {
@@ -38,16 +40,16 @@ test('M15 governs trusted employee skills, isolation, reconciliation, removal, a
   const [vhalamEmployee,buddhajiEmployee]=await Promise.all([vhalam,buddhaji].map(project=>prisma.employeeProjectAssignment.create({data:{employeeId:employee.id,projectId:project.id}})))
   const runtime=await prisma.hermesRuntime.create({data:{key:`runtime-${suffix}`,name:'M15 isolated runtime'}})
   const runtimeAssignment=await prisma.hermesRuntimeAssignment.create({data:{projectId:vhalam.id,runtimeId:runtime.id,employeeProjectAssignmentId:vhalamEmployee.id,profileKey:botProfileId(vhalam.slug,employee.systemKey!)}})
-  const trusted=await prisma.skill.create({data:{slug:`grounded-${suffix}`,name:'Grounded Research',description:'Safe cited research.',category:'Research',sourceIdentifier:`grounded-${suffix}`}})
+  const trusted=await prisma.skill.findUniqueOrThrow({where:{sourceIdentifier:'one-three-one-rule'}})
   const untrusted=await prisma.skill.create({data:{slug:`untrusted-${suffix}`,name:'Untrusted',description:'Denied.',category:'Test',sourceIdentifier:`untrusted-${suffix}`,trustStatus:'UNTRUSTED'}})
   const disabled=await prisma.skill.create({data:{slug:`disabled-${suffix}`,name:'Disabled',description:'Denied.',category:'Test',sourceIdentifier:`disabled-${suffix}`,isEnabled:false}})
   const unsafe=await prisma.skill.create({data:{slug:`unsafe-${suffix}`,name:'Unsafe path',description:'Denied.',category:'Test',sourceIdentifier:'../arbitrary-skill'}})
-  await prisma.hermesRuntimeAssignment.update({where:{id:runtimeAssignment.id},data:{externalRuntimeMetadata:{skills:[{key:trusted.sourceIdentifier,name:trusted.name,bundled:true}]}}})
+  await prisma.hermesRuntimeAssignment.update({where:{id:runtimeAssignment.id},data:{externalRuntimeMetadata:{skills:[{key:'bundled-core',name:'Bundled core',bundled:true}]}}})
   const context=(index:number,project=vhalam)=>({user:{id:users[index].id,email:users[index].email!},organization:{id:organization.id,name:organization.name,slug:organization.slug,role:(index?'OPERATOR':'OWNER') as OrganizationRole},project:{id:project.id,name:project.name,slug:project.slug,role:(index?'OPERATOR':'OWNER') as ProjectRole}})
   const harness=adapterHarness()
   t.after(async()=>{
     await prisma.organization.delete({where:{id:organization.id}})
-    await prisma.skill.deleteMany({where:{id:{in:[trusted.id,untrusted.id,disabled.id,unsafe.id]}}})
+    await prisma.skill.deleteMany({where:{id:{in:[untrusted.id,disabled.id,unsafe.id]}}})
     await prisma.hermesRuntime.delete({where:{id:runtime.id}})
     await prisma.employee.delete({where:{id:employee.id}})
     await prisma.user.deleteMany({where:{id:{in:users.map(user=>user.id)}}})
@@ -55,6 +57,7 @@ test('M15 governs trusted employee skills, isolation, reconciliation, removal, a
   })
 
   assert.equal((await listAvailableSkills(context(0))).some(skill=>skill.id===trusted.id),true)
+  assert.equal((await listAvailableSkills(context(0),vhalamEmployee.id)).find(skill=>skill.id===trusted.id)?.assignable,true)
   assert.equal((await listAvailableSkills(context(0))).some(skill=>skill.id===untrusted.id||skill.id===disabled.id),false)
   await assert.rejects(assignSkill(context(1),vhalamEmployee.id,trusted.id,harness.adapter),error=>hasCode(error,'FORBIDDEN'))
   await assert.rejects(assignSkill(context(0),vhalamEmployee.id,'unknown-skill',harness.adapter),error=>hasCode(error,'SKILL_NOT_AVAILABLE'))
@@ -65,6 +68,7 @@ test('M15 governs trusted employee skills, isolation, reconciliation, removal, a
 
   const assigned=await assignSkill(context(0),vhalamEmployee.id,trusted.id,harness.adapter)
   assert.equal(assigned.state,'ACTIVE');assert.equal(assigned.reconciliationStatus,'IN_SYNC')
+  assert.deepEqual(harness.provisioned,[trusted.sourceIdentifier])
   assert.deepEqual(harness.desired.at(-1),[trusted.sourceIdentifier])
   assert.equal(harness.observed().some(skill=>skill.key==='bundled-core'&&skill.bundled),true)
   assert.equal((await listEmployeeSkills(context(0),vhalamEmployee.id)).length,1)
