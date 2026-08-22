@@ -37,11 +37,12 @@ test('M15 governs trusted employee skills, isolation, reconciliation, removal, a
   const employee=await prisma.employee.create({data:{systemKey:`chief-${suffix}`,name:'Chief of Staff',role:'Chief of Staff',type:'SYSTEM'}})
   const [vhalamEmployee,buddhajiEmployee]=await Promise.all([vhalam,buddhaji].map(project=>prisma.employeeProjectAssignment.create({data:{employeeId:employee.id,projectId:project.id}})))
   const runtime=await prisma.hermesRuntime.create({data:{key:`runtime-${suffix}`,name:'M15 isolated runtime'}})
-  await prisma.hermesRuntimeAssignment.create({data:{projectId:vhalam.id,runtimeId:runtime.id,employeeProjectAssignmentId:vhalamEmployee.id,profileKey:botProfileId(vhalam.slug,employee.systemKey!)}})
+  const runtimeAssignment=await prisma.hermesRuntimeAssignment.create({data:{projectId:vhalam.id,runtimeId:runtime.id,employeeProjectAssignmentId:vhalamEmployee.id,profileKey:botProfileId(vhalam.slug,employee.systemKey!)}})
   const trusted=await prisma.skill.create({data:{slug:`grounded-${suffix}`,name:'Grounded Research',description:'Safe cited research.',category:'Research',sourceIdentifier:`grounded-${suffix}`}})
   const untrusted=await prisma.skill.create({data:{slug:`untrusted-${suffix}`,name:'Untrusted',description:'Denied.',category:'Test',sourceIdentifier:`untrusted-${suffix}`,trustStatus:'UNTRUSTED'}})
   const disabled=await prisma.skill.create({data:{slug:`disabled-${suffix}`,name:'Disabled',description:'Denied.',category:'Test',sourceIdentifier:`disabled-${suffix}`,isEnabled:false}})
   const unsafe=await prisma.skill.create({data:{slug:`unsafe-${suffix}`,name:'Unsafe path',description:'Denied.',category:'Test',sourceIdentifier:'../arbitrary-skill'}})
+  await prisma.hermesRuntimeAssignment.update({where:{id:runtimeAssignment.id},data:{externalRuntimeMetadata:{skills:[{key:trusted.sourceIdentifier,name:trusted.name,bundled:true}]}}})
   const context=(index:number,project=vhalam)=>({user:{id:users[index].id,email:users[index].email!},organization:{id:organization.id,name:organization.name,slug:organization.slug,role:(index?'OPERATOR':'OWNER') as OrganizationRole},project:{id:project.id,name:project.name,slug:project.slug,role:(index?'OPERATOR':'OWNER') as ProjectRole}})
   const harness=adapterHarness()
   t.after(async()=>{

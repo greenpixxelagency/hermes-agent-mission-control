@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     const context = await requireProjectContextForRequest(request)
     const employeeProjectAssignmentId = new URL(request.url).searchParams.get('employeeProjectAssignmentId')
     return NextResponse.json({
-      skills: await listAvailableSkills(context),
+      skills: await listAvailableSkills(context, employeeProjectAssignmentId ?? undefined),
       assignments: employeeProjectAssignmentId ? await listEmployeeSkills(context, employeeProjectAssignmentId) : [],
     })
   } catch (error) { return errorResponse(error) }

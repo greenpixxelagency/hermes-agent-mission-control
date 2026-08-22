@@ -30,12 +30,25 @@ async function employeeAssignment(context: ProjectContext, id: string) {
   return assignment
 }
 
-export async function listAvailableSkills(context: ProjectContext) {
-  return prisma.skill.findMany({
+function observedSkillKeys(metadata: unknown) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return new Set<string>()
+  const skills = (metadata as { skills?: unknown }).skills
+  if (!Array.isArray(skills)) return new Set<string>()
+  return new Set(skills.flatMap(skill => skill && typeof skill === 'object' && typeof (skill as { key?: unknown }).key === 'string' ? [(skill as { key: string }).key] : []))
+}
+
+export async function listAvailableSkills(context: ProjectContext, employeeProjectAssignmentId?: string) {
+  const skills = await prisma.skill.findMany({
     where: { trustStatus: 'TRUSTED', isEnabled: true },
-    select: { id: true, slug: true, name: true, description: true, category: true, version: true, sourceType: true, trustStatus: true, isEnabled: true, updatedAt: true, assignments: { where: { projectId: context.project.id, state: 'ACTIVE' }, select: { id: true, employeeProjectAssignmentId: true } } },
+    select: { id: true, slug: true, name: true, description: true, category: true, version: true, sourceType: true, sourceIdentifier: true, trustStatus: true, isEnabled: true, updatedAt: true, assignments: { where: { projectId: context.project.id, state: 'ACTIVE' }, select: { id: true, employeeProjectAssignmentId: true } } },
     orderBy: [{ category: 'asc' }, { name: 'asc' }],
   })
+  let installed: Set<string> | null = null
+  if (employeeProjectAssignmentId) {
+    const employee = await employeeAssignment(context, employeeProjectAssignmentId)
+    installed = observedSkillKeys(employee.runtimeAssignments.find(runtime => runtime.active)?.externalRuntimeMetadata)
+  }
+  return skills.map(({ sourceIdentifier, ...skill }) => ({ ...skill, assignable: installed ? installed.has(sourceIdentifier) : undefined }))
 }
 
 export async function getSkill(context: ProjectContext, skillId: string) {
@@ -68,6 +81,7 @@ async function reconcileSkillChange(context: ProjectContext, memberId: string, a
 export async function assignSkill(context: ProjectContext, employeeProjectAssignmentId: string, skillId: string, adapter: HermesRuntimeAdapter = hermesRuntimeAdapter) {
   if (!administerRoles.has(context.project.role)) throw new SkillLibraryError('FORBIDDEN')
   const [member, employee, skill] = await Promise.all([actor(context), employeeAssignment(context, employeeProjectAssignmentId), getSkill(context, skillId)])
+  if (!observedSkillKeys(employee.runtimeAssignments.find(runtime => runtime.active)?.externalRuntimeMetadata).has(skill.sourceIdentifier)) throw new SkillLibraryError('SKILL_NOT_INSTALLED')
   const existing = await prisma.employeeSkillAssignment.findUnique({ where: { employeeProjectAssignmentId_skillId: { employeeProjectAssignmentId, skillId } } })
   if (existing?.state === EmployeeSkillAssignmentState.ACTIVE) return prisma.employeeSkillAssignment.findUniqueOrThrow({ where: { id: existing.id }, include: { skill: true } })
   const assignment = await prisma.$transaction(async tx => {
