@@ -100,6 +100,14 @@ function validateProfile(actual: string, expected: string) {
   if (!actual || actual !== expected) throw new HermesBotError('ADAPTER_MALFORMED_RESPONSE')
 }
 
+function safeResponseShape(value: unknown) {
+  if (!value || typeof value !== 'object') return typeof value
+  return Object.entries(value).map(([key, field]) => {
+    const safeKey = /^[a-zA-Z][a-zA-Z0-9]{0,40}$/.test(key) ? key : 'field'
+    return `${safeKey}_${Array.isArray(field) ? 'array' : field === null ? 'null' : typeof field}`
+  }).join('_').slice(0, 180)
+}
+
 function adapterFailure(error: unknown) {
   if (error instanceof HermesBotError) return error
   if (error instanceof Error && /^HERMES_ADAPTER_\d{3}(?:_[a-zA-Z0-9_]{1,200})?$/.test(error.message)) return new HermesBotError(error.message)
@@ -134,7 +142,7 @@ export async function reconcileHermesBotAssignment(context: ProjectContext, empl
     if (!status?.profileId) throw new HermesBotError('ADAPTER_MALFORMED_STATUS_RESPONSE')
     validateProfile(bot.profileId, desired.profileId); validateProfile(status.profileId, desired.profileId)
     if (!Array.isArray(skills)) throw new HermesBotError('ADAPTER_MALFORMED_SKILLS_RESPONSE')
-    if (!Array.isArray(routines)) throw new HermesBotError('ADAPTER_MALFORMED_ROUTINES_RESPONSE')
+    if (!Array.isArray(routines)) throw new HermesBotError(`ADAPTER_MALFORMED_ROUTINES_RESPONSE_${safeResponseShape(routines)}`)
     if (!Array.isArray(sessions)) throw new HermesBotError('ADAPTER_MALFORMED_SESSIONS_RESPONSE')
     const capabilityFingerprint = capability?.fingerprint || capability?.capabilityFingerprint
     if (!capabilityFingerprint) throw new HermesBotError('ADAPTER_MALFORMED_CAPABILITY_RESPONSE')
