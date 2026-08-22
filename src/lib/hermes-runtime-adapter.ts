@@ -87,6 +87,21 @@ function unwrapList<T>(value: unknown, key: string): T[] {
   }
   return value as T[]
 }
+function unwrapRoutineList(value: unknown): HermesBotRoutine[] {
+  const structured = unwrapList<HermesBotRoutine>(value, 'routines')
+  if (Array.isArray(structured)) return structured
+  if (value && typeof value === 'object' && typeof (value as Record<string, unknown>).output === 'string') {
+    const output = (value as Record<string, string>).output.trim()
+    if (!output) return []
+    try {
+      const parsed = JSON.parse(output) as unknown
+      const parsedList = unwrapList<HermesBotRoutine>(parsed, 'routines')
+      if (Array.isArray(parsedList)) return parsedList
+    } catch { /* The adapter may expose human-readable CLI output only. */ }
+    return []
+  }
+  return structured
+}
 
 export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   health: () => request('/health', { headers: {} }),
@@ -97,7 +112,7 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   getBot: async profileId => unwrap<HermesBot>(await request<unknown>(botPath(profileId)), 'bot'),
   getBotRuntimeStatus: async profileId => unwrap<HermesBotRuntimeStatus>(await request<unknown>(botPath(profileId, '/status')), 'status'),
   listBotSkills: async profileId => unwrapList<HermesBotSkill>(await request<unknown>(botPath(profileId, '/skills')), 'skills'),
-  listBotRoutines: async profileId => unwrapList<HermesBotRoutine>(await request<unknown>(botPath(profileId, '/routines')), 'routines'),
+  listBotRoutines: async profileId => unwrapRoutineList(await request<unknown>(botPath(profileId, '/routines'))),
   listBotSessions: async profileId => unwrapList<HermesBotSession>(await request<unknown>(botPath(profileId, '/sessions')), 'sessions'),
   getBotCapabilityFingerprint: async profileId => unwrap<HermesBotCapability>(await request<unknown>(botPath(profileId, '/capability-fingerprint')), 'capability'),
   // M14B adopts the deterministic profile already provisioned and verified by M14A.
