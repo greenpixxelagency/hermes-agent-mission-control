@@ -130,10 +130,14 @@ export async function reconcileHermesBotAssignment(context: ProjectContext, empl
     const [bot, status, skills, routines, sessions, capability] = await Promise.all([
       adapter.getBot(desired.profileId), adapter.getBotRuntimeStatus(desired.profileId), adapter.listBotSkills(desired.profileId), adapter.listBotRoutines(desired.profileId), adapter.listBotSessions(desired.profileId), adapter.getBotCapabilityFingerprint(desired.profileId),
     ])
+    if (!bot?.profileId) throw new HermesBotError('ADAPTER_MALFORMED_BOT_RESPONSE')
+    if (!status?.profileId) throw new HermesBotError('ADAPTER_MALFORMED_STATUS_RESPONSE')
     validateProfile(bot.profileId, desired.profileId); validateProfile(status.profileId, desired.profileId)
-    if (!Array.isArray(skills) || !Array.isArray(routines) || !Array.isArray(sessions)) throw new HermesBotError('ADAPTER_MALFORMED_RESPONSE')
+    if (!Array.isArray(skills)) throw new HermesBotError('ADAPTER_MALFORMED_SKILLS_RESPONSE')
+    if (!Array.isArray(routines)) throw new HermesBotError('ADAPTER_MALFORMED_ROUTINES_RESPONSE')
+    if (!Array.isArray(sessions)) throw new HermesBotError('ADAPTER_MALFORMED_SESSIONS_RESPONSE')
     const capabilityFingerprint = capability?.fingerprint || capability?.capabilityFingerprint
-    if (!capabilityFingerprint) throw new HermesBotError('ADAPTER_MALFORMED_RESPONSE')
+    if (!capabilityFingerprint) throw new HermesBotError('ADAPTER_MALFORMED_CAPABILITY_RESPONSE')
     const saved = await prisma.hermesRuntimeAssignment.update({ where: { id: current.id }, data: {
       runtimeKind: HermesRuntimeKind.HERMES_BOT, provisioningState: 'READY', reconciliationState: 'IN_SYNC', assignmentState: status.state, active: status.state === 'ACTIVE',
       desiredDisplayName: desired.displayName, desiredDescription: desired.description, desiredSoulHash: desired.soul.hash, desiredModelProvider: desired.runtime.provider, desiredModelId: desired.runtime.modelId,
