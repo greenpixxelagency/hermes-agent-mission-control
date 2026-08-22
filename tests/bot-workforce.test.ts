@@ -4,6 +4,7 @@ import { OrganizationRole, PrismaClient, ProjectRole } from '@prisma/client'
 
 import {
   botProfileId,
+  compileHermesSoul,
   reconcileHermesBotAssignment,
   runtimeSlug,
   sendHermesBotMessage,
@@ -95,6 +96,9 @@ test('M14B provisions deterministic project-scoped bots and enforces runtime aut
   })
 
   assert.equal(runtimeSlug(' ../Chief of Staff '), 'chief-of-staff')
+  const soul = compileHermesSoul({ employee: { name: 'Chief of Staff', role: 'Chief of Staff', description: 'Coordinates approved project work.', soulSummary: null }, assignment: { roleOverride: null }, project: { name: 'Vhalam', slug: 'vhalam' } })
+  assert.equal(soul.content.startsWith('# SOUL\n'), true)
+  assert.equal(/oauth|bearer|password|api[_ -]?key|credential|token|secret/i.test(soul.content), false)
   assert.equal(vhalamProfile.startsWith(`rogeros-${vhalam.slug}-`), true)
   assert.notEqual(vhalamProfile, buddhajiProfile)
   assert.equal(safeAdapterErrorHint({ code: 'MISSING_FIELD', field: 'projectKey', message: 'must not be exposed' }), 'MISSING_FIELD_projectKey')

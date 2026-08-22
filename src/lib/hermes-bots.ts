@@ -32,15 +32,24 @@ function approvedRuntimeConfig() {
   }
 }
 
-function soul(input: { employee: { name: string; role: string; description: string | null; soulSummary: string | null }; assignment: { roleOverride: string | null }; project: { name: string; slug: string } }) {
+export function compileHermesSoul(input: { employee: { name: string; role: string; description: string | null; soulSummary: string | null }; assignment: { roleOverride: string | null }; project: { name: string; slug: string } }) {
   const role = input.assignment.roleOverride || input.employee.role
   const content = [
-    `You are ${input.employee.name}, serving as ${role} for the RogerOS project ${input.project.name}.`,
+    '# SOUL',
+    '',
+    '## Identity',
+    `Name: ${input.employee.name}`,
+    `Role: ${role}`,
+    `Project: ${input.project.name}`,
+    '',
+    '## Mission',
     input.employee.description || input.employee.soulSummary || `Focus on the responsibilities of ${role}.`,
-    'Work only within the project context explicitly supplied by RogerOS.',
-    'Do not override RogerOS permissions, policies, approvals, or business records.',
-    'Escalate uncertainty and consequential actions to the authorized RogerOS operator.',
-  ].join('\n\n')
+    '',
+    '## Operating principles',
+    '- Work only within the project context supplied by RogerOS.',
+    '- Treat RogerOS permissions, policies, approvals, and business records as authoritative.',
+    '- Escalate uncertainty and consequential actions to the authorized RogerOS operator.',
+  ].join('\n')
   return { content, hash: createHash('sha256').update(content).digest('hex') }
 }
 
@@ -63,7 +72,7 @@ function expectedProfile(loaded: LoadedAssignment) {
 export function compileHermesBotDesiredState(loaded: LoadedAssignment): HermesBotSpec {
   const profileId = expectedProfile(loaded)
   if (loaded.runtimeAssignment.profileKey !== profileId) throw new HermesBotError('INVALID_RUNTIME_IDENTITY')
-  const projectedSoul = soul({ employee: loaded.assignment.employee, assignment: loaded.assignment, project: loaded.assignment.project })
+  const projectedSoul = compileHermesSoul({ employee: loaded.assignment.employee, assignment: loaded.assignment, project: loaded.assignment.project })
   const model = approvedRuntimeConfig()
   return {
     profileId,
