@@ -79,6 +79,8 @@ test('M14B normalizes the deployed Bot Chat output envelope', () => {
   assert.equal(normalized.result, 'ROGEROS_M14B_BOT_CHAT_OK')
   assert.equal(normalized.profileId, 'rogeros-vhalam-chief')
   assert.equal(normalized.correlationId, 'safe-correlation')
+  const cliOutput = normalizeHermesBotMessageResult({ profileId: 'rogeros-vhalam-chief', correlationId: 'safe-correlation', output: '┌─ Reasoning ─────┐\nInternal model reasoning.\n\nROGEROS_M14B_BOT_CHAT_OK' })
+  assert.equal(cliOutput.result, 'ROGEROS_M14B_BOT_CHAT_OK')
 })
 
 test('M14B provisions deterministic project-scoped bots and enforces runtime authorization', async t => {

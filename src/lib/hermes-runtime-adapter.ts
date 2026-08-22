@@ -104,10 +104,13 @@ function unwrapRoutineList(value: unknown): HermesBotRoutine[] {
   return structured
 }
 export function normalizeHermesBotMessageResult(value: RawHermesBotMessageResult): HermesBotMessageResult {
+  const rawResult = (value.result || value.output || '').replace(/\x1b\[[0-9;]*m/g, '').trim()
+  const lines = rawResult.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+  const result = lines[0]?.startsWith('┌─ Reasoning') ? (lines.at(-1) || '') : rawResult
   return {
     correlationId: value.correlationId || '',
     profileId: value.profileId || '',
-    result: value.result || value.output || '',
+    result,
     sessionId: value.sessionId || null,
     completedAt: value.completedAt || new Date().toISOString(),
   }
