@@ -91,6 +91,12 @@ function validateProfile(actual: string, expected: string) {
   if (!actual || actual !== expected) throw new HermesBotError('ADAPTER_MALFORMED_RESPONSE')
 }
 
+function adapterFailure(error: unknown) {
+  if (error instanceof HermesBotError) return error
+  if (error instanceof Error && /^HERMES_ADAPTER_\d{3}$/.test(error.message)) return new HermesBotError(error.message)
+  return new HermesBotError('ADAPTER_FAILURE')
+}
+
 export async function reconcileHermesBotAssignment(context: ProjectContext, employeeProjectAssignmentId: string, adapter: HermesRuntimeAdapter = hermesRuntimeAdapter) {
   if (!administerRoles.has(context.project.role)) throw new HermesBotError('FORBIDDEN')
   const member = await actor(context)
@@ -126,10 +132,10 @@ export async function reconcileHermesBotAssignment(context: ProjectContext, empl
     await audit(context, member.id, 'runtime.bot.reconciled', current.id, 'Hermes Bot reconciliation succeeded', { profileId: desired.profileId, capabilityFingerprint: capability.fingerprint, drifted })
     return saved
   } catch (error) {
-    await prisma.hermesRuntimeAssignment.update({ where: { id: current.id }, data: { provisioningState: 'FAILED', reconciliationState: 'FAILED', lastReconcileError: error instanceof HermesBotError ? error.code : 'ADAPTER_FAILURE' } })
+    const failure = adapterFailure(error)
+    await prisma.hermesRuntimeAssignment.update({ where: { id: current.id }, data: { provisioningState: 'FAILED', reconciliationState: 'FAILED', lastReconcileError: failure.code } })
     await audit(context, member.id, 'runtime.bot.reconcile.failed', current.id, 'Hermes Bot reconciliation failed safely', { profileId: desired.profileId })
-    if (error instanceof HermesBotError) throw error
-    throw new HermesBotError('ADAPTER_FAILURE')
+    throw failure
   }
 }
 
@@ -163,8 +169,7 @@ export async function sendHermesBotMessage(context: ProjectContext, employeeProj
     return { correlationId, conversationId: conversation.id, messageId: saved.id, result: saved.body, sessionId: response.sessionId || null }
   } catch (error) {
     await audit(context, member.id, 'runtime.bot.chat.failed', loaded.runtimeAssignment.id, 'Hermes Bot Chat failed safely', { correlationId, profileId, conversationId: conversation.id })
-    if (error instanceof HermesBotError) throw error
-    throw new HermesBotError('ADAPTER_FAILURE')
+    throw adapterFailure(error)
   }
 }
 
