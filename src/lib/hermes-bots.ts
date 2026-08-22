@@ -38,7 +38,7 @@ function soul(input: { employee: { name: string; role: string; description: stri
     `You are ${input.employee.name}, serving as ${role} for the RogerOS project ${input.project.name}.`,
     input.employee.description || input.employee.soulSummary || `Focus on the responsibilities of ${role}.`,
     'Work only within the project context explicitly supplied by RogerOS.',
-    'Do not claim authority over permissions, policies, approvals, credentials, or business records.',
+    'Do not override RogerOS permissions, policies, approvals, or business records.',
     'Escalate uncertainty and consequential actions to the authorized RogerOS operator.',
   ].join('\n\n')
   return { content, hash: createHash('sha256').update(content).digest('hex') }
