@@ -2,6 +2,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
 type RuntimeExecution = { id: string; status: string; resultText: string | null; errorMessage: string | null; createdAt: string; completedAt: string | null; runtime: { key: string } }
+type EmployeeAssignment = { id: string; status: string; employee: { name: string; role: string } }
 type Task = {
   id: string; title: string; description: string | null; status: string; priority: string; dueAt: string | null; updatedAt: string
   relatedThread: { id: string; title: string | null } | null
@@ -18,14 +19,18 @@ export function TaskWorkspace({ project, currentMemberId }: { project: { id: str
   const [view, setView] = useState<'board' | 'list'>('board')
   const [selected, setSelected] = useState<Task | null>(null)
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [employeeProjectAssignmentId, setEmployeeProjectAssignmentId] = useState('')
+  const [employees, setEmployees] = useState<EmployeeAssignment[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [dispatching, setDispatching] = useState(false)
   const query = useMemo(() => `projectId=${encodeURIComponent(project.id)}`, [project.id])
   const load = useCallback(async () => {
-    const response = await fetch(`/api/tasks2?${query}`)
-    if (!response.ok) throw Error()
-    setTasks((await response.json()).tasks)
+    const [tasksResponse, workforceResponse] = await Promise.all([fetch(`/api/tasks2?${query}`), fetch(`/api/workforce?${query}`)])
+    if (!tasksResponse.ok) throw Error()
+    setTasks((await tasksResponse.json()).tasks)
+    if (workforceResponse.ok) setEmployees((await workforceResponse.json()).employees)
   }, [query])
   const reloadSelected = async (id: string) => {
     const response = await fetch(`/api/tasks2/${id}?${query}`)
@@ -36,9 +41,9 @@ export function TaskWorkspace({ project, currentMemberId }: { project: { id: str
 
   const create = async (event: FormEvent) => {
     event.preventDefault(); if (!title.trim()) return
-    const response = await fetch('/api/tasks2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id, title, projectMemberId: currentMemberId }) })
+    const response = await fetch('/api/tasks2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id, title, description, projectMemberId: employeeProjectAssignmentId ? undefined : currentMemberId, employeeProjectAssignmentId: employeeProjectAssignmentId || undefined }) })
     if (!response.ok) { setError('Unable to create task.'); return }
-    setTitle(''); await load()
+    setTitle(''); setDescription(''); setEmployeeProjectAssignmentId(''); await load()
   }
   const patch = async (id: string, data: object) => {
     const response = await fetch(`/api/tasks2/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id, ...data }) })
@@ -67,7 +72,12 @@ export function TaskWorkspace({ project, currentMemberId }: { project: { id: str
   const runtime = selected?.assignments.find(assignment => assignment.employeeProjectAssignment?.runtimeAssignments?.[0])?.employeeProjectAssignment?.runtimeAssignments?.[0]
   return <div className="hq-rise"><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">{project.name} / Work</p><h1 className="mt-1 text-3xl font-semibold">Tasks</h1></div><div className="rounded-lg border border-[var(--line)] p-1"><button onClick={() => setView('board')} className={`rounded px-3 py-1 text-sm ${view === 'board' ? 'bg-white/10' : ''}`}>Board</button><button onClick={() => setView('list')} className={`rounded px-3 py-1 text-sm ${view === 'list' ? 'bg-white/10' : ''}`}>List</button></div></div>
     {error && <p role="alert" className="mb-3 text-sm text-[var(--down)]">{error}</p>}
-    <form onSubmit={create} className="mb-5 flex gap-2"><input value={title} onChange={event => setTitle(event.target.value)} placeholder="Create a task" className="min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--surface-1)] px-3 py-2 text-sm" /><button className="btn-primary px-4 text-sm">Create task</button></form>
+    <form onSubmit={create} className="mb-5 grid gap-2 rounded-xl border border-[var(--line)] p-3 md:grid-cols-[minmax(0,1fr)_auto]">
+      <input value={title} onChange={event => setTitle(event.target.value)} placeholder="Create a task" className="min-w-0 rounded-lg border border-[var(--line)] bg-[var(--surface-1)] px-3 py-2 text-sm" />
+      <select aria-label="Assign employee" value={employeeProjectAssignmentId} onChange={event => setEmployeeProjectAssignmentId(event.target.value)} className="rounded-lg border border-[var(--line)] bg-[var(--surface-1)] px-3 py-2 text-sm"><option value="">Assign me</option>{employees.filter(employee => employee.status === 'ACTIVE').map(employee => <option key={employee.id} value={employee.id}>{employee.employee.name} · {employee.employee.role}</option>)}</select>
+      <textarea aria-label="Task objective" value={description} onChange={event => setDescription(event.target.value)} placeholder="Optional objective for the assigned employee" className="min-h-20 rounded-lg border border-[var(--line)] bg-[var(--surface-1)] px-3 py-2 text-sm md:col-span-2" />
+      <button className="btn-primary justify-self-start px-4 py-2 text-sm md:col-span-2">Create task</button>
+    </form>
     {loading ? <p className="text-sm text-[var(--text-3)]">Loading tasks…</p> : view === 'board' ? <div className="grid gap-3 overflow-x-auto md:grid-cols-3 xl:grid-cols-6">{statuses.map(status => <section key={status} className="min-w-44 rounded-xl border border-[var(--line)] bg-[var(--surface-1)] p-2"><h2 className="eyebrow px-1 py-2">{status.replace('_', ' ')}</h2>{tasks.filter(task => task.status === status).map(card)}</section>)}</div> : <div className="overflow-x-auto rounded-xl border border-[var(--line)]"><table className="w-full text-left text-sm"><thead className="border-b border-[var(--line)] text-[var(--text-3)]"><tr><th className="p-3">Task</th><th>Status</th><th>Priority</th><th>Assignee</th><th>Due</th></tr></thead><tbody>{tasks.map(task => <tr key={task.id} onClick={() => open(task)} className="cursor-pointer border-b border-[var(--line)] hover:bg-white/[.03]"><td className="p-3 font-medium">{task.title}</td><td>{task.status}</td><td>{task.priority}</td><td>{assignee(task)}</td><td>{task.dueAt ? new Date(task.dueAt).toLocaleDateString() : '—'}</td></tr>)}</tbody></table></div>}
     {selected && <aside className="fixed inset-y-0 right-0 z-20 w-full max-w-md overflow-y-auto border-l border-[var(--line)] bg-[#10141d] p-5 shadow-2xl"><button onClick={() => setSelected(null)} className="text-sm text-[var(--text-3)]">Close</button><h2 className="mt-4 text-xl font-semibold">{selected.title}</h2><p className="mt-3 whitespace-pre-wrap text-sm text-[var(--text-2)]">{selected.description || 'No objective added.'}</p>
       <label className="mt-5 block text-xs text-[var(--text-3)]">Status<select value={selected.status} onChange={event => patch(selected.id, { status: event.target.value })} className="mt-1 w-full rounded border border-[var(--line)] bg-[var(--surface-2)] p-2 text-sm">{statuses.map(status => <option key={status}>{status}</option>)}<option>CANCELLED</option></select></label>
