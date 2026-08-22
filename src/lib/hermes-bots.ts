@@ -93,7 +93,7 @@ function validateProfile(actual: string, expected: string) {
 
 function adapterFailure(error: unknown) {
   if (error instanceof HermesBotError) return error
-  if (error instanceof Error && /^HERMES_ADAPTER_\d{3}(?:_[a-zA-Z0-9_]{1,160})?$/.test(error.message)) return new HermesBotError(error.message)
+  if (error instanceof Error && /^HERMES_ADAPTER_\d{3}(?:_[a-zA-Z0-9_]{1,200})?$/.test(error.message)) return new HermesBotError(error.message)
   return new HermesBotError('ADAPTER_FAILURE')
 }
 

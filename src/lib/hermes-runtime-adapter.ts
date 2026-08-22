@@ -58,7 +58,20 @@ export function safeAdapterErrorHint(payload: null | Record<string, unknown>) {
   }
   return [...new Set(values)].join('_').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 160)
 }
-async function request<T>(path: string, init?: RequestInit): Promise<T> { const c = config(); const response = await fetch(`${c.base}${path}`, { ...init, headers: { ...c.headers, ...init?.headers }, cache: 'no-store' }); if (!response.ok) { const payload=await response.json().catch(()=>null) as null|Record<string,unknown>;const hint=safeAdapterErrorHint(payload);throw new Error(`HERMES_ADAPTER_${response.status}${hint?`_${hint}`:''}`) } return response.json() as Promise<T> }
+function adapterOperation(path: string) {
+  if (path.endsWith('/identity')) return 'IDENTITY'
+  if (path.endsWith('/soul')) return 'SOUL'
+  if (path.endsWith('/runtime')) return 'RUNTIME'
+  if (path.endsWith('/skills')) return 'SKILLS'
+  if (path.endsWith('/capabilities')) return 'CAPABILITIES'
+  if (path.endsWith('/status')) return 'STATUS'
+  if (path.endsWith('/routines')) return 'ROUTINES'
+  if (path.endsWith('/sessions')) return 'SESSIONS'
+  if (path.endsWith('/messages')) return 'MESSAGES'
+  if (path.includes('/bots/')) return 'BOT'
+  return 'ADAPTER'
+}
+async function request<T>(path: string, init?: RequestInit): Promise<T> { const c = config(); const response = await fetch(`${c.base}${path}`, { ...init, headers: { ...c.headers, ...init?.headers }, cache: 'no-store' }); if (!response.ok) { const payload=await response.json().catch(()=>null) as null|Record<string,unknown>;const hint=safeAdapterErrorHint(payload);throw new Error(`HERMES_ADAPTER_${response.status}_${adapterOperation(path)}${hint?`_${hint}`:''}`) } return response.json() as Promise<T> }
 const botPath = (profileId: string, suffix = '') => `/bots/${encodeURIComponent(profileId)}${suffix}`
 
 export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
