@@ -52,6 +52,10 @@ export function safeAdapterErrorHint(payload: null | Record<string, unknown>) {
     const value = payload[key]
     if (Array.isArray(value)) values.push(...value.filter((item): item is string => typeof item === 'string' && /^[a-zA-Z][a-zA-Z0-9_.-]{0,80}$/.test(item)))
   }
+  const serialized = JSON.stringify(payload)
+  for (const field of ['profileId', 'projectKey', 'runtimeProfileKey', 'employeeKey', 'displayName', 'description', 'soul', 'runtime', 'approvedSkills']) {
+    if (new RegExp(`(^|[^a-zA-Z0-9])${field}([^a-zA-Z0-9]|$)`).test(serialized)) values.push(field)
+  }
   return [...new Set(values)].join('_').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 160)
 }
 async function request<T>(path: string, init?: RequestInit): Promise<T> { const c = config(); const response = await fetch(`${c.base}${path}`, { ...init, headers: { ...c.headers, ...init?.headers }, cache: 'no-store' }); if (!response.ok) { const payload=await response.json().catch(()=>null) as null|Record<string,unknown>;const hint=safeAdapterErrorHint(payload);throw new Error(`HERMES_ADAPTER_${response.status}${hint?`_${hint}`:''}`) } return response.json() as Promise<T> }

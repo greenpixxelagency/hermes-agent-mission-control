@@ -99,6 +99,7 @@ test('M14B provisions deterministic project-scoped bots and enforces runtime aut
   assert.notEqual(vhalamProfile, buddhajiProfile)
   assert.equal(safeAdapterErrorHint({ code: 'MISSING_FIELD', field: 'projectKey', message: 'must not be exposed' }), 'MISSING_FIELD_projectKey')
   assert.equal(safeAdapterErrorHint({ error: 'UNKNOWN_FIELD', unknownFields: ['runtimeProfileKey'], token: 'secret-value' }), 'UNKNOWN_FIELD_runtimeProfileKey')
+  assert.equal(safeAdapterErrorHint({ error: 'UNKNOWN_FIELD', details: 'Unknown field: description', message: 'secret-value' }), 'UNKNOWN_FIELD_description')
 
   await assert.rejects(reconcileHermesBotAssignment(context(2), vhalamEmployee.id, harness.adapter), error => hasCode(error, 'FORBIDDEN'))
   await assert.rejects(reconcileHermesBotAssignment(context(3), vhalamEmployee.id, harness.adapter), error => hasCode(error, 'FORBIDDEN'))
