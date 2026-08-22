@@ -11,7 +11,7 @@ import {
 } from '../src/lib/hermes-bots'
 import type {
   HermesBot,
-  HermesBotSpec,
+  HermesBotIdentitySpec,
   HermesRuntimeAdapter,
 } from '../src/lib/hermes-runtime-adapter'
 
@@ -40,10 +40,10 @@ function adapterHarness() {
     listBotRoutines: async () => [],
     listBotSessions: async () => [],
     getBotCapabilityFingerprint: async () => ({ fingerprint: 'm14b-safe-capability-fingerprint', skillCount: 1, botChatAvailable: true, routinesAvailable: true }),
-    ensureBot: async (spec: HermesBotSpec) => {
+    ensureBot: async (spec: HermesBotIdentitySpec) => {
       ensureCount += 1
       profiles.push(spec.profileId)
-      bot = { profileId: spec.profileId, displayName: spec.displayName, description: spec.description, state, soulHash: spec.soul.hash, modelProvider: spec.runtime.provider, modelId: spec.runtime.modelId }
+      bot = { profileId: spec.profileId, displayName: spec.profileId, state }
       return bot
     },
     updateBotIdentity: async (profileId, metadata) => ({ ...(bot ?? { profileId, state }), ...metadata, profileId, state }),

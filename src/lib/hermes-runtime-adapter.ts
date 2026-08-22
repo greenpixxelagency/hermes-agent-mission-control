@@ -10,6 +10,7 @@ export type HermesBotRoutine = { id: string; name: string; enabled: boolean }
 export type HermesBotSession = { id: string; status: string; updatedAt?: string | null }
 export type HermesBotCapability = { fingerprint: string; skillCount: number; botChatAvailable: boolean; routinesAvailable: boolean }
 export type HermesBotSpec = { profileId: string; projectKey: string; employeeKey: string; displayName: string; description: string; soul: { revision: number; hash: string; content: string }; runtime: { provider: string; modelId: string }; approvedSkills: string[] }
+export type HermesBotIdentitySpec = Pick<HermesBotSpec, 'profileId' | 'projectKey' | 'employeeKey'>
 export type HermesBotMessageResult = { correlationId: string; profileId: string; result: string; sessionId?: string | null; completedAt: string }
 
 export type HermesExecutionRuntimeAdapter = {
@@ -27,7 +28,7 @@ export type HermesRuntimeAdapter = HermesExecutionRuntimeAdapter & {
   listBotRoutines: (profileId: string) => Promise<HermesBotRoutine[]>
   listBotSessions: (profileId: string) => Promise<HermesBotSession[]>
   getBotCapabilityFingerprint: (profileId: string) => Promise<HermesBotCapability>
-  ensureBot: (spec: HermesBotSpec) => Promise<HermesBot>
+  ensureBot: (spec: HermesBotIdentitySpec) => Promise<HermesBot>
   updateBotIdentity: (profileId: string, metadata: { displayName: string; description: string }) => Promise<HermesBot>
   updateBotSoul: (profileId: string, soul: { revision: number; hash: string; content: string }) => Promise<HermesBot>
   updateBotRuntimeConfig: (profileId: string, config: { provider: string; modelId: string }) => Promise<HermesBot>
