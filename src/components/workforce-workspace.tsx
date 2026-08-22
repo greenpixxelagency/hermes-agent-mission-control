@@ -1,99 +1,51 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
+import { Bot, BriefcaseBusiness, ChevronRight, CirclePlus, MessageCircle, RefreshCw, Send, ShieldCheck, Sparkles, UserRoundPlus, X } from 'lucide-react'
 
-type RuntimeAssignment = {
-  id: string
-  active: boolean
-  profileKey: string
-  runtimeKind: string
-  assignmentState: string
-  provisioningState: string
-  reconciliationState: string
-  desiredDisplayName: string | null
-  lastObservedHermesVersion: string | null
-  capabilityFingerprint: string | null
-  lastReconciledAt: string | null
-  runtimeStatus: string | null
-  externalRuntimeMetadata: { botChatAvailable?: boolean; skillCount?: number; skills?:Array<{key:string;name:string;bundled:boolean}>; routinesAvailable?: boolean; routines?:Array<{id:string;name:string;enabled:boolean}> } | null
-  runtime: { key: string; name: string; status: string }
-  executions: Array<{ status: string; createdAt: string; resultText: string | null }>
-}
-type EmployeeAssignment = {
-  id: string
-  status: string
-  employee: { name: string; role: string; description: string | null; type: string; status: string; systemKey: string | null }
-  runtimeAssignments: RuntimeAssignment[]
-  _count: { taskAssignments: number }
-}
+import { Avatar, EmptyState, Metric, PageHeader, StatusPill, friendlyLabel } from '@/components/rogeros-ui'
+
+type RuntimeAssignment = { id: string; active: boolean; profileKey: string; runtimeKind: string; assignmentState: string; provisioningState: string; reconciliationState: string; desiredDisplayName: string | null; desiredModelProvider?: string | null; desiredModelId?: string | null; lastObservedHermesVersion: string | null; capabilityFingerprint: string | null; lastReconciledAt: string | null; runtimeStatus: string | null; externalRuntimeMetadata: { botChatAvailable?: boolean; skillCount?: number; skills?: Array<{key:string;name:string;bundled:boolean}>; routinesAvailable?: boolean; routines?: Array<{id:string;name:string;enabled:boolean}> } | null; runtime: { key: string; name: string; status: string }; executions: Array<{ status: string; createdAt: string; resultText: string | null }> }
+type EmployeeAssignment = { id: string; status: string; roleOverride?: string | null; joinedAt?: string; employee: { name: string; role: string; description: string | null; type: string; status: string; systemKey: string | null }; runtimeAssignments: RuntimeAssignment[]; _count: { taskAssignments: number } }
 type Health = { healthy: boolean; hermesVersion: string; runtimeIdentity: string; checkedAt: string }
 type ChatMessage = { id:string; body:string; kind:string; createdAt:string; authorUserId:string|null; authorSystemIdentity:string|null }
 
 export function WorkforceWorkspace({ project }: { project: { id: string; name: string; role: string } }) {
-  const [items, setItems] = useState<EmployeeAssignment[]>([])
-  const [health, setHealth] = useState<Health | null>(null)
-  const [name, setName] = useState('')
-  const [role, setRole] = useState('')
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState<Record<string,string>>({})
-  const [chat, setChat] = useState<Record<string,string>>({})
-  const [history, setHistory] = useState<Record<string,ChatMessage[]>>({})
-  const [openChat, setOpenChat] = useState('')
-  const [working, setWorking] = useState('')
-
-  const load = useCallback(async () => {
-    const [employees, runtimeHealth] = await Promise.all([
-      fetch(`/api/workforce?projectId=${project.id}`),
-      fetch(`/api/runtime/health?projectId=${project.id}`),
-    ])
-    if (employees.ok) setItems((await employees.json()).employees)
-    if (runtimeHealth.ok) setHealth(await runtimeHealth.json())
-  }, [project.id])
-  useEffect(() => {
-    const timer = setTimeout(() => { void load() }, 0)
-    return () => clearTimeout(timer)
-  }, [load])
-
-  const create = async (event: FormEvent) => {
-    event.preventDefault()
-    const response = await fetch('/api/workforce', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id, name, role }) })
-    if (!response.ok) { setError('Unable to create employee'); return }
-    setName(''); setRole(''); await load()
-  }
-
-  const runtimeAction = async (assignmentId:string,path:string,body:Record<string,unknown>) => {
-    setWorking(`${assignmentId}:${path}`);setError('')
-    try{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projectId:project.id,employeeProjectAssignmentId:assignmentId,...body})});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'Runtime action failed');setNotice(current=>({...current,[assignmentId]:result.result||'Runtime action completed.'}));if(path.includes('/chat')){setChat(current=>({...current,[assignmentId]:''}));await loadHistory(assignmentId)}await load()}catch(actionError){setNotice(current=>({...current,[assignmentId]:actionError instanceof Error?actionError.message:'Runtime action failed'}))}finally{setWorking('')}
-  }
-  const loadHistory=async(assignmentId:string)=>{const response=await fetch(`/api/runtime/bots/chat?projectId=${encodeURIComponent(project.id)}&employeeProjectAssignmentId=${encodeURIComponent(assignmentId)}`);if(response.ok){const result=await response.json();setHistory(current=>({...current,[assignmentId]:result.messages}))}}
-  const toggleChat=async(assignmentId:string)=>{const next=openChat===assignmentId?'':assignmentId;setOpenChat(next);if(next)await loadHistory(assignmentId)}
-  const canOperate=['OWNER','ADMIN','OPERATOR'].includes(project.role)
-  const canAdmin=['OWNER','ADMIN'].includes(project.role)
+  const [items, setItems] = useState<EmployeeAssignment[]>([]); const [health, setHealth] = useState<Health | null>(null); const [name, setName] = useState(''); const [role, setRole] = useState('')
+  const [error, setError] = useState(''); const [notice, setNotice] = useState<Record<string,string>>({}); const [chat, setChat] = useState<Record<string,string>>({}); const [history, setHistory] = useState<Record<string,ChatMessage[]>>({})
+  const [selected, setSelected] = useState<string>(''); const [chatOpen, setChatOpen] = useState(false); const [working, setWorking] = useState(''); const [creating, setCreating] = useState(false)
+  const load = useCallback(async () => { const [employeeResponse, healthResponse] = await Promise.all([fetch(`/api/workforce?projectId=${project.id}`), fetch(`/api/runtime/health?projectId=${project.id}`)]); if (employeeResponse.ok) setItems((await employeeResponse.json()).employees); if (healthResponse.ok) setHealth(await healthResponse.json()) }, [project.id])
+  useEffect(() => { const timer = setTimeout(() => { void load() }, 0); return () => clearTimeout(timer) }, [load])
+  const create = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/workforce', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id, name, role }) }); if (!response.ok) { setError('The employee could not be added.'); return } setName(''); setRole(''); setCreating(false); await load() }
+  const loadHistory = async (assignmentId:string) => { const response = await fetch(`/api/runtime/bots/chat?projectId=${encodeURIComponent(project.id)}&employeeProjectAssignmentId=${encodeURIComponent(assignmentId)}`); if (response.ok) { const result = await response.json(); setHistory(current => ({ ...current, [assignmentId]: result.messages })) } }
+  const runtimeAction = async (assignmentId:string, path:string, body:Record<string,unknown>) => { setWorking(`${assignmentId}:${path}`); setError(''); try { const response = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ projectId:project.id, employeeProjectAssignmentId:assignmentId, ...body }) }); const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || 'The runtime action could not complete.'); setNotice(current => ({ ...current, [assignmentId]: result.result || 'Changes saved.' })); if (path.includes('/chat')) { setChat(current => ({ ...current, [assignmentId]: '' })); await loadHistory(assignmentId) } await load() } catch (actionError) { setNotice(current => ({ ...current, [assignmentId]: actionError instanceof Error ? actionError.message : 'The runtime action could not complete.' })) } finally { setWorking('') } }
+  const canOperate = ['OWNER','ADMIN','OPERATOR'].includes(project.role); const canAdmin = ['OWNER','ADMIN'].includes(project.role); const current = items.find(item => item.id === selected); const currentRuntime = current?.runtimeAssignments[0]
+  const activeCount = items.filter(item => item.status === 'ACTIVE').length; const aiCount = items.filter(item => item.runtimeAssignments.length > 0).length; const attentionCount = items.filter(item => { const runtime = item.runtimeAssignments[0]; return runtime && (runtime.reconciliationState === 'FAILED' || runtime.provisioningState === 'FAILED' || runtime.assignmentState === 'SUSPENDED') }).length
+  const openEmployee = async (id: string) => { setSelected(id); setChatOpen(false); if (canOperate) await loadHistory(id) }
+  const changeSuspension = async () => { if (!current || !currentRuntime) return; const suspending = currentRuntime.assignmentState !== 'SUSPENDED'; if (suspending && !window.confirm(`Suspend ${current.employee.name}? New AI messages and task execution will be paused, while history is preserved.`)) return; await runtimeAction(current.id, '/api/runtime/bots/state', { action: suspending ? 'suspend' : 'resume' }) }
 
   return <div className="hq-rise">
-    <p className="eyebrow">{project.name} / Workforce</p>
-    <h1 className="mt-1 text-3xl font-semibold">Workforce</h1>
-    <p className="mt-2 text-sm text-[var(--text-2)]">Project-assigned employees and their project-scoped runtime assignments.</p>
-    {health && <p className="mt-3 text-xs text-[var(--text-3)]">Staging Hermes: {health.healthy ? 'Healthy' : 'Unavailable'} · {health.runtimeIdentity} · {health.hermesVersion}</p>}
-    <form onSubmit={create} className="mt-6 flex flex-wrap gap-2">
-      <input value={name} onChange={event => setName(event.target.value)} placeholder="Employee name" className="rounded border border-[var(--line)] bg-transparent p-2 text-sm" />
-      <input value={role} onChange={event => setRole(event.target.value)} placeholder="Role" className="rounded border border-[var(--line)] bg-transparent p-2 text-sm" />
-      <button className="btn-primary px-4 text-sm">Add Employee</button>
-    </form>
-    {error && <p className="mt-3 text-sm text-[var(--down)]">{error}</p>}
-    <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{items.map(item => {
-      const runtime = item.runtimeAssignments[0]
-      const latest = runtime?.executions[0]
-      return <article key={item.id} className="panel p-4">
-        <div className="flex justify-between"><h2 className="font-semibold">{item.employee.name}</h2><span className="text-xs text-[var(--accent)]">{item.employee.type === 'SYSTEM' ? 'System Employee' : 'Custom'}</span></div>
-        <p className="mt-1 text-sm text-[var(--text-2)]">{item.employee.role}</p>
-        {runtime ? <div className="mt-4 rounded-lg border border-[var(--line)] p-3"><p className="eyebrow">Hermes runtime</p><div className="mt-2 space-y-1 text-xs text-[var(--text-3)]"><p>Runtime: {runtime.runtimeStatus==='HEALTHY'?'Connected':runtime.runtimeStatus||runtime.runtime.key}</p><p>Bot: {runtime.desiredDisplayName||runtime.profileKey}</p><p>Profile: {runtime.profileKey}</p><p>Status: {runtime.assignmentState}</p><p>Hermes: {runtime.lastObservedHermesVersion||health?.hermesVersion||'Not observed'}</p><p>Bot Chat: {runtime.externalRuntimeMetadata?.botChatAvailable?'Ready':'Not observed'}</p><p>Skills: {runtime.externalRuntimeMetadata?.skills?.map(skill=>skill.name).join(', ')||`${runtime.externalRuntimeMetadata?.skillCount??'—'} observed`}</p><p>Routines: {runtime.externalRuntimeMetadata?.routines?.length?runtime.externalRuntimeMetadata.routines.map(routine=>`${routine.name} (${routine.enabled?'enabled':'disabled'})`).join(', '):runtime.externalRuntimeMetadata?.routinesAvailable?'Available (scheduler deferred)':'Not observed'}</p><p>Reconciliation: {runtime.reconciliationState.replace('_',' ')}</p><p>Capability: {runtime.capabilityFingerprint?runtime.capabilityFingerprint.slice(0,16)+'…':'Not observed'}</p><p>Last synced: {runtime.lastReconciledAt?new Date(runtime.lastReconciledAt).toLocaleString():'Never'}</p><p>Latest task execution: {latest?.status ?? 'None'}</p></div>
-          <div className="mt-3 flex flex-wrap gap-2">{canAdmin&&<button disabled={working!==''} onClick={()=>void runtimeAction(item.id,'/api/runtime/bots/reconcile',{})} className="btn-ghost px-3 py-2 text-xs">Reconcile Bot</button>}{canAdmin&&<button disabled={working!==''} onClick={()=>void runtimeAction(item.id,'/api/runtime/bots/state',{action:runtime.assignmentState==='SUSPENDED'?'resume':'suspend'})} className="btn-ghost px-3 py-2 text-xs">{runtime.assignmentState==='SUSPENDED'?'Resume AI Employee':'Suspend AI Employee'}</button>}</div>
-          {canOperate&&<div className="mt-3"><button onClick={()=>void toggleChat(item.id)} className="btn-ghost px-3 py-2 text-xs">{openChat===item.id?'Hide Bot Chat':'Open Bot Chat'}</button>{openChat===item.id&&<div className="mt-3"><div className="max-h-48 space-y-2 overflow-y-auto rounded border border-[var(--line)] p-2">{(history[item.id]||[]).length?(history[item.id]||[]).map(message=><div key={message.id} className="text-xs"><span className="font-semibold">{message.authorSystemIdentity?'Bot':'You'}:</span> <span className="whitespace-pre-wrap text-[var(--text-2)]">{message.body}</span></div>):<p className="text-xs text-[var(--text-3)]">No Bot Chat messages yet.</p>}</div><textarea aria-label={`Message ${item.employee.name}`} value={chat[item.id]||''} onChange={event=>setChat(current=>({...current,[item.id]:event.target.value}))} placeholder="Message this AI employee" className="mt-2 min-h-20 w-full rounded border border-[var(--line)] bg-transparent p-2 text-xs"/><button disabled={working!==''||runtime.assignmentState!=='ACTIVE'||!(chat[item.id]||'').trim()} onClick={()=>void runtimeAction(item.id,'/api/runtime/bots/chat',{message:chat[item.id]})} className="btn-primary mt-2 px-3 py-2 text-xs">Send to Bot</button></div>}</div>}
-          {notice[item.id]&&<p className="mt-3 whitespace-pre-wrap text-xs text-[var(--accent)]">{notice[item.id]}</p>}
-        </div> : <p className="mt-4 text-xs text-[var(--text-3)]">Runtime: Not assigned</p>}
-        <p className="mt-4 text-xs text-[var(--text-3)]">{item._count.taskAssignments} assigned tasks · {item.status}</p>
-      </article>
-    })}</div>
+    <PageHeader eyebrow={`${project.name} · Company`} title="Workforce" description="The people and AI employees responsible for moving this project forward." action={canAdmin ? <button onClick={() => setCreating(value => !value)} className="btn-primary inline-flex items-center gap-2 px-3 py-2 text-xs"><UserRoundPlus className="w-3.5"/> Add employee</button> : undefined} />
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Active employees" value={activeCount} hint={`${items.length} total assignments`} /><Metric label="AI-enabled" value={aiCount} hint="Connected to an approved runtime" /><Metric label="Runtime health" value={health?.healthy ? 'Healthy' : health ? 'Attention' : 'Checking'} hint={health?.hermesVersion ? `Hermes ${health.hermesVersion}` : 'Secure staging runtime'} tone={health?.healthy ? 'good' : health ? 'warn' : 'neutral'} /><Metric label="Needs attention" value={attentionCount} hint={attentionCount ? 'Open an employee to review' : 'Everyone is ready'} tone={attentionCount ? 'bad' : 'good'} /></div>
+    {creating && <form onSubmit={create} className="panel mt-5 grid gap-3 p-4 sm:grid-cols-2"><div><label className="mb-1.5 block text-[10px] text-[var(--ros-muted)]">Employee name</label><input required value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Performance Marketing" className="w-full px-3 py-2.5 text-xs"/></div><div><label className="mb-1.5 block text-[10px] text-[var(--ros-muted)]">Business role</label><input required value={role} onChange={event => setRole(event.target.value)} placeholder="e.g. Growth lead" className="w-full px-3 py-2.5 text-xs"/></div><div className="flex gap-2 sm:col-span-2"><button className="btn-primary px-4 py-2 text-xs">Add to {project.name}</button><button type="button" onClick={() => setCreating(false)} className="btn-ghost px-4 py-2 text-xs">Cancel</button></div></form>}
+    {error && <div role="alert" className="mt-4 rounded-xl border border-[rgba(235,130,122,.25)] bg-[rgba(235,130,122,.08)] px-4 py-3 text-xs text-[var(--ros-bad)]">{error}</div>}
+    <div className="mt-7 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{items.length ? items.map(item => <EmployeeCard key={item.id} item={item} health={health} onOpen={() => void openEmployee(item.id)}/>) : <section className="panel md:col-span-2"><EmptyState icon={<UserRoundPlus/>} title="Build your project team" description="Add a person or AI employee when this project needs a new owner for work." /></section>}</div>
+    {current && <><button className="fixed inset-0 z-40 bg-black/55" aria-label="Close employee details" onClick={() => setSelected('')}/><aside className="fixed inset-y-0 right-0 z-50 w-full max-w-[520px] overflow-y-auto border-l border-[var(--ros-line)] bg-[#121815] p-5 shadow-2xl"><div className="flex items-center justify-between"><p className="eyebrow">Employee profile</p><button onClick={() => setSelected('')} aria-label="Close employee details" className="text-[var(--ros-faint)]"><X className="w-5"/></button></div><div className="mt-5 flex items-start gap-4"><Avatar name={current.employee.name} size="lg"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-semibold tracking-[-.025em]">{current.employee.name}</h2><StatusPill tone={current.status === 'ACTIVE' ? 'good' : 'warn'}>{friendlyLabel(current.status)}</StatusPill></div><p className="mt-1 text-xs text-[var(--ros-muted)]">{current.roleOverride || current.employee.role}</p><p className="mt-2 text-[11px] leading-5 text-[var(--ros-faint)]">{current.employee.description || `Responsible for ${current.employee.role.toLowerCase()} outcomes in ${project.name}.`}</p></div></div>
+      <div className="mt-6 grid grid-cols-2 gap-3"><ProfileSummary icon={<BriefcaseBusiness/>} label="Project" value={project.name}/><ProfileSummary icon={<CheckSquareIcon/>} label="Assigned work" value={`${current._count.taskAssignments} tasks`}/></div>
+      <section className="panel mt-6 p-4"><div className="flex items-start justify-between gap-3"><div className="flex gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[rgba(126,208,173,.1)] text-[var(--ros-accent)]"><Bot className="w-4"/></span><div><h3 className="text-xs font-semibold">AI runtime</h3><p className="mt-1 text-[10px] text-[var(--ros-faint)]">{currentRuntime ? 'Securely connected to this employee.' : 'No AI runtime is assigned.'}</p></div></div>{currentRuntime && <StatusPill tone={runtimeTone(currentRuntime)}>{runtimeHeadline(currentRuntime)}</StatusPill>}</div>
+        {currentRuntime && <><div className="mt-4 grid gap-3 sm:grid-cols-2"><ProfileSummary icon={<ShieldCheck/>} label="Status" value={friendlyLabel(currentRuntime.assignmentState)}/><ProfileSummary icon={<Sparkles/>} label="Skills" value={`${currentRuntime.externalRuntimeMetadata?.skillCount ?? currentRuntime.externalRuntimeMetadata?.skills?.length ?? 0} available`}/><ProfileSummary icon={<MessageCircle/>} label="AI chat" value={currentRuntime.externalRuntimeMetadata?.botChatAvailable ? 'Ready' : 'Not observed'}/><ProfileSummary icon={<RefreshCw/>} label="Last synced" value={currentRuntime.lastReconciledAt ? new Date(currentRuntime.lastReconciledAt).toLocaleString() : 'Not yet'}/></div>
+          <div className="mt-4 flex flex-wrap gap-2">{canAdmin && <button disabled={working !== ''} onClick={() => void runtimeAction(current.id, '/api/runtime/bots/reconcile', {})} className="btn-ghost inline-flex items-center gap-2 px-3 py-2 text-[10px]"><RefreshCw className={`w-3 ${working.includes('reconcile') ? 'animate-spin' : ''}`}/> Sync runtime</button>}{canAdmin && <button disabled={working !== ''} onClick={() => void changeSuspension()} className="btn-ghost px-3 py-2 text-[10px]">{currentRuntime.assignmentState === 'SUSPENDED' ? 'Resume employee' : 'Suspend employee'}</button>}{canOperate && <button onClick={() => setChatOpen(value => !value)} className="btn-primary inline-flex items-center gap-2 px-3 py-2 text-[10px]"><MessageCircle className="w-3"/> {chatOpen ? 'Close chat' : `Chat with ${current.employee.name}`}</button>}</div>
+          <details className="mt-4 border-t border-[var(--ros-line)] pt-3"><summary className="cursor-pointer text-[10px] text-[var(--ros-faint)]">Technical details</summary><div className="mt-3 space-y-1 text-[9px] text-[var(--ros-faint)]"><p>Runtime type: {friendlyLabel(currentRuntime.runtimeKind)}</p><p>Provisioning: {friendlyLabel(currentRuntime.provisioningState)}</p><p>Reconciliation: {friendlyLabel(currentRuntime.reconciliationState)}</p><p>Hermes version: {currentRuntime.lastObservedHermesVersion || health?.hermesVersion || 'Not observed'}</p>{currentRuntime.desiredModelId && <p>Approved model: {currentRuntime.desiredModelId}</p>}{currentRuntime.capabilityFingerprint && <p>Capability record: {currentRuntime.capabilityFingerprint.slice(0,16)}…</p>}</div></details>
+        </>}
+      </section>
+      {chatOpen && currentRuntime && <section className="panel mt-5 overflow-hidden"><header className="border-b border-[var(--ros-line)] p-4"><h3 className="text-xs font-semibold">Conversation with {current.employee.name}</h3><p className="mt-1 text-[9px] text-[var(--ros-faint)]">Business-relevant messages are retained in RogerOS.</p></header><div className="max-h-72 space-y-4 overflow-y-auto p-4">{(history[current.id] || []).length ? (history[current.id] || []).map(message => <div key={message.id} className={`flex gap-2.5 ${message.authorSystemIdentity ? '' : 'flex-row-reverse'}`}><Avatar name={message.authorSystemIdentity ? current.employee.name : 'You'} size="sm"/><div className={`max-w-[80%] rounded-xl px-3 py-2 text-[11px] leading-5 ${message.authorSystemIdentity ? 'bg-white/[.04] text-[var(--ros-muted)]' : 'bg-[rgba(126,208,173,.1)] text-[var(--ros-text)]'}`}>{message.body}</div></div>) : <EmptyState icon={<MessageCircle/>} title="Start a conversation" description={`Send ${current.employee.name} a clear business question or request.`}/>}</div><div className="border-t border-[var(--ros-line)] p-3"><textarea aria-label={`Message ${current.employee.name}`} value={chat[current.id] || ''} onChange={event => setChat(value => ({ ...value, [current.id]: event.target.value }))} placeholder={`Message ${current.employee.name}…`} className="min-h-20 w-full resize-none p-3 text-xs"/><button disabled={working !== '' || currentRuntime.assignmentState !== 'ACTIVE' || !(chat[current.id] || '').trim()} onClick={() => void runtimeAction(current.id, '/api/runtime/bots/chat', { message: chat[current.id] })} className="btn-primary mt-2 inline-flex items-center gap-2 px-3 py-2 text-xs"><Send className="w-3"/> Send message</button></div></section>}
+      {notice[current.id] && <p className="mt-4 whitespace-pre-wrap rounded-lg bg-white/[.03] p-3 text-[10px] text-[var(--ros-muted)]">{notice[current.id]}</p>}
+    </aside></>}
   </div>
 }
+
+function EmployeeCard({ item, health, onOpen }: { item: EmployeeAssignment; health: Health | null; onOpen: () => void }) { const runtime = item.runtimeAssignments[0]; return <article className="panel group p-4"><div className="flex items-start gap-3"><Avatar name={item.employee.name} size="lg"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-sm font-semibold">{item.employee.name}</h2>{runtime ? <StatusPill tone={runtimeTone(runtime)}>{runtimeHeadline(runtime)}</StatusPill> : <StatusPill>Human</StatusPill>}</div><p className="mt-1 truncate text-[11px] text-[var(--ros-muted)]">{item.roleOverride || item.employee.role}</p><p className="mt-2 line-clamp-2 text-[10px] leading-4 text-[var(--ros-faint)]">{item.employee.description || 'Project employee responsible for assigned business outcomes.'}</p></div></div><div className="mt-5 grid grid-cols-2 gap-3 border-t border-[var(--ros-line)] pt-4"><div><p className="text-[9px] text-[var(--ros-faint)]">Current work</p><p className="mt-1 text-[11px] font-medium">{item._count.taskAssignments} assigned</p></div><div><p className="text-[9px] text-[var(--ros-faint)]">Runtime</p><p className="mt-1 text-[11px] font-medium">{runtime ? (runtime.runtimeStatus === 'HEALTHY' || health?.healthy ? 'Healthy' : friendlyLabel(runtime.runtimeStatus || runtime.reconciliationState)) : 'Not required'}</p></div></div><button onClick={onOpen} className="mt-4 flex w-full items-center justify-between rounded-lg border border-[var(--ros-line)] px-3 py-2 text-[10px] text-[var(--ros-muted)] hover:border-[var(--ros-line-strong)] hover:text-[var(--ros-text)]"><span>View employee</span><ChevronRight className="w-3.5"/></button></article> }
+function ProfileSummary({ icon, label, value }: { icon: ReactNode; label: string; value: string }) { return <div className="rounded-xl border border-[var(--ros-line)] bg-white/[.02] p-3"><div className="flex items-center gap-2 text-[var(--ros-faint)]">{icon}<span className="text-[9px]">{label}</span></div><p className="mt-2 truncate text-[11px] font-medium text-[var(--ros-text)]">{value}</p></div> }
+function runtimeHeadline(runtime: RuntimeAssignment) { if (runtime.assignmentState === 'SUSPENDED') return 'Paused'; if (runtime.provisioningState === 'FAILED' || runtime.reconciliationState === 'FAILED') return 'Attention'; if (runtime.runtimeStatus === 'HEALTHY' || runtime.reconciliationState === 'IN_SYNC') return 'Healthy'; return 'Connecting' }
+function runtimeTone(runtime: RuntimeAssignment): 'good' | 'warn' | 'bad' { const headline = runtimeHeadline(runtime); return headline === 'Healthy' ? 'good' : headline === 'Attention' ? 'bad' : 'warn' }
+function CheckSquareIcon() { return <CirclePlus className="w-4"/> }

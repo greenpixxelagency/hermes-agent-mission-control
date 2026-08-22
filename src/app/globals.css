@@ -163,6 +163,140 @@ textarea, input {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   RogerOS product system · business-facing application shell
+   ═══════════════════════════════════════════════════════════ */
+.rogeros-app {
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 500px at 35% -20%, rgba(67, 117, 102, 0.13), transparent 70%),
+    #0d1110;
+  color: #ecf0ed;
+  --ros-bg: #0d1110;
+  --ros-sidebar: #111614;
+  --ros-surface: #151b18;
+  --ros-surface-raised: #1a221e;
+  --ros-line: rgba(230, 241, 234, 0.09);
+  --ros-line-strong: rgba(230, 241, 234, 0.16);
+  --ros-text: #ecf0ed;
+  --ros-muted: #9ca8a1;
+  --ros-faint: #6e7b74;
+  --ros-accent: #7ed0ad;
+  --ros-accent-strong: #a2e2c6;
+  --ros-good: #69d09f;
+  --ros-warn: #e4bd68;
+  --ros-bad: #eb827a;
+}
+.rogeros-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 40; display: flex; width: 260px; flex-direction: column; border-right: 1px solid var(--ros-line); background: color-mix(in srgb, var(--ros-sidebar) 94%, transparent); padding: 22px 18px 18px; backdrop-filter: blur(20px); }
+.rogeros-brand { display: flex; align-items: center; gap: 11px; padding: 0 7px; }
+.rogeros-brand > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: #edf4ef; color: #102018; font-size: 15px; font-weight: 800; }
+.rogeros-brand > div { display: flex; flex-direction: column; line-height: 1.15; }
+.rogeros-brand strong { font-size: 16px; letter-spacing: -0.02em; }
+.rogeros-brand small { margin-top: 4px; color: var(--ros-faint); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.rogeros-mobile-close { display: none; margin-left: auto; color: var(--ros-muted); }
+.rogeros-mobile-close svg { width: 19px; }
+.rogeros-project-card { display: flex; flex-direction: column; margin: 24px 3px 18px; border: 1px solid var(--ros-line); border-radius: 12px; background: rgba(255,255,255,.025); padding: 12px 14px; }
+.rogeros-project-card small { color: var(--ros-faint); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.rogeros-project-card strong { margin-top: 5px; font-size: 14px; }
+.rogeros-project-card span { margin-top: 2px; color: var(--ros-muted); font-size: 11px; }
+.rogeros-sidebar nav { min-height: 0; flex: 1; overflow-y: auto; }
+.rogeros-nav-group { margin-top: 18px; }
+.rogeros-nav-group:first-child { margin-top: 2px; }
+.rogeros-nav-group > p { margin: 0 10px 7px; color: var(--ros-faint); font-size: 9px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
+.rogeros-nav-group a { display: flex; min-height: 38px; align-items: center; gap: 11px; margin: 2px 0; border: 1px solid transparent; border-radius: 9px; padding: 8px 10px; color: var(--ros-muted); font-size: 13px; transition: 160ms ease; }
+.rogeros-nav-group a:hover { background: rgba(255,255,255,.035); color: var(--ros-text); }
+.rogeros-nav-group a.is-active { border-color: rgba(126,208,173,.13); background: rgba(126,208,173,.09); color: var(--ros-accent-strong); }
+.rogeros-nav-group svg { width: 16px; height: 16px; stroke-width: 1.8; }
+.rogeros-nav-group small { margin-left: auto; border: 1px solid var(--ros-line); border-radius: 999px; padding: 2px 5px; color: var(--ros-faint); font-size: 8px; text-transform: uppercase; }
+.rogeros-sidebar-footer { border-top: 1px solid var(--ros-line); padding-top: 12px; }
+.rogeros-sidebar-footer > a { display: flex; align-items: center; gap: 10px; border-radius: 9px; padding: 9px 10px; color: var(--ros-muted); font-size: 12px; }
+.rogeros-sidebar-footer > a:hover { background: rgba(255,255,255,.035); color: var(--ros-text); }
+.rogeros-sidebar-footer > a svg { width: 15px; }
+.rogeros-sidebar-footer > button { display: flex; width: 100%; align-items: center; gap: 10px; margin-top: 5px; border-radius: 10px; padding: 8px; text-align: left; }
+.rogeros-sidebar-footer > button:hover { background: rgba(255,255,255,.035); }
+.rogeros-account-avatar, .rogeros-top-account { display: grid; place-items: center; border: 1px solid var(--ros-line-strong); border-radius: 50%; background: #24322b; color: var(--ros-accent-strong); font-weight: 700; text-transform: uppercase; }
+.rogeros-account-avatar { width: 31px; height: 31px; font-size: 10px; }
+.rogeros-sidebar-footer button > span:last-child { display: flex; min-width: 0; flex-direction: column; }
+.rogeros-sidebar-footer button strong { max-width: 140px; overflow: hidden; color: var(--ros-text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.rogeros-sidebar-footer button small { color: var(--ros-faint); font-size: 9px; }
+.rogeros-main { min-height: 100vh; margin-left: 260px; }
+.rogeros-topbar { position: sticky; top: 0; z-index: 30; display: flex; height: 66px; align-items: center; gap: 18px; border-bottom: 1px solid var(--ros-line); background: rgba(13,17,16,.82); padding: 0 28px; backdrop-filter: blur(18px); }
+.rogeros-menu-button { display: none; color: var(--ros-muted); }
+.rogeros-menu-button svg { width: 20px; }
+.rogeros-project-switcher { display: flex; flex-direction: column; min-width: 150px; }
+.rogeros-project-switcher > span { color: var(--ros-faint); font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.rogeros-project-switcher > div { display: flex; align-items: center; }
+.rogeros-project-switcher select { min-width: 0; appearance: none; background: transparent; padding: 2px 22px 0 0; color: var(--ros-text); font-size: 14px; font-weight: 650; outline: none; }
+.rogeros-project-switcher svg { width: 14px; margin-left: -17px; color: var(--ros-faint); pointer-events: none; }
+.rogeros-search-trigger { display: flex; width: min(400px, 38vw); align-items: center; gap: 9px; margin: 0 auto; border: 1px solid var(--ros-line); border-radius: 10px; background: rgba(255,255,255,.025); padding: 8px 10px; color: var(--ros-faint); font-size: 12px; text-align: left; }
+.rogeros-search-trigger:hover { border-color: var(--ros-line-strong); color: var(--ros-muted); }
+.rogeros-search-trigger svg { width: 15px; }
+.rogeros-search-trigger kbd { margin-left: auto; border: 1px solid var(--ros-line); border-radius: 5px; padding: 2px 5px; font-size: 9px; }
+.rogeros-top-status { display: flex; align-items: center; gap: 6px; color: var(--ros-faint); font-size: 10px; white-space: nowrap; }
+.rogeros-top-status > span { width: 6px; height: 6px; border-radius: 50%; background: var(--ros-good); box-shadow: 0 0 0 3px rgba(105,208,159,.1); }
+.rogeros-top-account { width: 31px; height: 31px; font-size: 9px; }
+.rogeros-content { width: 100%; max-width: 1500px; margin: 0 auto; padding: 32px clamp(20px, 3.4vw, 50px) 56px; }
+.rogeros-app .panel { border-color: var(--ros-line); background: var(--ros-surface); box-shadow: none; }
+.rogeros-app .panel-interactive:hover { border-color: var(--ros-line-strong); background: var(--ros-surface-raised); }
+.rogeros-app .btn-primary { border: 1px solid rgba(162,226,198,.4); background: #dcece3; color: #142019; box-shadow: none; }
+.rogeros-app .btn-ghost { border-color: var(--ros-line); background: transparent; color: var(--ros-muted); }
+.rogeros-app :where(input,textarea,select) { border-color: var(--ros-line); border-radius: 9px; background-color: rgba(255,255,255,.02); color: var(--ros-text); outline: none; }
+.rogeros-app :where(input,textarea,select)::placeholder { color: var(--ros-faint); }
+.rogeros-app :where(input,textarea,select):focus { border-color: rgba(126,208,173,.5); box-shadow: 0 0 0 3px rgba(126,208,173,.08); }
+.rogeros-page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+.rogeros-page-header .eyebrow { color: var(--ros-faint); }
+.rogeros-page-header h1 { margin-top: 6px; color: var(--ros-text); font-size: clamp(25px, 3vw, 34px); font-weight: 680; letter-spacing: -.035em; }
+.rogeros-page-header > div > p:last-child:not(.eyebrow) { max-width: 680px; margin-top: 7px; color: var(--ros-muted); font-size: 13px; line-height: 1.6; }
+.rogeros-section-title { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
+.rogeros-section-title h2 { color: var(--ros-text); font-size: 15px; font-weight: 650; }
+.rogeros-section-title p { margin-top: 3px; color: var(--ros-faint); font-size: 11px; }
+.rogeros-metric { position: relative; min-height: 116px; overflow: hidden; border: 1px solid var(--ros-line); border-radius: 13px; background: var(--ros-surface); padding: 17px; }
+.rogeros-metric::after { position: absolute; inset: auto -20px -35px auto; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,.025); content: ''; }
+.rogeros-metric > p { color: var(--ros-muted); font-size: 11px; }
+.rogeros-metric > strong { display: block; margin-top: 13px; color: var(--ros-text); font-size: 23px; font-weight: 680; letter-spacing: -.03em; }
+.rogeros-metric > span { display: block; margin-top: 4px; color: var(--ros-faint); font-size: 10px; }
+.rogeros-metric-good > strong { color: var(--ros-good); }
+.rogeros-metric-warn > strong { color: var(--ros-warn); }
+.rogeros-metric-bad > strong { color: var(--ros-bad); }
+.rogeros-avatar { display: inline-grid; flex: none; place-items: center; border: 1px solid rgba(126,208,173,.18); border-radius: 11px; background: linear-gradient(145deg,#263a31,#18251f); color: var(--ros-accent-strong); font-weight: 720; }
+.rogeros-avatar-sm { width: 28px; height: 28px; border-radius: 9px; font-size: 9px; }
+.rogeros-avatar-md { width: 38px; height: 38px; font-size: 11px; }
+.rogeros-avatar-lg { width: 54px; height: 54px; border-radius: 15px; font-size: 14px; }
+.rogeros-status { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ros-line); border-radius: 999px; background: rgba(255,255,255,.025); padding: 4px 8px; color: var(--ros-muted); font-size: 9px; font-weight: 650; letter-spacing: .02em; }
+.rogeros-status > span { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.rogeros-status-good { color: var(--ros-good); }.rogeros-status-warn { color: var(--ros-warn); }.rogeros-status-bad { color: var(--ros-bad); }.rogeros-status-accent { color: var(--ros-accent); }
+.rogeros-empty { display: flex; min-height: 220px; flex-direction: column; align-items: center; justify-content: center; padding: 30px; text-align: center; }
+.rogeros-empty-icon { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid var(--ros-line); border-radius: 12px; background: rgba(255,255,255,.025); color: var(--ros-muted); }
+.rogeros-empty-icon svg { width: 18px; }
+.rogeros-empty h3 { margin-top: 13px; color: var(--ros-text); font-size: 14px; font-weight: 650; }
+.rogeros-empty p { max-width: 360px; margin-top: 5px; color: var(--ros-faint); font-size: 11px; line-height: 1.6; }
+.rogeros-entry { display: grid; min-height: 100vh; place-content: center; background: #0d1110; padding: 24px; text-align: center; }
+.rogeros-entry-mark { display: grid; width: 48px; height: 48px; place-items: center; margin: 0 auto 18px; border-radius: 14px; background: #edf4ef; color: #102018; font-weight: 800; }
+.rogeros-entry h1 { margin-top: 8px; font-size: 24px; font-weight: 650; }.rogeros-entry > p:last-child { max-width: 420px; margin-top: 8px; color: var(--text-2); font-size: 13px; }
+.rogeros-command-backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center; background: rgba(5,8,7,.68); padding: 12vh 20px 20px; backdrop-filter: blur(8px); }
+.rogeros-command { width: min(560px,100%); overflow: hidden; border: 1px solid var(--ros-line-strong); border-radius: 15px; background: #151b18; box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+.rogeros-command > header { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--ros-line); padding: 16px; }.rogeros-command > header svg { width: 19px; color: var(--ros-accent); }.rogeros-command > header div { display: flex; flex: 1; flex-direction: column; }.rogeros-command > header strong { font-size: 13px; }.rogeros-command > header span { margin-top: 2px; color: var(--ros-faint); font-size: 10px; }.rogeros-command kbd { border: 1px solid var(--ros-line); border-radius: 5px; padding: 3px 6px; color: var(--ros-faint); font-size: 9px; }
+.rogeros-command > div { max-height: 430px; overflow-y: auto; padding: 8px; }.rogeros-command > div button { display: flex; width: 100%; align-items: center; gap: 10px; border-radius: 9px; padding: 10px; color: var(--ros-muted); font-size: 12px; text-align: left; }.rogeros-command > div button:hover,.rogeros-command > div button:focus-visible { background: rgba(126,208,173,.08); color: var(--ros-text); }.rogeros-command > div svg { width: 16px; }.rogeros-command > div small { margin-left: auto; color: var(--ros-faint); font-size: 9px; }.rogeros-command footer { border-top: 1px solid var(--ros-line); padding: 10px 16px; color: var(--ros-faint); font-size: 9px; }
+.rogeros-sidebar-backdrop { position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,.55); }
+
+@media (max-width: 900px) {
+  .rogeros-sidebar { transform: translateX(-102%); transition: transform 180ms ease; }
+  .rogeros-sidebar.is-open { transform: translateX(0); box-shadow: 28px 0 80px rgba(0,0,0,.42); }
+  .rogeros-mobile-close,.rogeros-menu-button { display: inline-flex; }
+  .rogeros-main { margin-left: 0; }
+  .rogeros-topbar { padding: 0 18px; }
+  .rogeros-search-trigger { width: auto; margin-left: auto; }
+  .rogeros-search-trigger span,.rogeros-search-trigger kbd,.rogeros-top-status { display: none; }
+  .rogeros-content { padding: 26px 20px 44px; }
+}
+@media (max-width: 600px) {
+  .rogeros-topbar { height: 60px; gap: 12px; }
+  .rogeros-project-switcher { min-width: 0; max-width: 44vw; }
+  .rogeros-project-switcher select { max-width: 40vw; text-overflow: ellipsis; }
+  .rogeros-page-header { align-items: flex-start; flex-direction: column; margin-bottom: 22px; }
+  .rogeros-content { padding: 22px 14px 40px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
    PREMIUM DESIGN SYSTEM  ·  Hermy HQ  ·  "Calm Luxury" (Linear × Stripe)
    Restraint + space. Monochrome surface ladder, hairline borders,
    tabular/mono numerals, ONE desaturated accent, semantic-only

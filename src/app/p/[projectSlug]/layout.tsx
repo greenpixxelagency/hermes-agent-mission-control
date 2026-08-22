@@ -5,5 +5,5 @@ import { ProjectContextError, requireProjectContextBySlug } from '@/lib/project-
 import { prisma } from '@/lib/prisma'
 
 export default async function ProjectLayout({ children, params }: { children: React.ReactNode; params: Promise<{ projectSlug: string }> }) {
-  try { const { projectSlug } = await params; const context = await requireProjectContextBySlug(projectSlug); const projects = await prisma.project.findMany({ where: { members: { some: { organizationMember: { userId: context.user.id } } } }, select: { name: true, slug: true }, orderBy: { name: 'asc' } }); return <RogerOSShell project={context.project} projects={projects}>{children}</RogerOSShell> } catch (error) { if (error instanceof ProjectContextError) notFound(); throw error }
+  try { const { projectSlug } = await params; const context = await requireProjectContextBySlug(projectSlug); const projects = await prisma.project.findMany({ where: { members: { some: { organizationMember: { userId: context.user.id } } } }, select: { name: true, slug: true }, orderBy: { name: 'asc' } }); return <RogerOSShell project={context.project} projects={projects} organization={context.organization.name} accountLabel={context.user.email.split('@')[0]}>{children}</RogerOSShell> } catch (error) { if (error instanceof ProjectContextError) notFound(); throw error }
 }

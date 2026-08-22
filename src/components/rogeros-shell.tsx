@@ -2,23 +2,31 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { signOut } from 'next-auth/react'
+import { useEffect, useMemo, useState } from 'react'
+import { Activity, AppWindow, Bot, Brain, CheckCircle2, ChevronDown, Command, FileBarChart, LayoutDashboard, Menu, Search, Settings, ShieldCheck, Sparkles, Users, X } from 'lucide-react'
 
-const navigation = [
-  ['Command Center', ''], ['Team', 'team'], ['Tasks', 'tasks'], ['Meetings', 'meetings'],
-  ['Workforce', 'workforce'], ['Project Brain', 'brain'], ['Workspaces', 'workspaces'],
-  ['Tools', 'tools'],
-  ['Market', 'market'], ['Approvals', 'approvals'], ['Reports', 'reports'], ['Automations', 'automations'],
+type ShellProject = { name: string; slug: string; role?: string }
+type NavItem = { label: string; path: string; icon: typeof LayoutDashboard; foundation?: boolean }
+const groups: Array<{ label: string; items: NavItem[] }> = [
+  { label: 'Work', items: [{ label: 'Command Center', path: '', icon: LayoutDashboard }, { label: 'Team', path: 'team', icon: Users }, { label: 'Tasks', path: 'tasks', icon: CheckCircle2 }] },
+  { label: 'Company', items: [{ label: 'Workforce', path: 'workforce', icon: Bot }, { label: 'Project Brain', path: 'brain', icon: Brain }, { label: 'Tools', path: 'tools', icon: AppWindow }, { label: 'Market', path: 'market', icon: Sparkles, foundation: true }] },
+  { label: 'Control', items: [{ label: 'Approvals', path: 'approvals', icon: ShieldCheck }, { label: 'Reports', path: 'reports', icon: FileBarChart, foundation: true }, { label: 'Automations', path: 'automations', icon: Activity, foundation: true }] },
 ]
 
-export function RogerOSShell({ children, project, projects }: { children: React.ReactNode; project: { name: string; slug: string }; projects: Array<{ name: string; slug: string }> }) {
-  const pathname = usePathname(); const router = useRouter()
-  const suffix = pathname.split('/').slice(3).join('/')
-  return <div className="min-h-screen bg-[#0b0e14] text-slate-100">
-    <aside className="fixed inset-y-0 hidden w-64 border-r border-white/10 bg-[#10141d] p-5 md:block">
-      <div className="mb-10"><div className="text-xl font-semibold">RogerOS</div><div className="text-xs text-slate-400">by Green Pixxel</div></div>
-      <nav className="space-y-1">{navigation.map(([label, path]) => <Link key={label} href={`/p/${project.slug}${path ? `/${path}` : ''}`} className="block rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white">{label}</Link>)}</nav>
-      <Link href={`/p/${project.slug}/settings`} className="absolute bottom-6 text-sm text-slate-400 hover:text-white">Settings</Link>
-    </aside>
-    <main className="md:ml-64"><header className="flex items-center justify-between border-b border-white/10 px-6 py-4"><div><div className="text-xs uppercase tracking-[0.18em] text-slate-500">Current project</div><select aria-label="Project switcher" value={project.slug} onChange={e => router.push(`/p/${e.target.value}${suffix ? `/${suffix}` : ''}`)} className="mt-1 bg-transparent text-lg font-semibold outline-none">{projects.map(p => <option className="bg-slate-900" key={p.slug} value={p.slug}>{p.name}</option>)}</select></div><div className="flex gap-3 text-sm text-slate-400"><button aria-label="Search" className="rounded-md border border-white/10 px-3 py-1.5">Search</button><div className="rounded-full bg-white/10 px-3 py-1.5">Account</div></div></header><section className="mx-auto max-w-6xl p-6">{children}</section></main>
+export function RogerOSShell({ children, project, projects, organization, accountLabel }: { children: React.ReactNode; project: ShellProject; projects: ShellProject[]; organization: string; accountLabel: string }) {
+  const pathname = usePathname(); const router = useRouter(); const [mobileOpen, setMobileOpen] = useState(false); const [commandOpen, setCommandOpen] = useState(false)
+  const suffix = pathname.split('/').slice(3).join('/'); const allItems = useMemo(() => groups.flatMap(group => group.items), []); const initials = accountLabel.slice(0, 2).toUpperCase()
+  useEffect(() => { const onKey = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); setCommandOpen(value => !value) } if (event.key === 'Escape') { setCommandOpen(false); setMobileOpen(false) } }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [])
+  const hrefFor = (path: string) => `/p/${project.slug}${path ? `/${path}` : ''}`; const active = (path: string) => pathname === hrefFor(path)
+  const navigation = <>{groups.map(group => <div key={group.label} className="rogeros-nav-group"><p>{group.label}</p>{group.items.map(item => { const Icon = item.icon; return <Link key={item.label} href={hrefFor(item.path)} onClick={() => setMobileOpen(false)} className={active(item.path) ? 'is-active' : ''}><Icon aria-hidden /><span>{item.label}</span>{item.foundation && <small>Next</small>}</Link> })}</div>)}</>
+
+  return <div className="rogeros-app">
+    <aside className={`rogeros-sidebar ${mobileOpen ? 'is-open' : ''}`} aria-label="Primary navigation"><div className="rogeros-brand"><span>R</span><div><strong>RogerOS</strong><small>by Green Pixxel</small></div><button className="rogeros-mobile-close" onClick={() => setMobileOpen(false)} aria-label="Close navigation"><X /></button></div><div className="rogeros-project-card"><small>Current company</small><strong>{project.name}</strong><span>{organization}</span></div><nav>{navigation}</nav><div className="rogeros-sidebar-footer"><Link href={`/p/${project.slug}/settings`}><Settings aria-hidden /> Settings</Link><button onClick={() => void signOut({ callbackUrl: '/login' })}><span className="rogeros-account-avatar">{initials}</span><span><strong>{accountLabel}</strong><small>{project.role ? friendlyRole(project.role) : 'Member'}</small></span></button></div></aside>
+    {mobileOpen && <button className="rogeros-sidebar-backdrop" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />}
+    <div className="rogeros-main"><header className="rogeros-topbar"><button className="rogeros-menu-button" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu /></button><label className="rogeros-project-switcher"><span>Project</span><div><select aria-label="Project switcher" value={project.slug} onChange={event => router.push(`/p/${event.target.value}${suffix ? `/${suffix}` : ''}`)}>{projects.map(item => <option key={item.slug} value={item.slug}>{item.name}</option>)}</select><ChevronDown aria-hidden /></div></label><button className="rogeros-search-trigger" onClick={() => setCommandOpen(true)}><Search aria-hidden /><span>Search or go to…</span><kbd>⌘ K</kbd></button><div className="rogeros-top-status"><span aria-hidden /> All systems</div><button className="rogeros-top-account" onClick={() => void signOut({ callbackUrl: '/login' })} title="Sign out">{initials}</button></header><main className="rogeros-content">{children}</main></div>
+    {commandOpen && <div className="rogeros-command-backdrop" role="presentation" onMouseDown={() => setCommandOpen(false)}><div className="rogeros-command" role="dialog" aria-modal="true" aria-label="RogerOS command menu" onMouseDown={event => event.stopPropagation()}><header><Command aria-hidden /><div><strong>Go anywhere in RogerOS</strong><span>Navigation commands available now</span></div><kbd>Esc</kbd></header><div>{allItems.map(item => { const Icon = item.icon; return <button key={item.label} onClick={() => { router.push(hrefFor(item.path)); setCommandOpen(false) }}><Icon aria-hidden /><span>{item.label}</span>{item.foundation && <small>Foundation</small>}</button> })}</div><footer>Project-wide search will arrive in a future milestone.</footer></div></div>}
   </div>
 }
+
+function friendlyRole(role: string) { return role.charAt(0) + role.slice(1).toLowerCase() }

@@ -6,7 +6,7 @@ import { CommandPalette } from '@/components/command-palette';
 
 export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isStandalone = pathname === '/login' || pathname.startsWith('/p/');
+  const isStandalone = pathname === '/' || pathname === '/login' || pathname.startsWith('/p/');
 
   if (isStandalone) {
     return <>{children}</>;
