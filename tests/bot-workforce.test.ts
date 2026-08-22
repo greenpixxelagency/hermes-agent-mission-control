@@ -14,6 +14,7 @@ import type {
   HermesBotIdentitySpec,
   HermesRuntimeAdapter,
 } from '../src/lib/hermes-runtime-adapter'
+import { safeAdapterErrorHint } from '../src/lib/hermes-runtime-adapter'
 
 const prisma = new PrismaClient()
 const suffix = `m14b-${Date.now()}`
@@ -96,6 +97,8 @@ test('M14B provisions deterministic project-scoped bots and enforces runtime aut
   assert.equal(runtimeSlug(' ../Chief of Staff '), 'chief-of-staff')
   assert.equal(vhalamProfile.startsWith(`rogeros-${vhalam.slug}-`), true)
   assert.notEqual(vhalamProfile, buddhajiProfile)
+  assert.equal(safeAdapterErrorHint({ code: 'MISSING_FIELD', field: 'projectKey', message: 'must not be exposed' }), 'MISSING_FIELD_projectKey')
+  assert.equal(safeAdapterErrorHint({ error: 'UNKNOWN_FIELD', unknownFields: ['runtimeProfileKey'], token: 'secret-value' }), 'UNKNOWN_FIELD_runtimeProfileKey')
 
   await assert.rejects(reconcileHermesBotAssignment(context(2), vhalamEmployee.id, harness.adapter), error => hasCode(error, 'FORBIDDEN'))
   await assert.rejects(reconcileHermesBotAssignment(context(3), vhalamEmployee.id, harness.adapter), error => hasCode(error, 'FORBIDDEN'))

@@ -41,7 +41,20 @@ export type HermesRuntimeAdapter = HermesExecutionRuntimeAdapter & {
 const url = () => process.env.HERMES_STAGING_ADAPTER_URL?.replace(/\/$/, '')
 const token = () => process.env.ROGEROS_HERMES_STAGING_ADAPTER_TOKEN
 function config() { const base = url(); const secret = token(); if (!base || !secret) throw new Error('HERMES_ADAPTER_NOT_CONFIGURED'); return { base, headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' } } }
-async function request<T>(path: string, init?: RequestInit): Promise<T> { const c = config(); const response = await fetch(`${c.base}${path}`, { ...init, headers: { ...c.headers, ...init?.headers }, cache: 'no-store' }); if (!response.ok) { const payload=await response.json().catch(()=>null) as null|Record<string,unknown>;const raw=[payload?.code,payload?.error,payload?.message].filter(value=>typeof value==='string').join('_');const hint=raw.replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,160);throw new Error(`HERMES_ADAPTER_${response.status}${hint?`_${hint}`:''}`) } return response.json() as Promise<T> }
+export function safeAdapterErrorHint(payload: null | Record<string, unknown>) {
+  if (!payload) return ''
+  const values: string[] = []
+  for (const key of ['code', 'error', 'field', 'missingField', 'requiredField', 'unknownField']) {
+    const value = payload[key]
+    if (typeof value === 'string' && /^[a-zA-Z][a-zA-Z0-9_.-]{0,80}$/.test(value)) values.push(value)
+  }
+  for (const key of ['fields', 'missingFields', 'requiredFields', 'unknownFields']) {
+    const value = payload[key]
+    if (Array.isArray(value)) values.push(...value.filter((item): item is string => typeof item === 'string' && /^[a-zA-Z][a-zA-Z0-9_.-]{0,80}$/.test(item)))
+  }
+  return [...new Set(values)].join('_').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 160)
+}
+async function request<T>(path: string, init?: RequestInit): Promise<T> { const c = config(); const response = await fetch(`${c.base}${path}`, { ...init, headers: { ...c.headers, ...init?.headers }, cache: 'no-store' }); if (!response.ok) { const payload=await response.json().catch(()=>null) as null|Record<string,unknown>;const hint=safeAdapterErrorHint(payload);throw new Error(`HERMES_ADAPTER_${response.status}${hint?`_${hint}`:''}`) } return response.json() as Promise<T> }
 const botPath = (profileId: string, suffix = '') => `/bots/${encodeURIComponent(profileId)}${suffix}`
 
 export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
