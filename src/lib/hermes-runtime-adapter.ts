@@ -77,6 +77,16 @@ function unwrap<T>(value: unknown, key: string): T {
   if (value && typeof value === 'object' && !Array.isArray(value) && key in value) return (value as Record<string, T>)[key]
   return value as T
 }
+function unwrapList<T>(value: unknown, key: string): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    if (Array.isArray(record[key])) return record[key] as T[]
+    const arrays = Object.values(record).filter(Array.isArray)
+    if (arrays.length === 1) return arrays[0] as T[]
+  }
+  return value as T[]
+}
 
 export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   health: () => request('/health', { headers: {} }),
@@ -86,9 +96,9 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   listBots: () => request('/bots'),
   getBot: async profileId => unwrap<HermesBot>(await request<unknown>(botPath(profileId)), 'bot'),
   getBotRuntimeStatus: async profileId => unwrap<HermesBotRuntimeStatus>(await request<unknown>(botPath(profileId, '/status')), 'status'),
-  listBotSkills: async profileId => unwrap<HermesBotSkill[]>(await request<unknown>(botPath(profileId, '/skills')), 'skills'),
-  listBotRoutines: async profileId => unwrap<HermesBotRoutine[]>(await request<unknown>(botPath(profileId, '/routines')), 'routines'),
-  listBotSessions: async profileId => unwrap<HermesBotSession[]>(await request<unknown>(botPath(profileId, '/sessions')), 'sessions'),
+  listBotSkills: async profileId => unwrapList<HermesBotSkill>(await request<unknown>(botPath(profileId, '/skills')), 'skills'),
+  listBotRoutines: async profileId => unwrapList<HermesBotRoutine>(await request<unknown>(botPath(profileId, '/routines')), 'routines'),
+  listBotSessions: async profileId => unwrapList<HermesBotSession>(await request<unknown>(botPath(profileId, '/sessions')), 'sessions'),
   getBotCapabilityFingerprint: async profileId => unwrap<HermesBotCapability>(await request<unknown>(botPath(profileId, '/capability-fingerprint')), 'capability'),
   // M14B adopts the deterministic profile already provisioned and verified by M14A.
   // A read through the typed Bot endpoint proves its existence without risking a duplicate.
