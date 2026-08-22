@@ -90,7 +90,7 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   // A read through the typed Bot endpoint proves its existence without risking a duplicate.
   ensureBot: spec => request(botPath(spec.profileId)),
   updateBotIdentity: (profileId, metadata) => request(botPath(profileId, '/identity'), { method: 'PUT', body: JSON.stringify(metadata) }),
-  updateBotSoul: (profileId, soul) => request(botPath(profileId, '/soul'), { method: 'PUT', body: JSON.stringify({ revision: soul.revision, content: soul.content }) }),
+  updateBotSoul: (profileId, soul) => request(botPath(profileId, '/soul'), { method: 'PUT', body: JSON.stringify({ revision: String(soul.revision), content: soul.content }) }),
   updateBotRuntimeConfig: (profileId, configValue) => request(botPath(profileId, '/runtime'), { method: 'PUT', body: JSON.stringify(configValue) }),
   reconcileBotSkills: (profileId, approvedSkills) => request(botPath(profileId, '/skills'), { method: 'PUT', body: JSON.stringify({ approvedSkills }) }),
   suspendBotAssignment: profileId => request(botPath(profileId, '/suspend'), { method: 'POST' }),
