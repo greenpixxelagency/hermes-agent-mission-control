@@ -5,6 +5,7 @@ import { OrganizationRole, PrismaClient, ProjectRole } from '@prisma/client'
 import {
   botProfileId,
   compileHermesSoul,
+  normalizeHermesRuntimeObservation,
   reconcileHermesBotAssignment,
   runtimeSlug,
   sendHermesBotMessage,
@@ -58,6 +59,20 @@ function adapterHarness() {
   }
   return { adapter, ensureCount: () => ensureCount, profiles }
 }
+
+test('M14B normalizes truthful runtime observations from status and health', () => {
+  const healthy = normalizeHermesRuntimeObservation({ status: { assignmentState: 'ACTIVE' }, health: { hermesReachable: true, hermesVersion: 'v0.20.5' }, capability: {} })
+  assert.equal(healthy.runtimeStatus, 'HEALTHY')
+  assert.equal(healthy.observedHermesVersion, 'v0.20.5')
+  assert.equal(healthy.botChatAvailable, true)
+  const degradedOptional = normalizeHermesRuntimeObservation({ status: { state: 'ACTIVE' }, health: { hermesReachable: true, hermesVersion: 'v0.20.5' }, capability: { botChatAvailable: false } })
+  assert.equal(degradedOptional.runtimeStatus, 'HEALTHY')
+  assert.equal(degradedOptional.botChatAvailable, false)
+  const unavailable = normalizeHermesRuntimeObservation({ status: { assignmentState: 'ACTIVE' }, health: { hermesReachable: false }, capability: {} })
+  assert.equal(unavailable.runtimeStatus, 'UNHEALTHY')
+  const suspended = normalizeHermesRuntimeObservation({ status: { assignmentState: 'SUSPENDED' }, health: { hermesReachable: true, hermesVersion: 'v0.20.5' }, capability: {} })
+  assert.equal(suspended.runtimeStatus, 'SUSPENDED')
+})
 
 test('M14B provisions deterministic project-scoped bots and enforces runtime authorization', async t => {
   const organization = await prisma.organization.create({ data: { name: 'M14B Test', slug: suffix } })
