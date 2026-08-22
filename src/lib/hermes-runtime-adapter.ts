@@ -63,7 +63,7 @@ function adapterOperation(path: string) {
   if (path.endsWith('/soul')) return 'SOUL'
   if (path.endsWith('/runtime')) return 'RUNTIME'
   if (path.endsWith('/skills')) return 'SKILLS'
-  if (path.endsWith('/capabilities')) return 'CAPABILITIES'
+  if (path.endsWith('/capability-fingerprint')) return 'CAPABILITIES'
   if (path.endsWith('/status')) return 'STATUS'
   if (path.endsWith('/routines')) return 'ROUTINES'
   if (path.endsWith('/sessions')) return 'SESSIONS'
@@ -85,7 +85,7 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   listBotSkills: profileId => request(botPath(profileId, '/skills')),
   listBotRoutines: profileId => request(botPath(profileId, '/routines')),
   listBotSessions: profileId => request(botPath(profileId, '/sessions')),
-  getBotCapabilityFingerprint: profileId => request(botPath(profileId, '/capabilities')),
+  getBotCapabilityFingerprint: profileId => request(botPath(profileId, '/capability-fingerprint')),
   // M14B adopts the deterministic profile already provisioned and verified by M14A.
   // A read through the typed Bot endpoint proves its existence without risking a duplicate.
   ensureBot: spec => request(botPath(spec.profileId)),
