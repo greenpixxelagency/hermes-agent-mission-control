@@ -12,6 +12,7 @@ export type HermesBotCapability = { fingerprint?: string; capabilityFingerprint?
 export type HermesBotSpec = { profileId: string; projectKey: string; employeeKey: string; displayName: string; description: string; soul: { revision: number; hash: string; content: string }; runtime: { provider: string; modelId: string }; approvedSkills: string[] }
 export type HermesBotIdentitySpec = Pick<HermesBotSpec, 'profileId'>
 export type HermesBotMessageResult = { correlationId: string; profileId: string; result: string; sessionId?: string | null; completedAt: string }
+type RawHermesBotMessageResult = Partial<HermesBotMessageResult> & { correlationId?: string; profileId?: string; output?: string }
 
 export type HermesExecutionRuntimeAdapter = {
   health: () => Promise<{ adapter: string; hermesReachable: boolean; hermesVersion: string; runtimeIdentity: string; timestamp: string }>
@@ -102,6 +103,15 @@ function unwrapRoutineList(value: unknown): HermesBotRoutine[] {
   }
   return structured
 }
+export function normalizeHermesBotMessageResult(value: RawHermesBotMessageResult): HermesBotMessageResult {
+  return {
+    correlationId: value.correlationId || '',
+    profileId: value.profileId || '',
+    result: value.result || value.output || '',
+    sessionId: value.sessionId || null,
+    completedAt: value.completedAt || new Date().toISOString(),
+  }
+}
 
 export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   health: () => request('/health', { headers: {} }),
@@ -124,5 +134,5 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   reconcileBotSkills: (profileId, approvedSkills) => request(botPath(profileId, '/skills'), { method: 'PUT', body: JSON.stringify({ approvedSkills }) }),
   suspendBotAssignment: profileId => request(botPath(profileId, '/suspend'), { method: 'POST' }),
   resumeBotAssignment: profileId => request(botPath(profileId, '/resume'), { method: 'POST' }),
-  sendBotMessage: (profileId, message, correlationId) => request(botPath(profileId, '/messages'), { method: 'POST', body: JSON.stringify({ message, correlationId }) }),
+  sendBotMessage: async (profileId, message, correlationId) => normalizeHermesBotMessageResult(await request<RawHermesBotMessageResult>(botPath(profileId, '/messages'), { method: 'POST', body: JSON.stringify({ message, correlationId }) })),
 }

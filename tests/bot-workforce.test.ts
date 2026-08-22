@@ -16,7 +16,7 @@ import type {
   HermesBotIdentitySpec,
   HermesRuntimeAdapter,
 } from '../src/lib/hermes-runtime-adapter'
-import { safeAdapterErrorHint } from '../src/lib/hermes-runtime-adapter'
+import { normalizeHermesBotMessageResult, safeAdapterErrorHint } from '../src/lib/hermes-runtime-adapter'
 
 const prisma = new PrismaClient()
 const suffix = `m14b-${Date.now()}`
@@ -72,6 +72,13 @@ test('M14B normalizes truthful runtime observations from status and health', () 
   assert.equal(unavailable.runtimeStatus, 'UNHEALTHY')
   const suspended = normalizeHermesRuntimeObservation({ status: { assignmentState: 'SUSPENDED' }, health: { hermesReachable: true, hermesVersion: 'v0.20.5' }, capability: {} })
   assert.equal(suspended.runtimeStatus, 'SUSPENDED')
+})
+
+test('M14B normalizes the deployed Bot Chat output envelope', () => {
+  const normalized = normalizeHermesBotMessageResult({ profileId: 'rogeros-vhalam-chief', correlationId: 'safe-correlation', output: 'ROGEROS_M14B_BOT_CHAT_OK' })
+  assert.equal(normalized.result, 'ROGEROS_M14B_BOT_CHAT_OK')
+  assert.equal(normalized.profileId, 'rogeros-vhalam-chief')
+  assert.equal(normalized.correlationId, 'safe-correlation')
 })
 
 test('M14B provisions deterministic project-scoped bots and enforces runtime authorization', async t => {
