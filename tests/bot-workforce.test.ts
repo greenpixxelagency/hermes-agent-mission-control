@@ -48,7 +48,7 @@ function adapterHarness() {
       return bot
     },
     updateBotIdentity: async (profileId, metadata) => ({ ...(bot ?? { profileId, state }), ...metadata, profileId, state }),
-    updateBotSoul: async (profileId, soul) => ({ ...(bot ?? { profileId, displayName: profileId, state }), profileId, state, soulHash: soul.hash }),
+    updateBotSoul: async profileId => ({ ...(bot ?? { profileId, displayName: profileId, state }), profileId, state }),
     updateBotRuntimeConfig: async (profileId, config) => ({ ...(bot ?? { profileId, displayName: profileId, state }), profileId, state, modelProvider: config.provider, modelId: config.modelId }),
     reconcileBotSkills: async () => [],
     suspendBotAssignment: async profileId => { state = 'SUSPENDED'; return { profileId, state } },
