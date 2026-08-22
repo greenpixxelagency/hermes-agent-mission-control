@@ -22,6 +22,7 @@
     "test:approvals": "node --experimental-strip-types --test tests/approval-rules.test.ts",
     "test:approvals:db": "node --env-file=.env.staging --import tsx --test tests/approval-lifecycle.test.ts",
     "test:runtime": "node --import tsx --test tests/runtime-foundation.test.ts",
+    "test:bot-workforce": "node --import tsx --test tests/bot-workforce.test.ts",
     "test:connections": "node --import tsx --test tests/connections-foundation.test.ts",
     "test:drive": "node --import tsx --test tests/drive-foundation.test.ts",
     "db:seed:connections-staging": "tsx prisma/seed-connections-staging.ts",

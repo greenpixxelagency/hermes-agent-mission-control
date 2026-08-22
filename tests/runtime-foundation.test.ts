@@ -4,8 +4,9 @@ import { readFile } from 'node:fs/promises'
 import { PrismaClient, ProjectRole } from '@prisma/client'
 
 import { dispatchTaskToHermes, getHermesExecution } from '../src/lib/hermes-runtime'
-import type { HermesRuntimeAdapter } from '../src/lib/hermes-runtime-adapter'
+import type { HermesExecutionRuntimeAdapter } from '../src/lib/hermes-runtime-adapter'
 import { canDispatchToHermes, canManageRuntimeAssignments } from '../src/lib/hermes-runtime-rules'
+import { botProfileId } from '../src/lib/hermes-bots'
 
 const prisma = new PrismaClient()
 const suffix = `m11-${Date.now()}`
@@ -15,7 +16,7 @@ function hasCode(error: unknown, code: string) {
   return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: unknown }).code === code)
 }
 
-const completedAdapter: HermesRuntimeAdapter = {
+const completedAdapter: HermesExecutionRuntimeAdapter = {
   health: async () => ({ adapter: 'ok', hermesReachable: true, hermesVersion: 'test', runtimeIdentity: 'test', timestamp }),
   ensureProfile: async () => ({ status: 'READY' }),
   dispatchExecution: async ({ executionId }) => ({ externalExecutionId: executionId, status: 'SUCCEEDED', startedAt: timestamp, completedAt: timestamp, result: 'ROGEROS_HERMES_M11_OK test result' }),
@@ -36,9 +37,11 @@ test('M11 runtime preserves project isolation, default-deny roles, and execution
     prisma.employeeProjectAssignment.create({ data: { employeeId: employee.id, projectId: buddhaji.id } }),
   ])
   const runtime = await prisma.hermesRuntime.create({ data: { key: `runtime-${suffix}`, name: 'M11 test runtime', profileKey: 'rogeros-vhalam-chief-of-staff' } })
+  const vhalamProfile = botProfileId(vhalam.slug, employee.systemKey!)
+  const buddhajiProfile = botProfileId(buddhaji.slug, employee.systemKey!)
   const [vhalamRuntime, buddhajiRuntime] = await Promise.all([
-    prisma.hermesRuntimeAssignment.create({ data: { projectId: vhalam.id, runtimeId: runtime.id, employeeProjectAssignmentId: vhalamEmployee.id, profileKey: 'rogeros-vhalam-chief-of-staff' } }),
-    prisma.hermesRuntimeAssignment.create({ data: { projectId: buddhaji.id, runtimeId: runtime.id, employeeProjectAssignmentId: buddhajiEmployee.id, profileKey: 'rogeros-vhalam-chief-of-staff' } }),
+    prisma.hermesRuntimeAssignment.create({ data: { projectId: vhalam.id, runtimeId: runtime.id, employeeProjectAssignmentId: vhalamEmployee.id, profileKey: vhalamProfile } }),
+    prisma.hermesRuntimeAssignment.create({ data: { projectId: buddhaji.id, runtimeId: runtime.id, employeeProjectAssignmentId: buddhajiEmployee.id, profileKey: buddhajiProfile } }),
   ])
   const task = await prisma.task.create({ data: { projectId: vhalam.id, title: 'M11 successful task', description: 'Return a safe test phrase', createdById: users[0].id, assignments: { create: { employeeProjectAssignmentId: vhalamEmployee.id } } } })
   const noRuntimeTask = await prisma.task.create({ data: { projectId: vhalam.id, title: 'M11 no runtime', createdById: users[0].id, assignments: { create: { employeeProjectAssignmentId: vhalamEmployee.id } } } })
@@ -88,14 +91,14 @@ test('M11 runtime preserves project isolation, default-deny roles, and execution
   await prisma.hermesRuntimeAssignment.update({ where: { id: vhalamRuntime.id }, data: { active: true } })
 
   // A malformed response fails closed and emits a failure lifecycle; no task completion is fabricated.
-  const malformed: HermesRuntimeAdapter = { ...completedAdapter, dispatchExecution: async () => ({ externalExecutionId: '', status: 'SUCCEEDED', startedAt: timestamp, completedAt: timestamp, result: 'unsafe' }) }
+  const malformed: HermesExecutionRuntimeAdapter = { ...completedAdapter, dispatchExecution: async () => ({ externalExecutionId: '', status: 'SUCCEEDED', startedAt: timestamp, completedAt: timestamp, result: 'unsafe' }) }
   await assert.rejects(dispatchTaskToHermes(context(0), noRuntimeTask.id, malformed), (error: unknown) => hasCode(error, 'ADAPTER_MALFORMED_RESPONSE'))
   const malformedExecution = await prisma.hermesExecution.findFirstOrThrow({ where: { projectId: vhalam.id, taskId: noRuntimeTask.id }, orderBy: { createdAt: 'desc' } })
   assert.equal(malformedExecution.status, 'FAILED')
   assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: noRuntimeTask.id } })).status, 'TODO')
 
   // Concurrent dispatch has one active winner due to the transaction advisory lock.
-  const running: HermesRuntimeAdapter = { ...completedAdapter, dispatchExecution: async ({ executionId }) => ({ externalExecutionId: executionId, status: 'RUNNING', startedAt: timestamp, completedAt: null }), getExecutionStatus: async executionId => ({ externalExecutionId: executionId, status: 'RUNNING', startedAt: timestamp, completedAt: null }) }
+  const running: HermesExecutionRuntimeAdapter = { ...completedAdapter, dispatchExecution: async ({ executionId }) => ({ externalExecutionId: executionId, status: 'RUNNING', startedAt: timestamp, completedAt: null }), getExecutionStatus: async executionId => ({ externalExecutionId: executionId, status: 'RUNNING', startedAt: timestamp, completedAt: null }) }
   const results = await Promise.allSettled([dispatchTaskToHermes(context(0), duplicateTask.id, running), dispatchTaskToHermes(context(1), duplicateTask.id, running)])
   assert.equal(results.filter(result => result.status === 'fulfilled').length, 1)
   assert.equal(results.filter(result => result.status === 'rejected').length, 1)

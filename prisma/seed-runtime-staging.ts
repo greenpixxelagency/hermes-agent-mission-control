@@ -22,7 +22,7 @@ async function main() {
     update: { name: 'RogerOS Hermes Staging', status: 'ACTIVE', profileKey: 'rogeros-vhalam-chief-of-staff' },
   })
   await prisma.hermesRuntimeAssignment.upsert({
-    where: { projectId_runtimeId: { projectId: project.id, runtimeId: runtime.id } },
+    where: { projectId_employeeProjectAssignmentId: { projectId: project.id, employeeProjectAssignmentId: employeeAssignment.id } },
     create: { projectId: project.id, runtimeId: runtime.id, employeeProjectAssignmentId: employeeAssignment.id, profileKey: 'rogeros-vhalam-chief-of-staff', active: true },
     update: { employeeProjectAssignmentId: employeeAssignment.id, profileKey: 'rogeros-vhalam-chief-of-staff', active: true },
   })

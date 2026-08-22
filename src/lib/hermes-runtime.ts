@@ -7,12 +7,13 @@ import {
 import { randomUUID } from 'node:crypto'
 
 import { recordAuditEvent } from '@/lib/audit'
-import type { HermesAdapterExecution, HermesRuntimeAdapter } from '@/lib/hermes-runtime-adapter'
+import type { HermesAdapterExecution, HermesExecutionRuntimeAdapter } from '@/lib/hermes-runtime-adapter'
 import { hermesRuntimeAdapter } from '@/lib/hermes-runtime-adapter'
 import type { ProjectContext } from '@/lib/project-context'
 import { prisma } from '@/lib/prisma'
 import { canDispatchToHermes, canManageRuntimeAssignments } from '@/lib/hermes-runtime-rules'
 import { getProjectBrainContextForTask } from '@/lib/drive-brain'
+import { botProfileId, runtimeSlug } from '@/lib/hermes-bots'
 
 const activeStatuses: HermesExecutionStatus[] = [HermesExecutionStatus.QUEUED, HermesExecutionStatus.DISPATCHING, HermesExecutionStatus.RUNNING]
 const adapterStatuses = new Set(['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED'])
@@ -136,7 +137,7 @@ async function persistAdapterStatus(context: ProjectContext, memberId: string, e
   return execution
 }
 
-async function pollBounded(context: ProjectContext, memberId: string, execution: { id: string; taskId: string; externalExecutionId: string | null; status: HermesExecutionStatus }, adapter: HermesRuntimeAdapter) {
+async function pollBounded(context: ProjectContext, memberId: string, execution: { id: string; taskId: string; externalExecutionId: string | null; status: HermesExecutionStatus }, adapter: HermesExecutionRuntimeAdapter) {
   let current = execution
   for (const delayMs of [250, 500, 1000]) {
     if (!current.externalExecutionId || !activeStatuses.includes(current.status)) break
@@ -147,7 +148,7 @@ async function pollBounded(context: ProjectContext, memberId: string, execution:
   return current
 }
 
-export async function dispatchTaskToHermes(context: ProjectContext, taskId: string, adapter: HermesRuntimeAdapter = hermesRuntimeAdapter) {
+export async function dispatchTaskToHermes(context: ProjectContext, taskId: string, adapter: HermesExecutionRuntimeAdapter = hermesRuntimeAdapter) {
   if (!canDispatchToHermes(context.project.role)) throw new HermesRuntimeError('FORBIDDEN')
   const member = await actorMember(context)
 
@@ -164,12 +165,16 @@ export async function dispatchTaskToHermes(context: ProjectContext, taskId: stri
         projectId: context.project.id,
         employeeProjectAssignmentId: assignmentId,
         active: true,
+        assignmentState: 'ACTIVE',
         runtime: { status: 'ACTIVE' },
         employeeAssignment: { status: 'ACTIVE' },
       },
       include: { runtime: true, employeeAssignment: { include: { employee: true } } },
     })
     if (!runtimeAssignment) throw new HermesRuntimeError('RUNTIME_ASSIGNMENT_NOT_FOUND')
+    if (!runtimeAssignment.employeeAssignment) throw new HermesRuntimeError('EMPLOYEE_ASSIGNMENT_REQUIRED')
+    const expectedProfile = botProfileId(context.project.slug, runtimeAssignment.employeeAssignment.employee.systemKey || runtimeAssignment.employeeAssignment.employee.name)
+    if (runtimeAssignment.profileKey !== expectedProfile) throw new HermesRuntimeError('INVALID_RUNTIME_IDENTITY')
     const existing = await tx.hermesExecution.findFirst({
       where: { projectId: context.project.id, taskId, status: { in: activeStatuses } },
       select: { id: true },
@@ -188,7 +193,11 @@ export async function dispatchTaskToHermes(context: ProjectContext, taskId: stri
         prompt: task.description || task.title,
       },
     })
-    return { execution, runtimeAssignment }
+    return {
+      execution,
+      runtimeAssignment,
+      employeeKey: runtimeSlug(runtimeAssignment.employeeAssignment.employee.systemKey || runtimeAssignment.employeeAssignment.employee.name),
+    }
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
   await recordLifecycle({ context, memberId: member.id, executionId: prepared.execution.id, taskId, eventType: 'runtime.execution.queued', activityType: TaskActivityType.RUNTIME_QUEUED, summary: 'Hermes execution queued' })
@@ -198,9 +207,9 @@ export async function dispatchTaskToHermes(context: ProjectContext, taskId: stri
     const contextBlock = brain.length ? `\n\nAuthorized Project Brain context (use only when relevant):\n${brain.map(item => `[Source: ${item.provenance.name}; Drive file: ${item.provenance.fileId}]\n${item.content}`).join('\n\n')}` : ''
     const response = await adapter.dispatchExecution({
       executionId: prepared.execution.externalExecutionId!,
-      projectKey: 'rogeros-vhalam',
-      runtimeProfileKey: prepared.runtimeAssignment.profileKey as 'rogeros-vhalam-chief-of-staff',
-      employeeKey: 'chief-of-staff',
+      projectKey: `rogeros-${runtimeSlug(context.project.slug)}`,
+      runtimeProfileKey: prepared.runtimeAssignment.profileKey,
+      employeeKey: prepared.employeeKey,
       taskInstruction: `${prepared.execution.prompt}${contextBlock}`,
     })
     const saved = await persistAdapterStatus(context, member.id, prepared.execution.id, taskId, response)
@@ -219,7 +228,7 @@ export async function getHermesExecution(context: ProjectContext, executionId: s
   return execution
 }
 
-export async function refreshHermesExecution(context: ProjectContext, executionId: string, adapter: HermesRuntimeAdapter = hermesRuntimeAdapter) {
+export async function refreshHermesExecution(context: ProjectContext, executionId: string, adapter: HermesExecutionRuntimeAdapter = hermesRuntimeAdapter) {
   const member = await actorMember(context)
   const execution = await getHermesExecution(context, executionId)
   if (!activeStatuses.includes(execution.status)) return execution

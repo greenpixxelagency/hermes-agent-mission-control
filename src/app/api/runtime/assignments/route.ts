@@ -4,9 +4,9 @@ import { canManageRuntimeAssignments, HermesRuntimeError } from '@/lib/hermes-ru
 import { runtimeErrorResponse } from '@/lib/hermes-runtime-api'
 import { prisma } from '@/lib/prisma'
 import { projectScopeErrorResponse, requireProjectContextForBody, requireProjectContextForRequest } from '@/lib/project-scope'
+import { botProfileId } from '@/lib/hermes-bots'
 
 const supportedRuntimeKey = 'rogeros-hermes-staging'
-const supportedProfileKey = 'rogeros-vhalam-chief-of-staff'
 
 export async function GET(request: Request) {
   try {
@@ -35,10 +35,12 @@ export async function POST(request: Request) {
       prisma.employeeProjectAssignment.findFirst({ where: { id: employeeProjectAssignmentId, projectId: context.project.id, status: 'ACTIVE' } }),
     ])
     if (!runtime || !employeeAssignment) throw new HermesRuntimeError('RUNTIME_ASSIGNMENT_NOT_FOUND')
+    const employee = await prisma.employee.findUniqueOrThrow({ where: { id: employeeAssignment.employeeId }, select: { name: true, systemKey: true } })
+    const profileKey = botProfileId(context.project.slug, employee.systemKey || employee.name)
     const assignment = await prisma.hermesRuntimeAssignment.upsert({
-      where: { projectId_runtimeId: { projectId: context.project.id, runtimeId: runtime.id } },
-      create: { projectId: context.project.id, runtimeId: runtime.id, employeeProjectAssignmentId: employeeAssignment.id, profileKey: supportedProfileKey, active: true },
-      update: { employeeProjectAssignmentId: employeeAssignment.id, profileKey: supportedProfileKey, active: true },
+      where: { projectId_employeeProjectAssignmentId: { projectId: context.project.id, employeeProjectAssignmentId: employeeAssignment.id } },
+      create: { projectId: context.project.id, runtimeId: runtime.id, employeeProjectAssignmentId: employeeAssignment.id, profileKey, active: true },
+      update: { runtimeId: runtime.id, active: true },
       include: { runtime: true, employeeAssignment: { include: { employee: true } } },
     })
     return NextResponse.json({ assignment }, { status: 201 })

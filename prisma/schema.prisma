@@ -82,6 +82,31 @@ enum HermesRuntimeStatus {
   ARCHIVED
 }
 
+enum HermesRuntimeKind {
+  HERMES_PROFILE
+  HERMES_BOT
+}
+
+enum HermesProvisioningState {
+  UNPROVISIONED
+  PROVISIONING
+  READY
+  FAILED
+}
+
+enum HermesReconciliationState {
+  IN_SYNC
+  DRIFTED
+  SYNCING
+  FAILED
+}
+
+enum HermesRuntimeAssignmentState {
+  ACTIVE
+  SUSPENDED
+  RETIRED
+}
+
 enum HermesExecutionStatus {
   QUEUED
   DISPATCHING
@@ -1028,6 +1053,26 @@ model HermesRuntimeAssignment {
   employeeProjectAssignmentId String?
   profileKey                  String
   active                      Boolean                    @default(true)
+  runtimeKind                 HermesRuntimeKind          @default(HERMES_PROFILE)
+  assignmentState             HermesRuntimeAssignmentState @default(ACTIVE)
+  provisioningState           HermesProvisioningState    @default(UNPROVISIONED)
+  reconciliationState         HermesReconciliationState  @default(DRIFTED)
+  desiredDisplayName          String?
+  desiredDescription          String?                    @db.Text
+  desiredSoulRevision         Int                        @default(1)
+  desiredSoulHash             String?
+  desiredModelProvider        String?
+  desiredModelId              String?
+  desiredSkillRevision        Int                        @default(0)
+  desiredRoutineRevision      Int                        @default(0)
+  lastObservedHermesVersion   String?
+  capabilityFingerprint       String?
+  lastReconciledAt            DateTime?
+  lastReconcileError          String?                    @db.Text
+  runtimeStatus               String?
+  suspendedAt                 DateTime?
+  retiredAt                   DateTime?
+  externalRuntimeMetadata     Json?
   createdAt                   DateTime                   @default(now())
   updatedAt                   DateTime                   @updatedAt
   project                     Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1035,7 +1080,8 @@ model HermesRuntimeAssignment {
   employeeAssignment          EmployeeProjectAssignment? @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
   executions                  HermesExecution[]
 
-  @@unique([projectId, runtimeId])
+  @@unique([projectId, employeeProjectAssignmentId])
+  @@unique([projectId, profileKey])
   @@unique([id, projectId])
   @@index([projectId, active])
 }
