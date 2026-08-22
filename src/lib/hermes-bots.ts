@@ -220,7 +220,7 @@ export async function sendHermesBotMessage(context: ProjectContext, employeeProj
   try {
     const response = await adapter.sendBotMessage(profileId, text, correlationId)
     validateProfile(response.profileId, profileId)
-    if (response.correlationId !== correlationId || !response.result?.trim()) throw new HermesBotError('ADAPTER_MALFORMED_RESPONSE')
+    if (response.correlationId !== correlationId || !response.result?.trim()) throw new HermesBotError(`ADAPTER_CHAT_SHAPE_${safeResponseShape(response)}`)
     const saved = await prisma.message.create({ data: { projectId: context.project.id, conversationId: conversation.id, authorSystemIdentity: systemIdentity(profileId), body: response.result.trim().slice(0, 20_000), kind: `BOT_CHAT_RESPONSE:${correlationId}` } })
     await audit(context, member.id, 'runtime.bot.chat.succeeded', loaded.runtimeAssignment.id, 'Hermes Bot Chat succeeded', { correlationId, profileId, conversationId: conversation.id, responseMessageId: saved.id, sessionId: response.sessionId || null })
     return { correlationId, conversationId: conversation.id, messageId: saved.id, result: saved.body, sessionId: response.sessionId || null }
