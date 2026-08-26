@@ -66,8 +66,10 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
+
+html[data-theme='dark'] { color-scheme: dark; }
 
 body {
   background: var(--background);
@@ -168,9 +170,45 @@ textarea, input {
 .rogeros-app {
   min-height: 100vh;
   background:
-    radial-gradient(900px 500px at 35% -20%, rgba(67, 117, 102, 0.13), transparent 70%),
-    #0d1110;
-  color: #ecf0ed;
+    radial-gradient(900px 500px at 35% -20%, var(--ros-ambient), transparent 70%),
+    var(--ros-bg);
+  color: var(--ros-text);
+  --ros-bg: #f4f7f5;
+  --ros-sidebar: #edf3ef;
+  --ros-surface: #ffffff;
+  --ros-surface-raised: #f7faf8;
+  --ros-line: rgba(24, 61, 43, 0.11);
+  --ros-line-strong: rgba(24, 61, 43, 0.2);
+  --ros-text: #17251d;
+  --ros-muted: #52665b;
+  --ros-faint: #6b7c72;
+  --ros-accent: #247858;
+  --ros-accent-strong: #165f43;
+  --ros-good: #19734d;
+  --ros-warn: #855b0d;
+  --ros-bad: #aa3c36;
+  --ros-ambient: rgba(53, 145, 103, 0.11);
+  --ros-subtle: rgba(24, 88, 57, 0.035);
+  --ros-subtle-hover: rgba(24, 88, 57, 0.065);
+  --ros-brand-bg: #1f6b4d;
+  --ros-brand-text: #ffffff;
+  --ros-avatar-bg: #dceae2;
+  --ros-avatar-bg-strong: #cfe2d7;
+  --ros-primary-bg: #1f6b4d;
+  --ros-primary-text: #ffffff;
+  --ros-topbar: rgba(244, 247, 245, .88);
+  --ros-command-backdrop: rgba(20, 32, 26, .42);
+  --surface-1: var(--ros-surface);
+  --surface-2: var(--ros-surface-raised);
+  --surface-3: var(--ros-surface-raised);
+  --line: var(--ros-line);
+  --line-strong: var(--ros-line-strong);
+  --text: var(--ros-text);
+  --text-2: var(--ros-muted);
+  --text-3: var(--ros-faint);
+  --accent: var(--ros-accent);
+}
+[data-theme='dark'] .rogeros-app {
   --ros-bg: #0d1110;
   --ros-sidebar: #111614;
   --ros-surface: #151b18;
@@ -185,16 +223,27 @@ textarea, input {
   --ros-good: #69d09f;
   --ros-warn: #e4bd68;
   --ros-bad: #eb827a;
+  --ros-ambient: rgba(67, 117, 102, 0.13);
+  --ros-subtle: rgba(255,255,255,.025);
+  --ros-subtle-hover: rgba(255,255,255,.04);
+  --ros-brand-bg: #edf4ef;
+  --ros-brand-text: #102018;
+  --ros-avatar-bg: #24322b;
+  --ros-avatar-bg-strong: #18251f;
+  --ros-primary-bg: #dcece3;
+  --ros-primary-text: #142019;
+  --ros-topbar: rgba(13,17,16,.82);
+  --ros-command-backdrop: rgba(5,8,7,.68);
 }
 .rogeros-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 40; display: flex; width: 260px; flex-direction: column; border-right: 1px solid var(--ros-line); background: color-mix(in srgb, var(--ros-sidebar) 94%, transparent); padding: 22px 18px 18px; backdrop-filter: blur(20px); }
 .rogeros-brand { display: flex; align-items: center; gap: 11px; padding: 0 7px; }
-.rogeros-brand > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: #edf4ef; color: #102018; font-size: 15px; font-weight: 800; }
+.rogeros-brand > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: var(--ros-brand-bg); color: var(--ros-brand-text); font-size: 15px; font-weight: 800; }
 .rogeros-brand > div { display: flex; flex-direction: column; line-height: 1.15; }
 .rogeros-brand strong { font-size: 16px; letter-spacing: -0.02em; }
 .rogeros-brand small { margin-top: 4px; color: var(--ros-faint); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 .rogeros-mobile-close { display: none; margin-left: auto; color: var(--ros-muted); }
 .rogeros-mobile-close svg { width: 19px; }
-.rogeros-project-card { display: flex; flex-direction: column; margin: 24px 3px 18px; border: 1px solid var(--ros-line); border-radius: 12px; background: rgba(255,255,255,.025); padding: 12px 14px; }
+.rogeros-project-card { display: flex; flex-direction: column; margin: 24px 3px 18px; border: 1px solid var(--ros-line); border-radius: 12px; background: var(--ros-subtle); padding: 12px 14px; }
 .rogeros-project-card small { color: var(--ros-faint); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .rogeros-project-card strong { margin-top: 5px; font-size: 14px; }
 .rogeros-project-card span { margin-top: 2px; color: var(--ros-muted); font-size: 11px; }
@@ -203,23 +252,23 @@ textarea, input {
 .rogeros-nav-group:first-child { margin-top: 2px; }
 .rogeros-nav-group > p { margin: 0 10px 7px; color: var(--ros-faint); font-size: 9px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
 .rogeros-nav-group a { display: flex; min-height: 38px; align-items: center; gap: 11px; margin: 2px 0; border: 1px solid transparent; border-radius: 9px; padding: 8px 10px; color: var(--ros-muted); font-size: 13px; transition: 160ms ease; }
-.rogeros-nav-group a:hover { background: rgba(255,255,255,.035); color: var(--ros-text); }
+.rogeros-nav-group a:hover { background: var(--ros-subtle-hover); color: var(--ros-text); }
 .rogeros-nav-group a.is-active { border-color: rgba(126,208,173,.13); background: rgba(126,208,173,.09); color: var(--ros-accent-strong); }
 .rogeros-nav-group svg { width: 16px; height: 16px; stroke-width: 1.8; }
 .rogeros-nav-group small { margin-left: auto; border: 1px solid var(--ros-line); border-radius: 999px; padding: 2px 5px; color: var(--ros-faint); font-size: 8px; text-transform: uppercase; }
 .rogeros-sidebar-footer { border-top: 1px solid var(--ros-line); padding-top: 12px; }
 .rogeros-sidebar-footer > a { display: flex; align-items: center; gap: 10px; border-radius: 9px; padding: 9px 10px; color: var(--ros-muted); font-size: 12px; }
-.rogeros-sidebar-footer > a:hover { background: rgba(255,255,255,.035); color: var(--ros-text); }
+.rogeros-sidebar-footer > a:hover { background: var(--ros-subtle-hover); color: var(--ros-text); }
 .rogeros-sidebar-footer > a svg { width: 15px; }
 .rogeros-sidebar-footer > button { display: flex; width: 100%; align-items: center; gap: 10px; margin-top: 5px; border-radius: 10px; padding: 8px; text-align: left; }
-.rogeros-sidebar-footer > button:hover { background: rgba(255,255,255,.035); }
-.rogeros-account-avatar, .rogeros-top-account { display: grid; place-items: center; border: 1px solid var(--ros-line-strong); border-radius: 50%; background: #24322b; color: var(--ros-accent-strong); font-weight: 700; text-transform: uppercase; }
+.rogeros-sidebar-footer > button:hover { background: var(--ros-subtle-hover); }
+.rogeros-account-avatar, .rogeros-top-account { display: grid; place-items: center; border: 1px solid var(--ros-line-strong); border-radius: 50%; background: var(--ros-avatar-bg); color: var(--ros-accent-strong); font-weight: 700; text-transform: uppercase; }
 .rogeros-account-avatar { width: 31px; height: 31px; font-size: 10px; }
 .rogeros-sidebar-footer button > span:last-child { display: flex; min-width: 0; flex-direction: column; }
 .rogeros-sidebar-footer button strong { max-width: 140px; overflow: hidden; color: var(--ros-text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .rogeros-sidebar-footer button small { color: var(--ros-faint); font-size: 9px; }
 .rogeros-main { min-height: 100vh; margin-left: 260px; }
-.rogeros-topbar { position: sticky; top: 0; z-index: 30; display: flex; height: 66px; align-items: center; gap: 18px; border-bottom: 1px solid var(--ros-line); background: rgba(13,17,16,.82); padding: 0 28px; backdrop-filter: blur(18px); }
+.rogeros-topbar { position: sticky; top: 0; z-index: 30; display: flex; height: 66px; align-items: center; gap: 18px; border-bottom: 1px solid var(--ros-line); background: var(--ros-topbar); padding: 0 28px; backdrop-filter: blur(18px); }
 .rogeros-menu-button { display: none; color: var(--ros-muted); }
 .rogeros-menu-button svg { width: 20px; }
 .rogeros-project-switcher { display: flex; flex-direction: column; min-width: 150px; }
@@ -227,19 +276,22 @@ textarea, input {
 .rogeros-project-switcher > div { display: flex; align-items: center; }
 .rogeros-project-switcher select { min-width: 0; appearance: none; background: transparent; padding: 2px 22px 0 0; color: var(--ros-text); font-size: 14px; font-weight: 650; outline: none; }
 .rogeros-project-switcher svg { width: 14px; margin-left: -17px; color: var(--ros-faint); pointer-events: none; }
-.rogeros-search-trigger { display: flex; width: min(400px, 38vw); align-items: center; gap: 9px; margin: 0 auto; border: 1px solid var(--ros-line); border-radius: 10px; background: rgba(255,255,255,.025); padding: 8px 10px; color: var(--ros-faint); font-size: 12px; text-align: left; }
+.rogeros-search-trigger { display: flex; width: min(400px, 38vw); align-items: center; gap: 9px; margin: 0 auto; border: 1px solid var(--ros-line); border-radius: 10px; background: var(--ros-subtle); padding: 8px 10px; color: var(--ros-faint); font-size: 12px; text-align: left; }
 .rogeros-search-trigger:hover { border-color: var(--ros-line-strong); color: var(--ros-muted); }
 .rogeros-search-trigger svg { width: 15px; }
 .rogeros-search-trigger kbd { margin-left: auto; border: 1px solid var(--ros-line); border-radius: 5px; padding: 2px 5px; font-size: 9px; }
 .rogeros-top-status { display: flex; align-items: center; gap: 6px; color: var(--ros-faint); font-size: 10px; white-space: nowrap; }
 .rogeros-top-status > span { width: 6px; height: 6px; border-radius: 50%; background: var(--ros-good); box-shadow: 0 0 0 3px rgba(105,208,159,.1); }
 .rogeros-top-account { width: 31px; height: 31px; font-size: 9px; }
+.rogeros-theme-toggle { display: grid; width: 31px; height: 31px; flex: none; place-items: center; border: 1px solid var(--ros-line); border-radius: 9px; background: var(--ros-subtle); color: var(--ros-muted); transition: 160ms ease; }
+.rogeros-theme-toggle:hover { border-color: var(--ros-line-strong); background: var(--ros-subtle-hover); color: var(--ros-text); }
+.rogeros-theme-toggle svg { width: 14px; height: 14px; }
 .rogeros-content { width: 100%; max-width: 1500px; margin: 0 auto; padding: 32px clamp(20px, 3.4vw, 50px) 56px; }
 .rogeros-app .panel { border-color: var(--ros-line); background: var(--ros-surface); box-shadow: none; }
 .rogeros-app .panel-interactive:hover { border-color: var(--ros-line-strong); background: var(--ros-surface-raised); }
-.rogeros-app .btn-primary { border: 1px solid rgba(162,226,198,.4); background: #dcece3; color: #142019; box-shadow: none; }
+.rogeros-app .btn-primary { border: 1px solid color-mix(in srgb, var(--ros-primary-bg) 72%, transparent); background: var(--ros-primary-bg); color: var(--ros-primary-text); box-shadow: none; }
 .rogeros-app .btn-ghost { border-color: var(--ros-line); background: transparent; color: var(--ros-muted); }
-.rogeros-app :where(input,textarea,select) { border-color: var(--ros-line); border-radius: 9px; background-color: rgba(255,255,255,.02); color: var(--ros-text); outline: none; }
+.rogeros-app :where(input,textarea,select) { border-color: var(--ros-line); border-radius: 9px; background-color: var(--ros-subtle); color: var(--ros-text); outline: none; }
 .rogeros-app :where(input,textarea,select)::placeholder { color: var(--ros-faint); }
 .rogeros-app :where(input,textarea,select):focus { border-color: rgba(126,208,173,.5); box-shadow: 0 0 0 3px rgba(126,208,173,.08); }
 .rogeros-page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
@@ -257,7 +309,7 @@ textarea, input {
 .rogeros-metric-good > strong { color: var(--ros-good); }
 .rogeros-metric-warn > strong { color: var(--ros-warn); }
 .rogeros-metric-bad > strong { color: var(--ros-bad); }
-.rogeros-avatar { display: inline-grid; flex: none; place-items: center; border: 1px solid rgba(126,208,173,.18); border-radius: 11px; background: linear-gradient(145deg,#263a31,#18251f); color: var(--ros-accent-strong); font-weight: 720; }
+.rogeros-avatar { display: inline-grid; flex: none; place-items: center; border: 1px solid color-mix(in srgb, var(--ros-accent) 22%, transparent); border-radius: 11px; background: linear-gradient(145deg,var(--ros-avatar-bg),var(--ros-avatar-bg-strong)); color: var(--ros-accent-strong); font-weight: 720; }
 .rogeros-avatar-sm { width: 28px; height: 28px; border-radius: 9px; font-size: 9px; }
 .rogeros-avatar-md { width: 38px; height: 38px; font-size: 11px; }
 .rogeros-avatar-lg { width: 54px; height: 54px; border-radius: 15px; font-size: 14px; }
@@ -269,11 +321,11 @@ textarea, input {
 .rogeros-empty-icon svg { width: 18px; }
 .rogeros-empty h3 { margin-top: 13px; color: var(--ros-text); font-size: 14px; font-weight: 650; }
 .rogeros-empty p { max-width: 360px; margin-top: 5px; color: var(--ros-faint); font-size: 11px; line-height: 1.6; }
-.rogeros-entry { display: grid; min-height: 100vh; place-content: center; background: #0d1110; padding: 24px; text-align: center; }
-.rogeros-entry-mark { display: grid; width: 48px; height: 48px; place-items: center; margin: 0 auto 18px; border-radius: 14px; background: #edf4ef; color: #102018; font-weight: 800; }
+.rogeros-entry { display: grid; min-height: 100vh; place-content: center; background: var(--ros-bg, var(--background)); padding: 24px; text-align: center; }
+.rogeros-entry-mark { display: grid; width: 48px; height: 48px; place-items: center; margin: 0 auto 18px; border-radius: 14px; background: var(--ros-brand-bg, #1f6b4d); color: var(--ros-brand-text, #fff); font-weight: 800; }
 .rogeros-entry h1 { margin-top: 8px; font-size: 24px; font-weight: 650; }.rogeros-entry > p:last-child { max-width: 420px; margin-top: 8px; color: var(--text-2); font-size: 13px; }
-.rogeros-command-backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center; background: rgba(5,8,7,.68); padding: 12vh 20px 20px; backdrop-filter: blur(8px); }
-.rogeros-command { width: min(560px,100%); overflow: hidden; border: 1px solid var(--ros-line-strong); border-radius: 15px; background: #151b18; box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+.rogeros-command-backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center; background: var(--ros-command-backdrop); padding: 12vh 20px 20px; backdrop-filter: blur(8px); }
+.rogeros-command { width: min(560px,100%); overflow: hidden; border: 1px solid var(--ros-line-strong); border-radius: 15px; background: var(--ros-surface-raised); box-shadow: 0 30px 80px rgba(0,0,0,.24); }
 .rogeros-command > header { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--ros-line); padding: 16px; }.rogeros-command > header svg { width: 19px; color: var(--ros-accent); }.rogeros-command > header div { display: flex; flex: 1; flex-direction: column; }.rogeros-command > header strong { font-size: 13px; }.rogeros-command > header span { margin-top: 2px; color: var(--ros-faint); font-size: 10px; }.rogeros-command kbd { border: 1px solid var(--ros-line); border-radius: 5px; padding: 3px 6px; color: var(--ros-faint); font-size: 9px; }
 .rogeros-command > div { max-height: 430px; overflow-y: auto; padding: 8px; }.rogeros-command > div button { display: flex; width: 100%; align-items: center; gap: 10px; border-radius: 9px; padding: 10px; color: var(--ros-muted); font-size: 12px; text-align: left; }.rogeros-command > div button:hover,.rogeros-command > div button:focus-visible { background: rgba(126,208,173,.08); color: var(--ros-text); }.rogeros-command > div svg { width: 16px; }.rogeros-command > div small { margin-left: auto; color: var(--ros-faint); font-size: 9px; }.rogeros-command footer { border-top: 1px solid var(--ros-line); padding: 10px 16px; color: var(--ros-faint); font-size: 9px; }
 .rogeros-sidebar-backdrop { position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,.55); }

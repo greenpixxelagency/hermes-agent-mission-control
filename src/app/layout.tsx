@@ -15,14 +15,17 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+const themeBootstrap = `(function(){try{var saved=localStorage.getItem('rogeros-theme');var theme=saved==='light'||saved==='dark'?saved:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');var root=document.documentElement;root.dataset.theme=theme;root.classList.toggle('dark',theme==='dark');root.style.colorScheme=theme;}catch(_){document.documentElement.dataset.theme='dark';document.documentElement.classList.add('dark');}})();`;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" dir="ltr" className="dark">
-      <body className="bg-[#0a0a0a] text-white min-h-screen">
+    <html lang="en" dir="ltr" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeBootstrap }} /></head>
+      <body className="min-h-screen">
         <ConditionalLayout>{children}</ConditionalLayout>
       </body>
     </html>
