@@ -13,7 +13,7 @@ const hasCode = (error: unknown, code: string) => Boolean(error && typeof error 
 
 function adapterHarness() {
   let bot: HermesBot | null = null
-  let observed: HermesBotSkill[] = [{ key: 'bundled-core', name: 'Bundled core', bundled: true }]
+  const observed: HermesBotSkill[] = [{ key: 'bundled-core', name: 'Bundled core', bundled: true }]
   let reconcileCalls = 0
   const provisioned: string[] = []
   const desired: string[][] = []
@@ -23,8 +23,8 @@ function adapterHarness() {
     listBots:async()=>bot?[bot]:[], getBot:async profileId=>bot??{profileId,displayName:profileId,state:'ACTIVE'}, getBotRuntimeStatus:async profileId=>({profileId,assignmentState:'ACTIVE',healthy:true,skillsAvailable:true,botChatAvailable:true}),
     listBotSkills:async()=>observed, listBotRoutines:async()=>[], listBotSessions:async()=>[], getBotCapabilityFingerprint:async()=>({fingerprint:`m15-${reconcileCalls}`,skillCount:observed.length,botChatAvailable:true,routinesAvailable:true}),
     ensureBot:async(spec:HermesBotIdentitySpec)=>{bot={profileId:spec.profileId,displayName:spec.profileId,state:'ACTIVE'};return bot}, updateBotIdentity:async(profileId,metadata)=>({profileId,state:'ACTIVE',...metadata}), updateBotSoul:async profileId=>({profileId,displayName:profileId,state:'ACTIVE'}), updateBotRuntimeConfig:async(profileId,config)=>({profileId,displayName:profileId,state:'ACTIVE',modelProvider:config.provider,modelId:config.modelId}),
-    provisionBotSkill:async(_profileId,skillId)=>{const first=!provisioned.includes(skillId);if(first)provisioned.push(skillId);return{skillId,provisioned:first,idempotent:!first}},
-    reconcileBotSkills:async(_profileId,approvedSkills)=>{reconcileCalls+=1;desired.push([...approvedSkills]);observed=[{key:'bundled-core',name:'Bundled core',bundled:true},...approvedSkills.map(key=>({key,name:key,bundled:false}))];return observed}, suspendBotAssignment:async profileId=>({profileId,state:'SUSPENDED'}),resumeBotAssignment:async profileId=>({profileId,state:'ACTIVE'}),sendBotMessage:async(profileId,_message,correlationId)=>({profileId,correlationId,result:'ROGEROS_M15_SKILL_OK',completedAt:timestamp}),
+    provisionBotSkill:async(_profileId,skillId)=>{const first=!provisioned.includes(skillId);if(first){provisioned.push(skillId);observed.push({key:skillId,name:skillId,bundled:false})}return{skillId,provisioned:first,idempotent:!first}},
+    reconcileBotSkills:async(_profileId,approvedSkills)=>{reconcileCalls+=1;desired.push([...approvedSkills]);return[{key:'bundled-core',name:'Bundled core',bundled:true},...approvedSkills.map(key=>({key,name:key,bundled:false}))]}, suspendBotAssignment:async profileId=>({profileId,state:'SUSPENDED'}),resumeBotAssignment:async profileId=>({profileId,state:'ACTIVE'}),sendBotMessage:async(profileId,_message,correlationId)=>({profileId,correlationId,result:'ROGEROS_M15_SKILL_OK',completedAt:timestamp}),
   }
   return {adapter,desired,observed:()=>observed,reconcileCalls:()=>reconcileCalls,provisioned}
 }
@@ -81,6 +81,10 @@ test('M15 governs trusted employee skills, isolation, reconciliation, removal, a
   assert.equal(removed.state,'REMOVED');assert.equal(removed.reconciliationStatus,'IN_SYNC')
   assert.deepEqual(harness.desired.at(-1),[])
   assert.equal(harness.observed().some(skill=>skill.key==='bundled-core'&&skill.bundled),true)
+  assert.equal(harness.observed().some(skill=>skill.key===trusted.sourceIdentifier),true)
+  const removedRuntime=await prisma.hermesRuntimeAssignment.findFirstOrThrow({where:{employeeProjectAssignmentId:vhalamEmployee.id}})
+  const removedMetadata=removedRuntime.externalRuntimeMetadata as {skills?:Array<{key?:string}>}|null
+  assert.equal(removedMetadata?.skills?.some(skill=>skill.key===trusted.sourceIdentifier),false)
   await assert.rejects(removeSkill(context(0),buddhajiEmployee.id,trusted.id,harness.adapter),error=>hasCode(error,'EMPLOYEE_ASSIGNMENT_NOT_FOUND'))
   const audits=await prisma.auditEvent.findMany({where:{projectId:vhalam.id,targetId:assigned.id}})
   for(const type of ['skill.assigned','skill.removed','skill.reconcile.requested','skill.reconcile.succeeded'])assert.equal(audits.some(event=>event.eventType===type),true)

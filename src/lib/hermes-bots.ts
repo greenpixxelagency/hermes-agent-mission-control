@@ -198,12 +198,14 @@ export async function reconcileHermesBotAssignment(context: ProjectContext, empl
     const capabilityFingerprint = capability?.fingerprint || capability?.capabilityFingerprint
     if (!capabilityFingerprint) throw new HermesBotError('ADAPTER_MALFORMED_CAPABILITY_RESPONSE')
     const observation = normalizeHermesRuntimeObservation({ status, health, capability })
+    const approvedSkillIds = new Set(desired.approvedSkills)
+    const activeSkills = skills.filter(skill => skill.bundled || approvedSkillIds.has(skill.key))
     await audit(context, member.id, 'runtime.bot.capability.refreshed', current.id, 'Hermes Bot capability observation refreshed', { profileId: desired.profileId, capabilityFingerprint })
     const saved = await prisma.hermesRuntimeAssignment.update({ where: { id: current.id }, data: {
       runtimeKind: HermesRuntimeKind.HERMES_BOT, provisioningState: 'READY', reconciliationState: 'IN_SYNC', assignmentState: observation.assignmentState, active: observation.assignmentState === 'ACTIVE',
       desiredDisplayName: desired.displayName, desiredDescription: desired.description, desiredSoulHash: desired.soul.hash, desiredModelProvider: desired.runtime.provider, desiredModelId: desired.runtime.modelId,
       lastObservedHermesVersion: observation.observedHermesVersion, capabilityFingerprint, runtimeStatus: observation.runtimeStatus, lastReconciledAt: observation.observedAt, lastReconcileError: null,
-      externalRuntimeMetadata: safeMetadata({ botModeAvailable: observation.botModeAvailable, botChatAvailable: observation.botChatAvailable, skillsAvailable: observation.skillsAvailable, routinesAvailable: observation.routinesAvailable, observedAt: observation.observedAt.toISOString(), skillCount: skills.length, skills: skills.map(skill => ({ key: skill.key, name: skill.name, bundled: Boolean(skill.bundled) })), routineCount: routines.length, routines: routines.map(routine => ({ id: routine.id, name: routine.name, enabled: routine.enabled })), sessionCount: sessions.length }),
+      externalRuntimeMetadata: safeMetadata({ botModeAvailable: observation.botModeAvailable, botChatAvailable: observation.botChatAvailable, skillsAvailable: observation.skillsAvailable, routinesAvailable: observation.routinesAvailable, observedAt: observation.observedAt.toISOString(), skillCount: activeSkills.length, skills: activeSkills.map(skill => ({ key: skill.key, name: skill.name, bundled: Boolean(skill.bundled) })), routineCount: routines.length, routines: routines.map(routine => ({ id: routine.id, name: routine.name, enabled: routine.enabled })), sessionCount: sessions.length }),
     } })
     await audit(context, member.id, 'runtime.bot.reconciled', current.id, 'Hermes Bot reconciliation succeeded', { profileId: desired.profileId, capabilityFingerprint, drifted })
     return saved
