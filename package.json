@@ -22,6 +22,7 @@
     "test:approvals": "node --experimental-strip-types --test tests/approval-rules.test.ts",
     "test:approvals:db": "node --env-file=.env.staging --import tsx --test tests/approval-lifecycle.test.ts",
     "test:runtime": "node --import tsx --test tests/runtime-foundation.test.ts",
+    "test:work-lifecycle": "node --env-file=.env.staging --import tsx --test tests/work-lifecycle.test.ts",
     "test:bot-workforce": "node --import tsx --test tests/bot-workforce.test.ts",
     "test:skills": "node --import tsx --test tests/skills.test.ts",
     "test:connections": "node --import tsx --test tests/connections-foundation.test.ts",

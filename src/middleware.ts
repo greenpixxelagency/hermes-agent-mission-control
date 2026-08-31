@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { isInternalServiceBypassAllowed } from '@/lib/internal-service-auth';
+import { isInternalServiceBypassAllowed, isSignedRuntimeCallbackPath } from '@/lib/internal-service-auth';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -28,6 +28,7 @@ export async function middleware(request: NextRequest) {
   // Skip auth for NextAuth routes, assets, login, and public embeddable charts
   if (
     pathname.startsWith('/api/auth/') ||
+    isSignedRuntimeCallbackPath(pathname) ||
     pathname.startsWith('/api/garden') ||
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/favicon.ico') ||

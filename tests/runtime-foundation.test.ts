@@ -72,7 +72,8 @@ test('M11 runtime preserves project isolation, default-deny roles, and execution
   assert.equal(execution.status, 'SUCCEEDED')
   assert.match(execution.resultText ?? '', /ROGEROS_HERMES_M11_OK/)
   assert.ok(execution.externalExecutionId)
-  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status, 'TODO')
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status, 'REVIEW')
+  assert.equal(execution.reviewStatus, 'PENDING')
   const activities = await prisma.taskActivity.findMany({ where: { projectId: vhalam.id, taskId: task.id } })
   assert.equal(activities.some(activity => activity.type === 'RUNTIME_QUEUED'), true)
   assert.equal(activities.some(activity => activity.type === 'RUNTIME_SUCCEEDED'), true)
@@ -95,7 +96,7 @@ test('M11 runtime preserves project isolation, default-deny roles, and execution
   await assert.rejects(dispatchTaskToHermes(context(0), noRuntimeTask.id, malformed), (error: unknown) => hasCode(error, 'ADAPTER_MALFORMED_RESPONSE'))
   const malformedExecution = await prisma.hermesExecution.findFirstOrThrow({ where: { projectId: vhalam.id, taskId: noRuntimeTask.id }, orderBy: { createdAt: 'desc' } })
   assert.equal(malformedExecution.status, 'FAILED')
-  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: noRuntimeTask.id } })).status, 'TODO')
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: noRuntimeTask.id } })).status, 'BLOCKED')
 
   // Concurrent dispatch has one active winner due to the transaction advisory lock.
   const running: HermesExecutionRuntimeAdapter = { ...completedAdapter, dispatchExecution: async ({ executionId }) => ({ externalExecutionId: executionId, status: 'RUNNING', startedAt: timestamp, completedAt: null }), getExecutionStatus: async executionId => ({ externalExecutionId: executionId, status: 'RUNNING', startedAt: timestamp, completedAt: null }) }

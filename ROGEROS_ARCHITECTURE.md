@@ -45,7 +45,9 @@ Employee (reusable definition)
 - `Task` is authoritative project work with status, priority, dependencies, activities, and assignments to project members or employees.
 - A Task is not a Hermes runtime task or mirror.
 - `HermesExecution` is a project-owned execution attempt for a RogerOS Task. Dispatch checks project membership, role, task assignment, runtime assignment, and duplicate-active-execution rules.
-- Execution lifecycle updates TaskActivity and AuditEvent records; provider IDs/results remain attached to the execution rather than replacing the Task.
+- Dispatch moves a Task to `IN_PROGRESS`. A valid successful execution moves only the latest attempt to `REVIEW`; only an authorized human review can move the Task to `DONE`. Revision requests preserve prior output and return the Task to `TODO`, while failed attempts move it to `BLOCKED` for an explicit safe retry.
+- The staging adapter reports terminal completion through a timestamped HMAC callback. RogerOS derives tenancy from the stored execution ID, rejects stale/forged/conflicting payloads, and retains bounded status synchronization as a fallback.
+- Execution lifecycle updates TaskActivity and AuditEvent records; provider IDs/results and immutable review evidence remain attached to the execution rather than replacing the Task.
 
 ## Project Brain
 
@@ -76,5 +78,4 @@ Employee (reusable definition)
 - Prefer normal RogerOS workflows over direct database or runtime mutation.
 - Stage and verify migrations before production. Never infer production migration history from staging.
 - Any architectural change must update this file.
-- Future concepts must be marked planned until implemented and approved. No post-M15 milestone architecture is defined here.
-
+- Future concepts must be marked planned until implemented and approved.

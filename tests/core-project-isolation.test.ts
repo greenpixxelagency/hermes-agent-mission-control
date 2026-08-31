@@ -4,7 +4,7 @@ import test from 'node:test'
 
 import { Prisma } from '@prisma/client'
 
-import { isInternalServiceBypassAllowed } from '../src/lib/internal-service-auth'
+import { isInternalServiceBypassAllowed, isSignedRuntimeCallbackPath } from '../src/lib/internal-service-auth'
 import { ProjectContextError, requireAuthenticatedUserId, toProjectContext } from '../src/lib/project-context'
 import { prisma } from '../src/lib/prisma'
 
@@ -66,4 +66,6 @@ test('M2 core execution records are isolated by project', async (t) => {
   assert.throws(() => requireAuthenticatedUserId(null), (error: unknown) => error instanceof ProjectContextError && error.status === 401)
   assert.equal(isInternalServiceBypassAllowed('/api/hermes/requests'), false)
   assert.equal(isInternalServiceBypassAllowed('/api/cron/x-stats'), true)
+  assert.equal(isSignedRuntimeCallbackPath('/api/runtime/callback'), true)
+  assert.equal(isSignedRuntimeCallbackPath('/api/runtime/callback/other'), false)
 })

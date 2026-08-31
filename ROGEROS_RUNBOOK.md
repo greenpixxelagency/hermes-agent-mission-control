@@ -35,6 +35,15 @@
 3. Exercise normal RogerOS flows; do not use direct database/runtime mutation as an acceptance shortcut.
 4. For runtime work, verify health first, capture assignment/reconciliation/execution/audit evidence, test controlled failure/isolation, and restore requested staging state.
 5. Never treat a provisioned provider artifact as authorized without the RogerOS assignment/permission/policy state.
+6. Runtime completion callbacks use `ROGEROS_HERMES_CALLBACK_SECRET` server-side only. Rotate the staging adapter and Preview value together; never expose it through `NEXT_PUBLIC_*`, logs, or client responses.
+
+## Hermes and VPS workstream handoff
+
+- Any work involving Hermes or its VPS requires a dedicated, copy-ready VPS prompt for the owner. Provide the prompt before asking for or relying on VPS-side changes, even if this task has remote tooling available.
+- Do not mix VPS mutations into the Dashboard repository workstream. Continue safe repository work separately, then consume the structured VPS handoff as evidence.
+- The VPS prompt must be self-contained and include the objective, verified runtime/service/path context, exact allowed scope, forbidden production scope, staging boundary, secret-handling constraints, commands or inspections expected, health/isolation/rollback checks, acceptance evidence, return format, and stop condition.
+- Never embed credentials, tokens, database URLs, OAuth secrets, adapter secrets, private keys, or other secret values in a handoff prompt. Refer only to protected variable or file names.
+- A VPS handoff is evidence, not automatic authority to change RogerOS production. Re-verify repository, staging, and deployment state before consuming it.
 
 ## Close a milestone
 
@@ -45,4 +54,3 @@
 ## Human intervention
 
 Stop only when completion requires unavailable credentials, owner login/2FA/CAPTCHA, billing/consent, destructive production authority, or a genuine product/architecture decision. State the exact minimum action and preserve all safe completed work.
-

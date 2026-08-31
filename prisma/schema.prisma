@@ -126,6 +126,12 @@ enum HermesExecutionStatus {
   CANCELLED
 }
 
+enum HermesExecutionReviewStatus {
+  PENDING
+  ACCEPTED
+  REVISION_REQUESTED
+}
+
 enum EmployeeType {
   SYSTEM
   CUSTOM
@@ -845,6 +851,7 @@ model ProjectMember {
   taskAssignments      TaskAssignment[]
   requestedApprovals   ApprovalRequest[]  @relation("ApprovalRequester")
   decidedApprovals     ApprovalRequest[]  @relation("ApprovalDecider")
+  reviewedExecutions   HermesExecution[]  @relation("HermesExecutionReviewer")
   auditEvents          AuditEvent[]
 
   @@unique([projectId, organizationMemberId])
@@ -1140,30 +1147,38 @@ model HermesRuntimeAssignment {
 }
 
 model HermesExecution {
-  id                  String                  @id @default(cuid())
-  projectId           String
-  taskId              String
-  runtimeId           String
-  runtimeAssignmentId String
-  status              HermesExecutionStatus   @default(QUEUED)
+  id                        String                       @id @default(cuid())
+  projectId                 String
+  taskId                    String
+  runtimeId                 String
+  runtimeAssignmentId       String
+  status                    HermesExecutionStatus        @default(QUEUED)
   // Adapter execution IDs are authoritative only for lifecycle synchronization.
   // They never grant a runtime or tool permission.
-  externalExecutionId String?                 @unique
-  prompt              String                  @db.Text
-  resultText          String?                 @db.Text
-  errorMessage        String?                 @db.Text
-  startedAt           DateTime?
-  completedAt         DateTime?
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  project             Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  task                Task                    @relation(fields: [taskId, projectId], references: [id, projectId], onDelete: Restrict)
-  runtime             HermesRuntime           @relation(fields: [runtimeId], references: [id], onDelete: Restrict)
-  runtimeAssignment   HermesRuntimeAssignment @relation(fields: [runtimeAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  externalExecutionId       String?                      @unique
+  prompt                    String                       @db.Text
+  resultText                String?                      @db.Text
+  errorMessage              String?                      @db.Text
+  reviewStatus              HermesExecutionReviewStatus?
+  reviewedByProjectMemberId String?
+  reviewedAt                DateTime?
+  reviewNote                String?                      @db.Text
+  callbackReceivedAt        DateTime?
+  callbackFingerprint       String?
+  startedAt                 DateTime?
+  completedAt               DateTime?
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
+  project                   Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task                      Task                         @relation(fields: [taskId, projectId], references: [id, projectId], onDelete: Restrict)
+  runtime                   HermesRuntime                @relation(fields: [runtimeId], references: [id], onDelete: Restrict)
+  runtimeAssignment         HermesRuntimeAssignment      @relation(fields: [runtimeAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  reviewedBy                ProjectMember?               @relation("HermesExecutionReviewer", fields: [reviewedByProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
 
-  @@unique([taskId, status])
   @@index([projectId, status, createdAt])
   @@index([projectId, taskId, createdAt])
+  @@index([taskId, status])
+  @@index([projectId, reviewStatus, completedAt])
 }
 
 model TaskDependency {

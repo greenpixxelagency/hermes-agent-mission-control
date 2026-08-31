@@ -64,3 +64,18 @@
 
 **Consequences:** Staging success never implies permission to alter production. Never assume production migration history from local or staging status.
 
+## AI completion requires human review
+
+**Decision:** A successful Hermes execution makes the latest Task result ready for review; it does not complete authoritative business work. OWNER, ADMIN, or APPROVER must accept it before the Task becomes done.
+
+**Reason:** Provider success proves execution finished, not that the business result is correct or approved.
+
+**Consequences:** RogerOS preserves every execution attempt and review decision, supports revision and explicit retry, prevents stale attempts from changing current Task state, and audits the complete lifecycle.
+
+## Runtime completion is authenticated and idempotent
+
+**Decision:** The isolated adapter reports terminal status using a timestamped HMAC callback, with bounded polling as a reconciliation fallback.
+
+**Reason:** Serverless request lifetimes cannot be the only completion mechanism, while runtime payloads cannot be trusted to supply tenancy or authorization.
+
+**Consequences:** Callback payloads contain only the external execution identity and terminal result. RogerOS derives project ownership from stored records, rejects forged, stale, oversized, malformed, conflicting, and replayed state changes, and treats exact duplicates as idempotent.
