@@ -64,6 +64,14 @@
 
 **Consequences:** Staging success never implies permission to alter production. Never assume production migration history from local or staging status.
 
+## Phase 3 sequencing follows governed dependencies
+
+**Decision:** Future Phase 3 work is planned from the original blueprint, reconciled against verified repository evidence, and delivered one bounded milestone at a time. A planning document is not implementation approval.
+
+**Reason:** The original blueprint contains the product direction, while the current repository contains deliberate scope reductions, added security boundaries, and completed work that must not be recreated or bypassed.
+
+**Consequences:** The remaining order is capability configuration, then outcome evidence, then recommendations/automation, then advanced workplace and SaaS productization. Customer onboarding, billing, production promotion, and credential-sensitive browser work cannot be pulled into M17 by inference. The current proposed M17 is Employee Market and Safe Hiring; owner approval is required before code, migration, deployment, or VPS work.
+
 ## AI completion requires human review
 
 **Decision:** A successful Hermes execution makes the latest Task result ready for review; it does not complete authoritative business work. OWNER, ADMIN, or APPROVER must accept it before the Task becomes done.

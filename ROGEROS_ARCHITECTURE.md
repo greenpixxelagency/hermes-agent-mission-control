@@ -39,6 +39,7 @@ Employee (reusable definition)
 - `HermesRuntimeAssignment` connects a project employee to a `HermesRuntime` profile. RogerOS compiles desired identity, SOUL, runtime configuration, and approved skills from authoritative records.
 - Reconciliation uses the typed Hermes adapter, observes runtime health/capabilities, records drift/failure safely, and writes AuditEvents.
 - Runtime assignment never grants external Tool permission; governed Tool permissions remain separate.
+- The Employee Market is planned, not implemented. Its curated templates must be versioned, non-secret catalog data; a hire must create project-owned provenance/configuration rather than making a mutable global employee definition a cross-project control channel. See `ROGEROS_PHASE_3_PLAN.md`.
 
 ## Tasks and execution
 
@@ -80,3 +81,4 @@ Employee (reusable definition)
 - Stage and verify migrations before production. Never infer production migration history from staging.
 - Any architectural change must update this file.
 - Future concepts must be marked planned until implemented and approved.
+- `ROGEROS_PHASE_3_PLAN.md` reconciles the original Phase 3 blueprint with verified repository state and is the dependency plan for proposed work after M16. It does not itself approve a milestone.

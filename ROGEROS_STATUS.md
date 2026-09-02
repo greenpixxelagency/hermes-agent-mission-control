@@ -26,6 +26,7 @@ Last updated: 2026-09-02
 ## Known limitations and risks
 
 - Only `one-three-one-rule` is currently allowlisted for Hermes provisioning. Expanding the catalog requires explicit security review and runtime acceptance.
+- The current custom-employee API resolves project membership but does not independently enforce the stronger Owner/Admin management role used by the Workforce UI. M17 must add server-side hiring authority and regression coverage before a Market or hiring flow is accepted.
 - Dogfood seed scripts intentionally name Green Pixxel, Vhalam, and Buddhaji; they must stay staging-only and must never be imported into product behavior.
 - Upstream legacy Hermy HQ routes still coexist with `/p/[projectSlug]`; avoid accidental cross-system refactors.
 - Local dependency resolution uses a linked `node_modules`, and Next.js reports multiple lockfiles/workspace-root inference during builds.
@@ -33,7 +34,8 @@ Last updated: 2026-09-02
 
 ## Current stop point
 
-- M16 is closed. No post-M16 milestone is approved or started.
+- M16 is closed. The Phase 3 blueprint reconciliation and proposed dependency plan are recorded in `ROGEROS_PHASE_3_PLAN.md`.
+- M17 Employee Market and Safe Hiring is proposed for owner review only; no M17 implementation is approved or started.
 - Production and `main` remain protected and untouched.
 
 ## M16 closeout evidence

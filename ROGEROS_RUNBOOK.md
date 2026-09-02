@@ -27,6 +27,7 @@
 - Prefer the smallest cohesive change; do not mix paused/unrelated work into a commit.
 - Run focused tests plus nearby tenancy/governance/runtime regressions, TypeScript, targeted lint, and the production build.
 - When schema is unchanged, do not create a migration.
+- Before a new milestone, reconcile its scope with `ROGEROS_PHASE_3_PLAN.md`, update the architecture/roadmap/decision/status records as needed, and obtain explicit owner approval. A planned milestone title is not authorization to implement it.
 
 ## Deployment and runtime acceptance
 

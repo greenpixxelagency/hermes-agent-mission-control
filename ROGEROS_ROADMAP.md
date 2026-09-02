@@ -15,11 +15,19 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 
 ## Current
 
-- M16 is complete and closed in staging. The approved stop point has been reached.
+- M16 is complete and closed in staging. A planning reconciliation now records the remaining Phase 3 work against the original blueprint in `ROGEROS_PHASE_3_PLAN.md`.
 
-## Upcoming approved/planned
+## Proposed next work — owner review required
 
-- No post-M16 milestone is approved. Future work requires a new explicit scope and approval.
+- **M17 — Employee Market and Safe Hiring (proposed, not approved).** Add a curated employee-template catalog and safe project-scoped hiring flow, including server-side Owner/Admin authority for both market hiring and the existing custom-employee mutation. It builds on Workforce, governed Skills, Tool permissions, Hermes assignments, audit, and the M16 review lifecycle; it must not auto-grant credentials, connections, Tools, or risky Skills.
+- **M18 — App/Tool/MCP Market and connection lifecycle (proposed).** Generalize the existing Tool/Connection foundation into curated manifest-backed installations.
+- **M19 — Connected App Workspaces (proposed).** Add project-authorized human operational views for installed apps.
+- **M20 — Workforce scorecards and cost evidence (proposed).** Establish auditable outcome/cost facts before Coach automation.
+- **M21 — Agent Coach recommendations (proposed).** Create reviewable recommendations only; no silent changes.
+- **M22 — Project-wide search and command (proposed).** Search and act only through project-scoped, authorized workflows.
+- Phase 3C advanced workplace and Phase 3D SaaS productization remain planned vision. Customer onboarding, templates/bundles, billing, and production promotion are not M17 work.
+
+See `ROGEROS_PHASE_3_PLAN.md` for completed-vs-blueprint reconciliation, dependencies, and the M17 acceptance gates.
 
 ## Longer-term product vision
 
