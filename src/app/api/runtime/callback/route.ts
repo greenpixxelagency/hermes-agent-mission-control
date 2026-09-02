@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server'
 
-import { MAX_CALLBACK_BODY_BYTES, parseHermesCompletion, verifyHermesCallback } from '@/lib/hermes-callback'
+import { parseHermesCompletion, readBoundedCallbackBody, verifyHermesCallback } from '@/lib/hermes-callback'
 import { applyHermesCompletionCallback, HermesRuntimeError } from '@/lib/hermes-runtime'
 
 export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
   try {
-    const body = await request.text()
-    if (Buffer.byteLength(body, 'utf8') > MAX_CALLBACK_BODY_BYTES) throw new HermesRuntimeError('CALLBACK_TOO_LARGE')
+    const body = await readBoundedCallbackBody(request)
     const evidence = verifyHermesCallback({ secret: process.env.ROGEROS_HERMES_CALLBACK_SECRET, timestamp: request.headers.get('x-rogeros-timestamp'), signature: request.headers.get('x-rogeros-signature'), body })
     const execution = await applyHermesCompletionCallback(parseHermesCompletion(body), evidence)
     return NextResponse.json({ accepted: true, executionId: execution.id, status: execution.status })

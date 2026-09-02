@@ -189,6 +189,7 @@ export async function getHermesExecution(context: ProjectContext, executionId: s
 }
 
 export async function refreshHermesExecution(context: ProjectContext, executionId: string, adapter: HermesExecutionRuntimeAdapter = hermesRuntimeAdapter) {
+  if (!canDispatchToHermes(context.project.role)) throw new HermesRuntimeError('FORBIDDEN')
   const member = await actorMember(context)
   const execution = await getHermesExecution(context, executionId)
   if (!activeStatuses.includes(execution.status)) return execution

@@ -6,6 +6,32 @@ import { HermesRuntimeError } from '@/lib/hermes-runtime'
 const MAX_CALLBACK_AGE_SECONDS = 300
 export const MAX_CALLBACK_BODY_BYTES = 32_768
 
+export async function readBoundedCallbackBody(request: Request) {
+  const contentLength = request.headers.get('content-length')
+  if (contentLength && /^\d+$/.test(contentLength) && Number(contentLength) > MAX_CALLBACK_BODY_BYTES) throw new HermesRuntimeError('CALLBACK_TOO_LARGE')
+  if (!request.body) return ''
+
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let totalBytes = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value) continue
+      totalBytes += value.byteLength
+      if (totalBytes > MAX_CALLBACK_BODY_BYTES) {
+        await reader.cancel().catch(() => undefined)
+        throw new HermesRuntimeError('CALLBACK_TOO_LARGE')
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  return Buffer.concat(chunks.map(chunk => Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)), totalBytes).toString('utf8')
+}
+
 export function callbackSignature(secret: string, timestamp: string, body: string) {
   return createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex')
 }

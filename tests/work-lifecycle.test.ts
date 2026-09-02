@@ -4,7 +4,7 @@ import test from 'node:test'
 
 import { PrismaClient, ProjectRole } from '@prisma/client'
 
-import { callbackSignature, parseHermesCompletion, verifyHermesCallback } from '../src/lib/hermes-callback'
+import { callbackSignature, MAX_CALLBACK_BODY_BYTES, parseHermesCompletion, readBoundedCallbackBody, verifyHermesCallback } from '../src/lib/hermes-callback'
 import type { HermesExecutionRuntimeAdapter } from '../src/lib/hermes-runtime-adapter'
 import {
   applyHermesCompletionCallback,
@@ -12,6 +12,7 @@ import {
   canReviewHermesResult,
   dispatchTaskToHermes,
   getHermesExecution,
+  refreshHermesExecution,
   retryHermesExecution,
   reviewHermesExecution,
 } from '../src/lib/hermes-runtime'
@@ -52,6 +53,13 @@ test('M16 signed callback rejects forged, stale, malformed, and extra fields', (
   assert.throws(() => verifyHermesCallback({ secret, timestamp: String(Number(timestamp) - 301), signature, body }), error => hasCode(error, 'CALLBACK_EXPIRED'))
   assert.throws(() => parseHermesCompletion('{broken'), error => hasCode(error, 'CALLBACK_MALFORMED'))
   assert.throws(() => parseHermesCompletion(JSON.stringify({ ...JSON.parse(body), projectId: 'forged' })), error => hasCode(error, 'CALLBACK_MALFORMED'))
+})
+
+test('M16 callback body reader enforces the byte limit before buffering an oversized body', async () => {
+  const accepted = 'x'.repeat(MAX_CALLBACK_BODY_BYTES)
+  assert.equal(await readBoundedCallbackBody(new Request('https://preview.invalid/api/runtime/callback', { method: 'POST', body: accepted })), accepted)
+  await assert.rejects(readBoundedCallbackBody(new Request('https://preview.invalid/api/runtime/callback', { method: 'POST', body: 'x'.repeat(MAX_CALLBACK_BODY_BYTES + 1) })), error => hasCode(error, 'CALLBACK_TOO_LARGE'))
+  await assert.rejects(readBoundedCallbackBody(new Request('https://preview.invalid/api/runtime/callback', { method: 'POST', headers: { 'content-length': String(MAX_CALLBACK_BODY_BYTES + 1) }, body: '{}' })), error => hasCode(error, 'CALLBACK_TOO_LARGE'))
 })
 
 test('M16 makes AI work reviewable, retryable, idempotent, and project-isolated', async t => {
@@ -120,6 +128,8 @@ test('M16 makes AI work reviewable, retryable, idempotent, and project-isolated'
 
   const callbackTask = await makeTask('Complete by callback')
   const callbackExecution = await dispatchTaskToHermes(context(0), callbackTask.id, runningAdapter())
+  await assert.rejects(refreshHermesExecution(context(4), callbackExecution.id, completedAdapter('viewer must not reconcile')), error => hasCode(error, 'FORBIDDEN'))
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: callbackTask.id } })).status, 'IN_PROGRESS')
   const callbackBody = JSON.stringify({ externalExecutionId: callbackExecution.externalExecutionId, status: 'SUCCEEDED', startedAt: now, completedAt: now, result: 'callback result' })
   const evidence = { fingerprint: callbackSignature('fingerprint-only-test-secret', '0000000000', callbackBody), receivedAt: new Date() }
   await applyHermesCompletionCallback(JSON.parse(callbackBody), evidence)
