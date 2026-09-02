@@ -36,6 +36,8 @@
 4. For runtime work, verify health first, capture assignment/reconciliation/execution/audit evidence, test controlled failure/isolation, and restore requested staging state.
 5. Never treat a provisioned provider artifact as authorized without the RogerOS assignment/permission/policy state.
 6. Runtime completion callbacks use `ROGEROS_HERMES_CALLBACK_SECRET` server-side only. Rotate the staging adapter and Preview value together; never expose it through `NEXT_PUBLIC_*`, logs, or client responses.
+7. Keep callback bodies within the server's streaming byte limit and preserve the exact timestamp, signature, and body contract. Use one fixed Preview callback URL; do not follow redirects.
+8. If Vercel Deployment Protection is enabled, keep the automation bypass credential only in the mode-`0600` isolated staging adapter environment and send it only in the callback request. The credential is project-scoped, not literally Preview-scoped: never log, commit, reuse, or treat it as RogerOS authorization, and rotate it if its storage or destination is uncertain.
 
 ## Hermes and VPS workstream handoff
 

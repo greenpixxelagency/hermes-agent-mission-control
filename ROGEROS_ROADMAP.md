@@ -11,15 +11,15 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 - SOPs, policies, Tools, employee permissions, governed connections/execution, approvals, and audit.
 - Hermes execution/runtime foundation, bot workforce reconciliation/chat, and governed Skill assignment/provisioning/removal.
 - M15 real deployed acceptance with `ROGEROS_M15_SKILL_OK` and clean runtime reconciliation.
+- M16 reliable AI work lifecycle and human review, including real signed-callback acceptance with `ROGEROS_M16_WORK_REVIEW_OK`, REVIEW-before-DONE proof, audit/activity evidence, role enforcement, and project isolation.
 
 ## Current
 
-- M16 Reliable AI Work Lifecycle + Human Review: durable runtime completion, safe retry/revision, role-governed review, and audit evidence.
+- M16 is complete and closed in staging. The approved stop point has been reached.
 
 ## Upcoming approved/planned
 
-- Immediate next task: finish the existing M16 repository work through conclusive regressions, commit/push, a verified non-`main` `phase-3` Preview deployment, real signed-callback `ROGEROS_M16_WORK_REVIEW_OK` review acceptance, and closeout. The isolated staging-adapter callback deployment is complete and must not be recreated.
-- No post-M16 milestone is approved. Stop after M16 acceptance and closeout.
+- No post-M16 milestone is approved. Future work requires a new explicit scope and approval.
 
 ## Longer-term product vision
 

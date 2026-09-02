@@ -78,4 +78,6 @@
 
 **Reason:** Serverless request lifetimes cannot be the only completion mechanism, while runtime payloads cannot be trusted to supply tenancy or authorization.
 
-**Consequences:** Callback payloads contain only the external execution identity and terminal result. RogerOS derives project ownership from stored records, rejects forged, stale, oversized, malformed, conflicting, and replayed state changes, and treats exact duplicates as idempotent.
+**Consequences:** Callback payloads contain only the external execution identity and terminal result. RogerOS derives project ownership from stored records, rejects forged, stale, oversized, malformed, conflicting, and replayed state changes, treats exact duplicates as idempotent, and enforces the byte limit while streaming before JSON parsing. Runtime refresh uses dispatch authority because reconciliation can change authoritative state.
+
+Vercel Deployment Protection requires a project-scoped automation bypass credential for the isolated adapter callback. The credential is stored only in the protected staging adapter environment, sent only to the fixed Preview callback URL, rotated as a secret, and never treated as a production or tenancy authorization boundary.

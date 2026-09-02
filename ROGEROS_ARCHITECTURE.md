@@ -46,7 +46,8 @@ Employee (reusable definition)
 - A Task is not a Hermes runtime task or mirror.
 - `HermesExecution` is a project-owned execution attempt for a RogerOS Task. Dispatch checks project membership, role, task assignment, runtime assignment, and duplicate-active-execution rules.
 - Dispatch moves a Task to `IN_PROGRESS`. A valid successful execution moves only the latest attempt to `REVIEW`; only an authorized human review can move the Task to `DONE`. Revision requests preserve prior output and return the Task to `TODO`, while failed attempts move it to `BLOCKED` for an explicit safe retry.
-- The staging adapter reports terminal completion through a timestamped HMAC callback. RogerOS derives tenancy from the stored execution ID, rejects stale/forged/conflicting payloads, and retains bounded status synchronization as a fallback.
+- The staging adapter reports terminal completion through a timestamped HMAC callback. RogerOS derives tenancy from the stored execution ID, rejects stale/forged/conflicting payloads, streams callback input through a strict byte limit before parsing, and retains bounded status synchronization as a fallback.
+- Runtime refresh can reconcile and mutate lifecycle state, so it uses the same OWNER, ADMIN, or OPERATOR dispatch authority rather than read-only membership. Vercel Deployment Protection is crossed only by a protected project-scoped automation bypass credential held by the isolated staging adapter and sent to its fixed Preview callback URL.
 - Execution lifecycle updates TaskActivity and AuditEvent records; provider IDs/results and immutable review evidence remain attached to the execution rather than replacing the Task.
 
 ## Project Brain
