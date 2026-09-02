@@ -330,6 +330,23 @@ textarea, input {
 .rogeros-command > div { max-height: 430px; overflow-y: auto; padding: 8px; }.rogeros-command > div button { display: flex; width: 100%; align-items: center; gap: 10px; border-radius: 9px; padding: 10px; color: var(--ros-muted); font-size: 12px; text-align: left; }.rogeros-command > div button:hover,.rogeros-command > div button:focus-visible { background: rgba(126,208,173,.08); color: var(--ros-text); }.rogeros-command > div svg { width: 16px; }.rogeros-command > div small { margin-left: auto; color: var(--ros-faint); font-size: 9px; }.rogeros-command footer { border-top: 1px solid var(--ros-line); padding: 10px 16px; color: var(--ros-faint); font-size: 9px; }
 .rogeros-sidebar-backdrop { position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,.55); }
 
+/* Apple-design inspired material system: spatial layers, direct feedback, restraint. */
+@media (min-width: 901px) {
+  .rogeros-sidebar { inset: 14px auto 14px 14px; width: 248px; border: 1px solid var(--ros-line); border-radius: 22px; padding: 18px 14px 14px; box-shadow: 0 22px 60px -36px rgba(17,29,64,.55), inset 0 1px rgba(255,255,255,.38); }
+  .rogeros-main { margin-left: 276px; }
+  .rogeros-topbar { top: 14px; margin: 0 14px; border: 1px solid var(--ros-line); border-radius: 18px; }
+  .rogeros-content { padding-top: 46px; }
+}
+.rogeros-sidebar,.rogeros-topbar { backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%); }
+.rogeros-nav-group a,.rogeros-sidebar-footer > a,.rogeros-sidebar-footer > button,.rogeros-theme-toggle,.rogeros-top-account { transition: background .18s ease, color .18s ease, border-color .18s ease, transform .12s ease; }
+.rogeros-nav-group a:active,.rogeros-sidebar-footer > a:active,.rogeros-sidebar-footer > button:active,.rogeros-theme-toggle:active,.rogeros-top-account:active { transform: scale(.97); }
+.rogeros-nav-group a.is-active { background: linear-gradient(100deg,color-mix(in srgb,var(--ros-accent) 17%,transparent),color-mix(in srgb,var(--ros-accent) 5%,transparent)); }
+.rogeros-app .panel { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.rogeros-app .panel-interactive { will-change: transform; }
+.rogeros-app .panel-interactive:hover { transform: translateY(-3px); }
+@media (prefers-reduced-motion: reduce) { .rogeros-nav-group a,.rogeros-sidebar-footer > a,.rogeros-sidebar-footer > button,.rogeros-theme-toggle,.rogeros-top-account { transition: none; }.rogeros-app .panel-interactive:hover { transform: none; } }
+@media (prefers-reduced-transparency: reduce) { .rogeros-sidebar,.rogeros-topbar,.rogeros-app .panel { backdrop-filter: none; -webkit-backdrop-filter: none; }.rogeros-sidebar { background: var(--ros-sidebar); }.rogeros-topbar { background: var(--ros-bg); }.rogeros-app .panel { background: var(--ros-surface-raised); } }
+
 /* RogerOS product polish: shared by every project workspace. */
 .rogeros-app::before { position: fixed; inset: 0; z-index: -1; background: linear-gradient(115deg, transparent 0 52%, rgba(255,255,255,.16) 100%); content: ''; pointer-events: none; }
 .rogeros-sidebar { box-shadow: inset -1px 0 rgba(255,255,255,.16); }
