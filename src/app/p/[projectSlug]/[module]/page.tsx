@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { BarChart3, Blocks, Settings2, Sparkles } from 'lucide-react'
 
 import { EmptyState, PageHeader, StatusPill } from '@/components/rogeros-ui'
-import { SkillLibraryWorkspace } from '@/components/skill-library-workspace'
+import { EmployeeMarketWorkspace } from '@/components/employee-market-workspace'
 import { ProjectContextError, requireProjectContextBySlug } from '@/lib/project-context'
 
 const modules = {
@@ -15,7 +15,7 @@ const modules = {
 
 export default async function ModulePage({ params }: { params: Promise<{ projectSlug: string; module: string }> }) {
   try {
-    const values = await params; const context = await requireProjectContextBySlug(values.projectSlug); const item = modules[values.module as keyof typeof modules]; if (!item) notFound(); if(values.module==='market') return <SkillLibraryWorkspace project={context.project}/>; const Icon = item.icon
+    const values = await params; const context = await requireProjectContextBySlug(values.projectSlug); const item = modules[values.module as keyof typeof modules]; if (!item) notFound(); if(values.module==='market') return <EmployeeMarketWorkspace project={context.project}/>; const Icon = item.icon
     return <div className="hq-rise"><PageHeader eyebrow={`${context.project.name} · ${item.eyebrow}`} title={item.title} description={item.description} action={<StatusPill tone="accent">Foundation</StatusPill>} /><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{item.cards.map(card => <section className="panel" key={card[0]}><EmptyState icon={<Icon />} title={card[0]} description={card[1]} /></section>)}</div></div>
   } catch (error) { if (error instanceof ProjectContextError) notFound(); throw error }
 }

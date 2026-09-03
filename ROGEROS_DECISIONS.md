@@ -70,7 +70,15 @@
 
 **Reason:** The original blueprint contains the product direction, while the current repository contains deliberate scope reductions, added security boundaries, and completed work that must not be recreated or bypassed.
 
-**Consequences:** The remaining order is capability configuration, then outcome evidence, then recommendations/automation, then advanced workplace and SaaS productization. Customer onboarding, billing, production promotion, and credential-sensitive browser work cannot be pulled into M17 by inference. The current proposed M17 is Employee Market and Safe Hiring; owner approval is required before code, migration, deployment, or VPS work.
+**Consequences:** The remaining order is capability configuration, then outcome evidence, then recommendations/automation, then advanced workplace and SaaS productization. Customer onboarding, billing, production promotion, and credential-sensitive browser work cannot be pulled into M17 by inference.
+
+## Employee Market provenance is immutable and capability-default-deny
+
+**Decision:** M17 market templates are curated global catalog versions, while each hire creates a distinct project-owned Employee, EmployeeProjectAssignment, provenance record, and safe configuration snapshot. OWNER and ADMIN authorization is enforced in the shared server-side hiring service for both market and custom hiring.
+
+**Reason:** A template catalog must not become a mutable cross-project employee or capability control channel, and UI-only hiring restrictions are not authorization.
+
+**Consequences:** Repeated hiring of the same template is idempotent per project. Recommended Skills and Tools can be selected and audited as metadata but create no Skill assignment, Tool permission, connection, credential, or runtime assignment. Pausing/resuming/retiring employment preserves existing Tasks, executions, review evidence, and history; retirement disables only the existing RogerOS runtime assignment record and does not add runtime transport behavior.
 
 ## AI completion requires human review
 

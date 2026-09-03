@@ -15,11 +15,11 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 
 ## Current
 
-- M16 is complete and closed in staging. A planning reconciliation now records the remaining Phase 3 work against the original blueprint in `ROGEROS_PHASE_3_PLAN.md`.
+- M17 Employee Market and Safe Hiring implementation is awaiting verified staging migration, focused database tests, Preview acceptance, and closeout. M16 remains complete and closed in staging.
 
 ## Proposed next work — owner review required
 
-- **M17 — Employee Market and Safe Hiring (proposed, not approved).** Add a curated employee-template catalog and safe project-scoped hiring flow, including server-side Owner/Admin authority for both market hiring and the existing custom-employee mutation. It builds on Workforce, governed Skills, Tool permissions, Hermes assignments, audit, and the M16 review lifecycle; it must not auto-grant credentials, connections, Tools, or risky Skills.
+- **M17 — Employee Market and Safe Hiring (in staging verification).** Curated employee-template versions and safe project-scoped hiring are implemented with server-side Owner/Admin authority for both market and custom hiring. It must not auto-grant credentials, connections, Tools, Skills, or runtime power.
 - **M18 — App/Tool/MCP Market and connection lifecycle (proposed).** Generalize the existing Tool/Connection foundation into curated manifest-backed installations.
 - **M19 — Connected App Workspaces (proposed).** Add project-authorized human operational views for installed apps.
 - **M20 — Workforce scorecards and cost evidence (proposed).** Establish auditable outcome/cost facts before Coach automation.

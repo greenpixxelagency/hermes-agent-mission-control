@@ -8,10 +8,10 @@ Last updated: 2026-09-02
 
 - Authoritative development branch: `phase-3`.
 - Meaningful M15 baseline: `3d82601724e8cb567578649e1c829478a0d64d7c` (`fix: report only active governed skills`).
-- Current session: M16 Reliable AI Work Lifecycle + Human Review is complete and accepted in staging. The application and security commits are pushed to `phase-3`, the verified Preview is healthy, and the real Hermes result passed through `REVIEW` before authorized human acceptance moved the Task to `DONE`.
+- Current session: M17 Employee Market and Safe Hiring is implemented locally on top of `origin/phase-3` head `e6ed1d14b4e543662f10fe53bf18ae0944529b95`. Prisma validation/generation, TypeScript, focused lint, migration diff review, and production build passed; it awaits verified staging migration/test/Preview acceptance. M16 remains complete and accepted in staging.
 - M15 is fully closed. Real Preview acceptance assigned `1-3-1 Communication`, reconciled it to the Vhalam Chief runtime, persisted `ROGEROS_M15_SKILL_OK`, audited the lifecycle, removed the assignment, and observed zero active governed skills afterward.
 - Stable phase-3 Preview: `https://hermes-agent-missio-git-a9eea4-greenpixxelagency-2153s-projects.vercel.app`.
-- Staging schema: all 21 repository migrations through `20260828120000_add_reliable_ai_work_review` reported applied on 2026-08-28.
+- Staging schema: all 21 repository migrations through `20260828120000_add_reliable_ai_work_review` reported applied on 2026-08-28. New additive migration `20260903090000_add_employee_market_safe_hiring` has not been applied.
 
 ## Completed product foundations
 
@@ -35,7 +35,8 @@ Last updated: 2026-09-02
 ## Current stop point
 
 - M16 is closed. The Phase 3 blueprint reconciliation and proposed dependency plan are recorded in `ROGEROS_PHASE_3_PLAN.md`.
-- M17 Employee Market and Safe Hiring is proposed for owner review only; no M17 implementation is approved or started.
+- M17 implementation is complete locally but is not closed: apply only the reviewed additive migration to a verified staging database, run focused database/regression tests, deploy a non-main Preview, and complete normal UI/isolation acceptance before any closeout.
+- Current local Vercel CLI identity is `buddhajicare-4495`, whose only listed team has no projects; it cannot access the documented Green Pixxel staging project. Do not link or deploy from this identity as a workaround.
 - Production and `main` remain protected and untouched.
 
 ## M16 closeout evidence

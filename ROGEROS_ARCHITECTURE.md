@@ -39,7 +39,7 @@ Employee (reusable definition)
 - `HermesRuntimeAssignment` connects a project employee to a `HermesRuntime` profile. RogerOS compiles desired identity, SOUL, runtime configuration, and approved skills from authoritative records.
 - Reconciliation uses the typed Hermes adapter, observes runtime health/capabilities, records drift/failure safely, and writes AuditEvents.
 - Runtime assignment never grants external Tool permission; governed Tool permissions remain separate.
-- The Employee Market is planned, not implemented. Its curated templates must be versioned, non-secret catalog data; a hire must create project-owned provenance/configuration rather than making a mutable global employee definition a cross-project control channel. See `ROGEROS_PHASE_3_PLAN.md`.
+- M17 Employee Market uses curated, versioned, non-secret catalog data. A hire creates a project-owned employment assignment plus immutable template/version and safe configuration snapshot provenance; it does not turn a mutable global Employee row into a cross-project control channel. Selected Skill and Tool recommendations remain non-grant metadata until separately approved through existing governed flows. See `ROGEROS_PHASE_3_PLAN.md`.
 
 ## Tasks and execution
 

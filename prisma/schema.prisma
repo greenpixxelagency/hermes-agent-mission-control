@@ -358,44 +358,46 @@ model OrganizationMember {
 }
 
 model Project {
-  id                       String                      @id @default(cuid())
-  organizationId           String
-  name                     String
-  slug                     String
-  status                   ProjectStatus               @default(ACTIVE)
-  createdAt                DateTime                    @default(now())
-  updatedAt                DateTime                    @updatedAt
-  organization             Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  members                  ProjectMember[]
-  agentRequests            AgentRequest[]
-  agentEvents              AgentEvent[]
-  hermesTasks              HermesTask[]
-  hermesMemories           HermesMemory[]
-  dataStoreEntries         ProjectDataStore[]
-  conversations            Conversation[]
-  messages                 Message[]
-  threads                  Thread[]
-  tasks                    Task[]
-  employeeAssignments      EmployeeProjectAssignment[]
-  constitution             ProjectConstitution?
-  knowledgeItems           KnowledgeItem[]
-  decisions                Decision[]
-  memories                 ProjectMemory[]
-  knowledgeSources         KnowledgeSource[]
-  sops                     SOP[]
-  policies                 Policy[]
-  taskSops                 TaskSOP[]
-  tools                    ProjectTool[]
-  connections              ProjectConnection[]
-  toolExecutions           ToolExecution[]
-  approvalRequests         ApprovalRequest[]
-  auditEvents              AuditEvent[]
-  hermesRuntimeAssignments HermesRuntimeAssignment[]
-  hermesExecutions         HermesExecution[]
-  connectionCredentials    ConnectionCredential[]
-  connectionScopes         ProjectConnectionScope[]
-  driveSources             DriveSource[]
-  driveOAuthStates         DriveOAuthState[]
+  id                           String                       @id @default(cuid())
+  organizationId               String
+  name                         String
+  slug                         String
+  status                       ProjectStatus                @default(ACTIVE)
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
+  organization                 Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members                      ProjectMember[]
+  agentRequests                AgentRequest[]
+  agentEvents                  AgentEvent[]
+  hermesTasks                  HermesTask[]
+  hermesMemories               HermesMemory[]
+  dataStoreEntries             ProjectDataStore[]
+  conversations                Conversation[]
+  messages                     Message[]
+  threads                      Thread[]
+  tasks                        Task[]
+  employeeAssignments          EmployeeProjectAssignment[]
+  employeeMarketHires          EmployeeMarketHire[]
+  employeeEmploymentActivities EmployeeEmploymentActivity[]
+  constitution                 ProjectConstitution?
+  knowledgeItems               KnowledgeItem[]
+  decisions                    Decision[]
+  memories                     ProjectMemory[]
+  knowledgeSources             KnowledgeSource[]
+  sops                         SOP[]
+  policies                     Policy[]
+  taskSops                     TaskSOP[]
+  tools                        ProjectTool[]
+  connections                  ProjectConnection[]
+  toolExecutions               ToolExecution[]
+  approvalRequests             ApprovalRequest[]
+  auditEvents                  AuditEvent[]
+  hermesRuntimeAssignments     HermesRuntimeAssignment[]
+  hermesExecutions             HermesExecution[]
+  connectionCredentials        ConnectionCredential[]
+  connectionScopes             ProjectConnectionScope[]
+  driveSources                 DriveSource[]
+  driveOAuthStates             DriveOAuthState[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -839,20 +841,22 @@ model ProjectMemory {
 }
 
 model ProjectMember {
-  id                   String             @id @default(cuid())
+  id                   String                       @id @default(cuid())
   projectId            String
   organizationMemberId String
   organizationId       String
-  role                 ProjectRole        @default(VIEWER)
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  project              Project            @relation(fields: [projectId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  organizationMember   OrganizationMember @relation(fields: [organizationMemberId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  role                 ProjectRole                  @default(VIEWER)
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  project              Project                      @relation(fields: [projectId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  organizationMember   OrganizationMember           @relation(fields: [organizationMemberId, organizationId], references: [id, organizationId], onDelete: Cascade)
   taskAssignments      TaskAssignment[]
-  requestedApprovals   ApprovalRequest[]  @relation("ApprovalRequester")
-  decidedApprovals     ApprovalRequest[]  @relation("ApprovalDecider")
-  reviewedExecutions   HermesExecution[]  @relation("HermesExecutionReviewer")
+  requestedApprovals   ApprovalRequest[]            @relation("ApprovalRequester")
+  decidedApprovals     ApprovalRequest[]            @relation("ApprovalDecider")
+  reviewedExecutions   HermesExecution[]            @relation("HermesExecutionReviewer")
   auditEvents          AuditEvent[]
+  marketHires          EmployeeMarketHire[]         @relation("EmployeeMarketHireCreator")
+  employmentActivities EmployeeEmploymentActivity[] @relation("EmployeeEmploymentActivityActor")
 
   @@unique([projectId, organizationMemberId])
   @@unique([id, projectId])
@@ -1024,18 +1028,47 @@ model Employee {
   projectAssignments EmployeeProjectAssignment[]
 }
 
+// M17: the market catalog is global, curated, and versioned. Template versions
+// are never used as a project's employee identity or capability grant.
+model EmployeeMarketTemplate {
+  id        String                          @id @default(cuid())
+  key       String                          @unique
+  createdAt DateTime                        @default(now())
+  versions  EmployeeMarketTemplateVersion[]
+}
+
+model EmployeeMarketTemplateVersion {
+  id                  String                 @id @default(cuid())
+  templateId          String
+  version             Int
+  name                String
+  role                String
+  description         String                 @db.Text
+  soulSummary         String?                @db.Text
+  supportedSkillKeys  String[]               @default([])
+  recommendedToolKeys String[]               @default([])
+  kpiTemplates        Json                   @default("[]")
+  isEnabled           Boolean                @default(true)
+  createdAt           DateTime               @default(now())
+  template            EmployeeMarketTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  hires               EmployeeMarketHire[]
+
+  @@unique([templateId, version])
+  @@index([isEnabled, createdAt])
+}
+
 model EmployeeProjectAssignment {
-  id                       String                    @id @default(cuid())
+  id                       String                       @id @default(cuid())
   employeeId               String
   projectId                String
-  status                   EmployeeStatus            @default(ACTIVE)
+  status                   EmployeeStatus               @default(ACTIVE)
   roleOverride             String?
-  joinedAt                 DateTime                  @default(now())
+  joinedAt                 DateTime                     @default(now())
   pausedAt                 DateTime?
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
-  employee                 Employee                  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  project                  Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
+  employee                 Employee                     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  project                  Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   conversationParticipants ConversationParticipant[]
   taskAssignments          TaskAssignment[]
   toolPermissions          EmployeeToolPermission[]
@@ -1044,10 +1077,53 @@ model EmployeeProjectAssignment {
   auditEvents              AuditEvent[]
   toolExecutions           ToolExecution[]
   skillAssignments         EmployeeSkillAssignment[]
+  marketHire               EmployeeMarketHire?
+  employmentActivities     EmployeeEmploymentActivity[]
 
   @@unique([employeeId, projectId])
   @@unique([id, projectId])
   @@index([projectId, status])
+}
+
+// A hire is project-owned provenance. The snapshot prevents later catalog
+// changes from silently changing an already-employed employee.
+model EmployeeMarketHire {
+  id                          String                        @id @default(cuid())
+  projectId                   String
+  employeeProjectAssignmentId String                        @unique
+  templateVersionId           String
+  templateKey                 String
+  templateVersion             Int
+  configurationSnapshot       Json
+  hiredByProjectMemberId      String
+  createdAt                   DateTime                      @default(now())
+  project                     Project                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employeeAssignment          EmployeeProjectAssignment     @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  templateVersionRecord       EmployeeMarketTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  hiredBy                     ProjectMember                 @relation("EmployeeMarketHireCreator", fields: [hiredByProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([projectId, templateKey])
+  @@unique([employeeProjectAssignmentId, projectId])
+  @@unique([id, projectId])
+  @@index([projectId, createdAt])
+}
+
+// This is employment activity, not task activity: no Task history is rewritten
+// when an employee is paused or retired.
+model EmployeeEmploymentActivity {
+  id                          String                    @id @default(cuid())
+  projectId                   String
+  employeeProjectAssignmentId String
+  actorProjectMemberId        String
+  eventType                   String
+  detail                      String?                   @db.Text
+  metadata                    Json                      @default("{}")
+  createdAt                   DateTime                  @default(now())
+  project                     Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employeeAssignment          EmployeeProjectAssignment @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  actor                       ProjectMember             @relation("EmployeeEmploymentActivityActor", fields: [actorProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@index([projectId, employeeProjectAssignmentId, createdAt])
 }
 
 // M15: RogerOS owns the trusted catalog; Hermes receives only this managed overlay.
