@@ -1,6 +1,6 @@
 # RogerOS Phase 3 reconciliation and forward plan
 
-> **Planning record, updated 2026-09-02.** This file reconciles the original `AI_Business_OS_Phase_3_Master_Blueprint.docx` with verified repository evidence. It is a planning aid; the architecture, decision log, roadmap, status, and runbook remain the durable operational sources of truth. A planned milestone is not authority to implement it.
+> **Planning record, updated 2026-09-05.** This file reconciles the original `AI_Business_OS_Phase_3_Master_Blueprint.docx` with verified repository evidence. It is a planning aid; the architecture, decision log, roadmap, status, and runbook remain the durable operational sources of truth. A planned milestone is not authority to implement it.
 
 ## How to use this record
 
@@ -19,6 +19,7 @@
 | Runtime and connections | Complete controlled foundation: project-scoped Hermes assignments/executions, governed connection execution, and scoped Google Drive. | M11–M13 commits `134140b`, `d2efffb`, `6cacf39`; runtime, connection, and Drive tests. |
 | Workforce and skills | Complete controlled foundation: employee assignments, Hermes bot profiles/chat/reconciliation, governed Skill catalog, assignment, provisioning, removal, and isolation. | M14B/M15 commits `d79fc85`, `192032d`, `e1cbde3`; bot-workforce and skills tests. |
 | Reliable AI work lifecycle | Complete and accepted in staging: dispatch, signed terminal callback, REVIEW before DONE, revision/retry, role controls, audit/activity evidence, and replay/conflict handling. | M16 commits `e93826d`, `7685721`; full serial suite 23/23; real `ROGEROS_M16_WORK_REVIEW_OK` acceptance. |
+| App/Tool/MCP Market and connection lifecycle | Complete and accepted in staging/Preview: curated versioned non-secret manifests, project-owned idempotent installation lifecycle, Owner/Admin controls, connection health synchronization, execution guards, and human-facing Market UI. | M18 commits `9c7effb`, `692416f`, `1e7b73d`, `d02a649`, `ae26801`; migrations `20260905090000`, `20260905093000`; local and staging serial suites 27/27; authenticated Preview acceptance. |
 
 ## Blueprint reconciliation
 
@@ -54,20 +55,18 @@ Blank customer onboarding, templates/bundles, billing, production OAuth verifica
 
 This is a recommendation for planning, not an approved implementation schedule.
 
-1. **M17 — Employee Market and Safe Hiring.** Establish the curated employee-template and governed hiring boundary on top of the completed Workforce, Skills, Tools, Runtime, and M16 lifecycle foundations.
-2. **M18 — App/Tool/MCP Market and connection lifecycle.** Generalize the existing Tool/Connection patterns into curated, manifest-backed installations without exposing credentials to employees. Installation lifecycle and health must be server-authorized, idempotent, and unable to claim provider connectivity without a typed connection flow.
-3. **M19 — Connected App Workspaces.** Add a generic human-facing workspace framework only for installed, healthy, project-authorized applications; begin with one reference app.
-4. **M20 — Workforce scorecards and cost evidence.** Produce project-scoped, auditable outcome/cost facts before allowing automatic workforce-improvement recommendations.
-5. **M21 — Agent Coach recommendations.** Make Coach outputs reviewable proposals for Skills, policy, Soul, or permission changes; no silent mutation.
-6. **M22 — Project-wide search and command.** Search only authorized project resources and create work only through existing governed workflows.
-7. **Phase 3C planning gates.** Select one advanced workplace vertical slice at a time. Meetings and Reporter can be planned before browser automation; Virtual Browser, takeover, and Teach Mode require a separate security design and VPS workstream.
-8. **Phase 3D productization gate.** Plan customer onboarding, templates/bundles, billing, operational controls, and production promotion only after an explicit tenant-isolation and production-readiness review.
+1. **M19 — Connected App Workspaces.** Add a generic human-facing workspace framework only for installed, healthy, project-authorized applications; begin with one reference app.
+2. **M20 — Workforce scorecards and cost evidence.** Produce project-scoped, auditable outcome/cost facts before allowing automatic workforce-improvement recommendations.
+3. **M21 — Agent Coach recommendations.** Make Coach outputs reviewable proposals for Skills, policy, Soul, or permission changes; no silent mutation.
+4. **M22 — Project-wide search and command.** Search only authorized project resources and create work only through existing governed workflows.
+5. **Phase 3C planning gates.** Select one advanced workplace vertical slice at a time. Meetings and Reporter can be planned before browser automation; Virtual Browser, takeover, and Teach Mode require a separate security design and VPS workstream.
+6. **Phase 3D productization gate.** Plan customer onboarding, templates/bundles, billing, operational controls, and production promotion only after an explicit tenant-isolation and production-readiness review.
 
 The ordering protects the blueprint's core principle: configure reusable capabilities first, observe their outcomes, then add increasingly autonomous or credential-sensitive features.
 
-## M18 Part 1 — App/Tool/MCP Market data foundation
+## M18 — App/Tool/MCP Market and connection lifecycle (complete)
 
-Part 1 establishes only the data and server-side control boundary: curated versioned non-secret manifests, project-owned installation provenance, explicit lifecycle states, and OWNER/ADMIN-only installation and lifecycle mutation. Each installation links to the existing `ProjectTool`; existing `ProjectConnection`, encrypted credential, scoped access, policy, approval, execution, and audit pathways remain authoritative. Installation is default-deny and creates no employee permission, connection credential/scope, policy exception, or execution adapter. UI, OAuth/provider expansion, staging migration, Preview deployment, and Hermes/VPS work are explicitly out of scope.
+M18 establishes curated versioned non-secret manifests, project-owned installation provenance, explicit lifecycle states, and OWNER/ADMIN-only idempotent installation/lifecycle mutation. Each installation links to the existing `ProjectTool`; existing `ProjectConnection`, encrypted credential, scoped access, policy, approval, execution, and audit pathways remain authoritative. Installation is default-deny and creates no employee permission, connection credential/scope, policy exception, or execution adapter. Parts 2–3 add lifecycle guards, typed Google Drive connection synchronization, health APIs, scope retirement/reselection, and the human-facing Market UI. The additive migrations were applied only to the verified staging database; local and authenticated Preview acceptance passed. Real provider OAuth and production promotion remain outside M18.
 
 ## Proposed M17 — Employee Market and Safe Hiring
 

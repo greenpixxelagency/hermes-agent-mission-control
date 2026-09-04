@@ -8,11 +8,11 @@ Last updated: 2026-09-05
 
 - Authoritative development branch: `phase-3`.
 - Meaningful M15 baseline: `3d82601724e8cb567578649e1c829478a0d64d7c` (`fix: report only active governed skills`).
-- Current session: M18 Parts 1–3 are implemented locally on the verified Part 1/Part 2 ancestry. TypeScript, Prisma generation/validation, targeted M18 UI lint, focused rules/authority tests, and the production build pass locally. Database-backed staging acceptance remains blocked because no usable staging environment credentials are present in this checkout.
+- Current session: M18 Parts 1–3 are implemented and closed on the verified Part 1/Part 2 ancestry. Local TypeScript, Prisma generation/validation, targeted M18 UI lint, focused rules/authority tests, production build, full 27/27 suite, and authenticated localhost acceptance pass. Verified staging migration, serial 27/27 staging regression, and authenticated Preview acceptance also pass.
 - M15 is fully closed. Real Preview acceptance assigned `1-3-1 Communication`, reconciled it to the Vhalam Chief runtime, persisted `ROGEROS_M15_SKILL_OK`, audited the lifecycle, removed the assignment, and observed zero active governed skills afterward.
 - Stable phase-3 Preview: `https://hermes-agent-missio-git-a9eea4-greenpixxelagency-2153s-projects.vercel.app`.
-- Staging schema: all 22 repository migrations through `20260903090000_add_employee_market_safe_hiring` are applied.
-- M18 is local-only implementation work: curated manifests, project-scoped installation provenance, idempotent lifecycle APIs, typed connection-state synchronization, health checks, execution re-checks, and the human-facing App Market/connection lifecycle UI are not yet migrated or accepted in staging.
+- Staging schema: all 24 repository migrations through `20260905093000_harden_app_market_lifecycle` are applied.
+- M18 is complete: curated manifests, project-scoped installation provenance, idempotent lifecycle APIs, typed connection-state synchronization, health checks, execution re-checks, and the human-facing App Market/connection lifecycle UI are migrated and accepted in staging/Preview.
 
 ## Completed product foundations
 
@@ -36,11 +36,11 @@ Last updated: 2026-09-05
 ## Current stop point
 
 - M16 is closed. The Phase 3 blueprint reconciliation and proposed dependency plan are recorded in `ROGEROS_PHASE_3_PLAN.md`.
-- M17 is closed. M18 Parts 1–3 implement the local App/Tool/MCP Market foundation, lifecycle services/routes, connection synchronization, and human-facing Market UI. Local commits are `9c7effbdaee0d74a70f70851a87d6a0398e6ac1e`, `692416f87756bc0702b31573945bf4fd1a2cf723`, `1e7b73da113b13e7975b25d4c9d0fd0d1d76faf2`, and `d02a6497205f3a57db918722940ee2ece231a683`. Staging migration, Preview deployment, and end-to-end acceptance remain pending.
+- M17 is closed. M18 is closed on local branch `codex/m18-localhost` at `ae26801` (`chore: complete localhost M18 verification`), pushed to `phase-3` and `codex/m18-localhost`. Its implementation ancestry includes Part 1 `9c7effbdaee0d74a70f70851a87d6a0398e6ac1e`, Part 2 `692416f87756bc0702b31573945bf4fd1a2cf723`, Part 3 `1e7b73da113b13e7975b25d4c9d0fd0d1d76faf2`, and UI/config follow-ups `d02a6497205f3a57db918722940ee2ece231a683`. Staging migrations `20260905090000_add_app_tool_mcp_market_foundation` and `20260905093000_harden_app_market_lifecycle` are applied; serial staging regression is 27/27. Authenticated Preview deployment `dpl_EhoRwohjPLP4zLMGBBnS2tPRNiG7` is Ready at `https://hermes-agent-mission-control-r2k7rry1s.vercel.app` and accepted Market browse, install, idempotent replay, health failure, disable, and uninstall. Temporary acceptance fixtures were removed afterward.
 - Current local Vercel CLI identity is `rogeros`, with access to `greenpixxelagency-2153s-projects/hermes-agent-mission-control`.
 - Local development profile is available at `http://localhost:3001` with an isolated workspace-local PostgreSQL cluster on port `55432`; `.env.local` and the local database files are gitignored.
 - The local database is synchronized with `prisma db push` via `npm run db:local:push`; a clean `prisma migrate deploy` cannot replay the historical migration ordering on an empty database because the older connections migration references `ProjectTool` before its later catalog migration. Migration files and staging history were not changed.
-- Local verification is complete: the full repository suite passes 27/27 against the local database, and authenticated localhost acceptance covered App Market install, idempotent replay, missing-connection health failure, disable, and uninstall. Real Google OAuth, staging migration, Preview acceptance, and remote push remain separate external gates.
+- Local verification is complete: the full repository suite passes 27/27 against the local database, and authenticated localhost acceptance covered App Market install, idempotent replay, missing-connection health failure, disable, and uninstall. Staging/Preview acceptance is complete. Real Google OAuth remains an intentionally unperformed provider-credential flow; production migration/deployment and `main` remain protected.
 - Production and `main` remain protected and untouched.
 
 ## M17 closeout evidence
@@ -51,6 +51,15 @@ Last updated: 2026-09-05
 - Verified Preview deployment `dpl_HRiPUkf4ggdg4NoknhPyVz5Vk7MP` is Ready at `https://hermes-agent-mission-control-ob7xfpp82.vercel.app`.
 - M17 application commit is `49c8f3a7cfe017838cbd814ba3821160c54422e4`; closeout fixes and evidence are pushed only to `phase-3`.
 - No capability, credential, connection, Tool, Skill, or Hermes runtime access is auto-granted by hiring. Production and `main` were not touched.
+
+## M18 closeout evidence
+
+- Applied only additive migrations `20260905090000_add_app_tool_mcp_market_foundation` and `20260905093000_harden_app_market_lifecycle` to the verified staging Neon database; Prisma reported all 24 repository migrations applied.
+- Full serial staging regression passed 27/27 after migration. Local full regression also passed 27/27, with authenticated localhost acceptance covering install, idempotent replay, connection-required health failure, disable, and uninstall.
+- Preview deployment `dpl_EhoRwohjPLP4zLMGBBnS2tPRNiG7` is Ready at `https://hermes-agent-mission-control-r2k7rry1s.vercel.app` from the completed M18 implementation. Authenticated acceptance covered Market page/API access, install, HTTP 200 idempotent replay, `CONNECTION_REQUIRED` health state, disable, and uninstall.
+- Preview-only database variables were corrected for the acceptance deployment; Production variables, production database, `main`, and canonical production/staging aliases were not changed.
+- Temporary staging acceptance data was removed after verification: the generated acceptance user, its one-member `local-development` organization, `local` project, installation, and related audit/history records. Curated global catalog rows were retained.
+- Real Google OAuth credential consent was not exercised; the implementation preserves explicit scope selection and existing encrypted connection boundaries. No provider credential, employee permission, policy exception, or execution authority is granted by installation.
 
 ## M16 closeout evidence
 
