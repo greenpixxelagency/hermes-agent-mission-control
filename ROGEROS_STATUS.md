@@ -39,6 +39,7 @@ Last updated: 2026-09-05
 - M17 is closed. M18 Parts 1–3 implement the local App/Tool/MCP Market foundation, lifecycle services/routes, connection synchronization, and human-facing Market UI. Local commits are `9c7effbdaee0d74a70f70851a87d6a0398e6ac1e`, `692416f87756bc0702b31573945bf4fd1a2cf723`, `1e7b73da113b13e7975b25d4c9d0fd0d1d76faf2`, and `d02a6497205f3a57db918722940ee2ece231a683`. Staging migration, Preview deployment, and end-to-end acceptance remain pending.
 - Current local Vercel CLI identity is `rogeros`, with access to `greenpixxelagency-2153s-projects/hermes-agent-mission-control`.
 - Local development profile is available at `http://localhost:3001` with an isolated workspace-local PostgreSQL cluster on port `55432`; `.env.local` and the local database files are gitignored.
+- The local database is synchronized with `prisma db push` via `npm run db:local:push`; a clean `prisma migrate deploy` cannot replay the historical migration ordering on an empty database because the older connections migration references `ProjectTool` before its later catalog migration. Migration files and staging history were not changed.
 - Production and `main` remain protected and untouched.
 
 ## M17 closeout evidence
