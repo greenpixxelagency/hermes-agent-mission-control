@@ -12,14 +12,14 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 - Hermes execution/runtime foundation, bot workforce reconciliation/chat, and governed Skill assignment/provisioning/removal.
 - M15 real deployed acceptance with `ROGEROS_M15_SKILL_OK` and clean runtime reconciliation.
 - M16 reliable AI work lifecycle and human review, including real signed-callback acceptance with `ROGEROS_M16_WORK_REVIEW_OK`, REVIEW-before-DONE proof, audit/activity evidence, role enforcement, and project isolation.
+- M17 Employee Market and Safe Hiring, including versioned curated templates, project-owned provenance, Owner/Admin controls, default-deny capabilities, employment lifecycle, staging migration, and focused Preview acceptance.
 
 ## Current
 
-- M17 Employee Market and Safe Hiring implementation is awaiting verified staging migration, focused database tests, Preview acceptance, and closeout. M16 remains complete and closed in staging.
+- M17 is complete and closed in staging. M18 remains proposed and requires owner approval.
 
 ## Proposed next work — owner review required
 
-- **M17 — Employee Market and Safe Hiring (in staging verification).** Curated employee-template versions and safe project-scoped hiring are implemented with server-side Owner/Admin authority for both market and custom hiring. It must not auto-grant credentials, connections, Tools, Skills, or runtime power.
 - **M18 — App/Tool/MCP Market and connection lifecycle (proposed).** Generalize the existing Tool/Connection foundation into curated manifest-backed installations.
 - **M19 — Connected App Workspaces (proposed).** Add project-authorized human operational views for installed apps.
 - **M20 — Workforce scorecards and cost evidence (proposed).** Establish auditable outcome/cost facts before Coach automation.

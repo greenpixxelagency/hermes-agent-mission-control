@@ -2,16 +2,16 @@
 
 > **ROGEROS_STATUS.md is a handoff aid, not the source of truth. Always verify git status, recent commits, migrations, tests, and relevant code before working.**
 
-Last updated: 2026-09-02
+Last updated: 2026-09-05
 
 ## Current state
 
 - Authoritative development branch: `phase-3`.
 - Meaningful M15 baseline: `3d82601724e8cb567578649e1c829478a0d64d7c` (`fix: report only active governed skills`).
-- Current session: M17 Employee Market and Safe Hiring is implemented locally on top of `origin/phase-3` head `e6ed1d14b4e543662f10fe53bf18ae0944529b95`. Prisma validation/generation, TypeScript, focused lint, migration diff review, and production build passed; it awaits verified staging migration/test/Preview acceptance. M16 remains complete and accepted in staging.
+- Current session: M17 Employee Market and Safe Hiring is complete and accepted in staging. The additive migration, focused database safety test, production build, and non-main Preview all passed.
 - M15 is fully closed. Real Preview acceptance assigned `1-3-1 Communication`, reconciled it to the Vhalam Chief runtime, persisted `ROGEROS_M15_SKILL_OK`, audited the lifecycle, removed the assignment, and observed zero active governed skills afterward.
 - Stable phase-3 Preview: `https://hermes-agent-missio-git-a9eea4-greenpixxelagency-2153s-projects.vercel.app`.
-- Staging schema: all 21 repository migrations through `20260828120000_add_reliable_ai_work_review` reported applied on 2026-08-28. New additive migration `20260903090000_add_employee_market_safe_hiring` has not been applied.
+- Staging schema: all 22 repository migrations through `20260903090000_add_employee_market_safe_hiring` are applied.
 
 ## Completed product foundations
 
@@ -22,11 +22,11 @@ Last updated: 2026-09-02
 - M14B: Hermes bot/profile workforce reconciliation and chat.
 - M15: governed Skill catalog, employee assignment, typed provisioning, reconciliation, execution acceptance, audit, removal, and isolation.
 - M16: reliable Hermes execution completion, safe retry/revision, signed callbacks, human review, activity/audit evidence, and deployed end-to-end acceptance.
+- M17: curated versioned Employee Market, project-owned hiring provenance, Owner/Admin authority, default-deny capability recommendations, and pause/resume/retire employment lifecycle.
 
 ## Known limitations and risks
 
 - Only `one-three-one-rule` is currently allowlisted for Hermes provisioning. Expanding the catalog requires explicit security review and runtime acceptance.
-- The current custom-employee API resolves project membership but does not independently enforce the stronger Owner/Admin management role used by the Workforce UI. M17 must add server-side hiring authority and regression coverage before a Market or hiring flow is accepted.
 - Dogfood seed scripts intentionally name Green Pixxel, Vhalam, and Buddhaji; they must stay staging-only and must never be imported into product behavior.
 - Upstream legacy Hermy HQ routes still coexist with `/p/[projectSlug]`; avoid accidental cross-system refactors.
 - Local dependency resolution uses a linked `node_modules`, and Next.js reports multiple lockfiles/workspace-root inference during builds.
@@ -35,9 +35,18 @@ Last updated: 2026-09-02
 ## Current stop point
 
 - M16 is closed. The Phase 3 blueprint reconciliation and proposed dependency plan are recorded in `ROGEROS_PHASE_3_PLAN.md`.
-- M17 implementation is complete locally but is not closed: apply only the reviewed additive migration to a verified staging database, run focused database/regression tests, deploy a non-main Preview, and complete normal UI/isolation acceptance before any closeout.
-- Current local Vercel CLI identity is `buddhajicare-4495`, whose only listed team has no projects; it cannot access the documented Green Pixxel staging project. Do not link or deploy from this identity as a workaround.
+- M17 is closed. The next milestone is M18 App/Tool/MCP Market and connection lifecycle, subject to owner approval.
+- Current local Vercel CLI identity is `rogeros`, with access to `greenpixxelagency-2153s-projects/hermes-agent-mission-control`.
 - Production and `main` remain protected and untouched.
+
+## M17 closeout evidence
+
+- Applied only additive migration `20260903090000_add_employee_market_safe_hiring` to the verified `phase-3` Preview database; Prisma reported all 22 migrations applied.
+- Focused staging test passed 1/1, covering Owner/Admin authority, Operator/Viewer denial, project isolation, idempotent hiring, default-deny Skills/Tools/runtime access, safe audit data, and pause/resume/retire lifecycle.
+- Test cleanup now removes version rows before their parent template and clears only `operations-m17-*` test fixtures left by interrupted runs.
+- Verified Preview deployment `dpl_HRiPUkf4ggdg4NoknhPyVz5Vk7MP` is Ready at `https://hermes-agent-mission-control-ob7xfpp82.vercel.app`.
+- M17 application commit is `49c8f3a7cfe017838cbd814ba3821160c54422e4`; closeout fixes and evidence are pushed only to `phase-3`.
+- No capability, credential, connection, Tool, Skill, or Hermes runtime access is auto-granted by hiring. Production and `main` were not touched.
 
 ## M16 closeout evidence
 
@@ -78,18 +87,17 @@ Last updated: 2026-09-02
 
 ### Current Git and deployment state
 
-- Authoritative worktree: `C:\Users\Samsung\.codex\visualizations\2026\08\14\019fff37-50d8-7573-83ee-f144a7eec709\hermes-m9`.
-- Branch: `phase-3`.
-- M16 application commit: `e93826de0b4217e4a111f51dfec0af2fb1713f95`.
-- M16 security hardening commit: `7685721c61bc06204343d260555079c18f402e98`.
-- Both commits are pushed to `origin/phase-3`; the closeout documentation follows them.
-- Production and `main` remain untouched. No post-M16 work has started.
+- Authoritative worktree: `C:\Users\Samsung\.codex\worktrees\45f2\hermes-agent-mission-control`.
+- Worktree is detached at the pushed `phase-3` history; use `HEAD:phase-3` for deliberate pushes from this checkout.
+- M17 application commit: `49c8f3a7cfe017838cbd814ba3821160c54422e4`.
+- M17 migration/test closeout commits follow it on `origin/phase-3`.
+- Production and `main` remain untouched.
 
 ## Warnings for a future approved milestone
 
 - Identify the authoritative worktree before editing; the Documents checkout may be stale.
 - Re-read the six RogerOS documents, then verify Git/code/migrations/tests yourself.
-- Do not recreate completed M1–M16 systems or hardcode dogfood projects.
+- Do not recreate completed M1–M17 systems or hardcode dogfood projects.
 - Do not touch production, `main`, production Hermes/bridge, or production data without explicit authorization.
 - For any Hermes or VPS operation, first provide the owner a self-contained prompt for the dedicated Hermes VPS Codex task, then continue from its returned handoff. Do not silently combine repository and VPS mutations.
 - Read-only VPS inspection found the unrelated production `hermyhq-bridge.service` already in an auto-restart failure loop. It was not touched. Do not fold investigation or repair of that service into M16 without a separate owner-approved VPS prompt.

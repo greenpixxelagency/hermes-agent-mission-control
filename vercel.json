@@ -1,6 +1,5 @@
 {
   "regions": ["iad1"],
-  "buildCommand": "if [ \"$VERCEL_ENV\" = \"preview\" ] && [ \"$VERCEL_GIT_COMMIT_REF\" = \"phase-3\" ]; then node --import tsx --test tests/employee-market.test.ts || exit 1; fi; npm run build",
   "crons": [
     {
       "path": "/api/cron/x-stats",
