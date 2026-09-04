@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { decryptDriveCredential, encryptDriveCredential, isDriveOAuthConfigured } from '@/lib/drive-crypto'
 import { AuditActorType, ConnectionCredentialStatus, ConnectionStatus, ProjectToolStatus } from '@prisma/client'
 import { recordAuditEvent } from '@/lib/audit'
+import { canManageAppMarket } from '@/lib/app-market-rules'
 
 // drive.readonly is the narrowest scope that can browse arbitrary existing
 // folders AND retrieve selected supported file content. drive.file cannot do
@@ -45,31 +46,41 @@ export async function finishDriveOAuth(input: { projectId?: string; userId: stri
   const state = await consumeDriveOAuthState({ state: input.state, userId: input.userId })
   const projectId = input.projectId ?? state.projectId
   if (projectId !== state.projectId) throw new Error('DRIVE_OAUTH_STATE_DENIED')
-  const member = await prisma.projectMember.findFirst({ where: { projectId, organizationMember: { userId: input.userId } }, select: { id: true } })
-  if (!member) throw new Error('DRIVE_PROJECT_ACCESS_DENIED')
-  const installation = await prisma.projectAppInstallation.findFirst({ where: { projectId, manifestVersionRecord: { connectionType: 'GOOGLE_DRIVE' } }, select: { status: true } })
-  if (installation?.status === 'DISABLED' || installation?.status === 'UNINSTALLED') throw new Error('APP_INSTALLATION_NOT_ACTIVE')
+  const member = await prisma.projectMember.findFirst({ where: { projectId, organizationMember: { userId: input.userId } }, select: { id: true, role: true } })
+  if (!member || !canManageAppMarket(member.role)) throw new Error('DRIVE_PROJECT_ACCESS_DENIED')
   const oauth = client(input.origin)
   const { tokens } = await oauth.getToken(input.code)
   if (!tokens.access_token) throw new Error('DRIVE_OAUTH_TOKEN_MISSING')
-  const tool = await prisma.toolDefinition.findUniqueOrThrow({ where: { key: 'google_drive' } })
-  const projectTool = await prisma.projectTool.upsert({ where: { projectId_toolDefinitionId: { projectId, toolDefinitionId: tool.id } }, create: { projectId, toolDefinitionId: tool.id, status: ProjectToolStatus.CONNECTED, displayName: 'Google Drive' }, update: { status: ProjectToolStatus.CONNECTED } })
-  const connection = await prisma.projectConnection.upsert({ where: { projectId_projectToolId: { projectId, projectToolId: projectTool.id } }, create: { projectId, projectToolId: projectTool.id, name: 'Google Drive', status: ConnectionStatus.CONNECTED, enabled: true, metadata: { provider: 'google_drive', scopes: ['drive.readonly'] } }, update: { status: ConnectionStatus.CONNECTED, enabled: true, metadata: { provider: 'google_drive', scopes: ['drive.readonly'] } } })
   const profile = await google.oauth2('v2').userinfo.get({ auth: Object.assign(oauth, { credentials: tokens }) }).catch(() => ({ data: {} as { email?: string; name?: string } }))
   const payload: DriveTokens = { accessToken: tokens.access_token, refreshToken: tokens.refresh_token ?? undefined, expiryDate: tokens.expiry_date }
-  const credential = await prisma.connectionCredential.upsert({ where: { connectionId: connection.id }, create: { projectId, connectionId: connection.id, provider: 'google_drive', encryptedPayload: encryptDriveCredential(payload), expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null, status: ConnectionCredentialStatus.ACTIVE, accountEmail: profile.data.email ?? null, accountDisplayName: profile.data.name ?? null }, update: { encryptedPayload: encryptDriveCredential(payload), expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null, status: ConnectionCredentialStatus.ACTIVE, accountEmail: profile.data.email ?? null, accountDisplayName: profile.data.name ?? null } })
-  await prisma.$transaction([
-    prisma.projectConnection.update({ where: { id: connection.id }, data: { credentialRef: credential.id } }),
-    prisma.projectTool.update({ where: { id: projectTool.id }, data: { credentialRef: credential.id } }),
-  ])
-  if (member) await recordAuditEvent({ projectId, eventType: 'drive.connection.connected', actor: { type: AuditActorType.HUMAN, projectMemberId: member.id }, targetType: 'ProjectConnection', targetId: connection.id, projectToolId: projectTool.id, summary: 'Google Drive connection established', metadata: { provider: 'google_drive', account: profile.data.email ? 'connected' : 'not-returned' } })
-  await (await import('@/lib/app-market')).synchronizeAppInstallationConnection(projectId, projectTool.id, 'CONNECTED')
+  const result = await prisma.$transaction(async tx => {
+    const currentMember = await tx.projectMember.findFirst({ where: { projectId, organizationMember: { userId: input.userId } }, select: { id: true, role: true } })
+    if (!currentMember || !canManageAppMarket(currentMember.role)) throw new Error('DRIVE_PROJECT_ACCESS_DENIED')
+    const installation = await tx.projectAppInstallation.findFirst({ where: { projectId, manifestVersionRecord: { connectionType: 'GOOGLE_DRIVE' }, status: { notIn: ['DISABLED', 'UNINSTALLED'] } }, select: { id: true } })
+    if (!installation) throw new Error('APP_INSTALLATION_NOT_ACTIVE')
+    const tool = await tx.toolDefinition.findUniqueOrThrow({ where: { key: 'google_drive' } })
+    const projectTool = await tx.projectTool.upsert({ where: { projectId_toolDefinitionId: { projectId, toolDefinitionId: tool.id } }, create: { projectId, toolDefinitionId: tool.id, status: ProjectToolStatus.CONNECTED, displayName: 'Google Drive' }, update: { status: ProjectToolStatus.CONNECTED } })
+    const connection = await tx.projectConnection.upsert({ where: { projectId_projectToolId: { projectId, projectToolId: projectTool.id } }, create: { projectId, projectToolId: projectTool.id, name: 'Google Drive', status: ConnectionStatus.CONNECTED, enabled: true, metadata: { provider: 'google_drive', scopes: ['drive.readonly'] } }, update: { status: ConnectionStatus.CONNECTED, enabled: true, metadata: { provider: 'google_drive', scopes: ['drive.readonly'] } } })
+    const credential = await tx.connectionCredential.upsert({ where: { connectionId: connection.id }, create: { projectId, connectionId: connection.id, provider: 'google_drive', encryptedPayload: encryptDriveCredential(payload), expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null, status: ConnectionCredentialStatus.ACTIVE, accountEmail: profile.data.email ?? null, accountDisplayName: profile.data.name ?? null }, update: { encryptedPayload: encryptDriveCredential(payload), expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null, status: ConnectionCredentialStatus.ACTIVE, accountEmail: profile.data.email ?? null, accountDisplayName: profile.data.name ?? null } })
+    const guarded = await tx.projectAppInstallation.updateMany({ where: { id: installation.id, projectId, status: { notIn: ['DISABLED', 'UNINSTALLED'] } }, data: { status: 'CONNECTED' } })
+    if (guarded.count !== 1) throw new Error('APP_INSTALLATION_NOT_ACTIVE')
+    await tx.projectConnection.update({ where: { id: connection.id }, data: { credentialRef: credential.id } })
+    await tx.projectTool.update({ where: { id: projectTool.id }, data: { credentialRef: credential.id } })
+    await recordAuditEvent({ projectId, eventType: 'app_market.connection.connected', actor: { type: AuditActorType.HUMAN, projectMemberId: currentMember.id }, targetType: 'ProjectAppInstallation', targetId: installation.id, projectToolId: projectTool.id, summary: 'App connection established', metadata: { connectionType: 'GOOGLE_DRIVE' } }, tx)
+    await recordAuditEvent({ projectId, eventType: 'drive.connection.connected', actor: { type: AuditActorType.HUMAN, projectMemberId: currentMember.id }, targetType: 'ProjectConnection', targetId: connection.id, projectToolId: projectTool.id, summary: 'Google Drive connection established', metadata: { provider: 'google_drive', account: profile.data.email ? 'connected' : 'not-returned' } }, tx)
+    return { connection, projectTool }
+  })
+  const { connection } = result
   return { connection, projectSlug: state.project.slug }
 }
 
 export async function disconnectDriveConnection(projectId: string, connectionId: string) {
-  await prisma.connectionCredential.updateMany({ where: { projectId, connectionId }, data: { status: ConnectionCredentialStatus.REVOKED } })
-  const connection = await prisma.projectConnection.update({ where: { id: connectionId }, data: { status: ConnectionStatus.DISCONNECTED, enabled: false } })
+  const existing = await prisma.projectConnection.findFirst({ where: { id: connectionId, projectId, projectTool: { tool: { key: 'google_drive' } } }, select: { id: true, projectToolId: true } })
+  if (!existing) throw new Error('DRIVE_CONNECTION_NOT_FOUND')
+  const connection = await prisma.$transaction(async tx => {
+    await tx.connectionCredential.updateMany({ where: { projectId, connectionId: existing.id, provider: 'google_drive' }, data: { status: ConnectionCredentialStatus.REVOKED } })
+    return tx.projectConnection.update({ where: { id: existing.id }, data: { status: ConnectionStatus.DISCONNECTED, enabled: false } })
+  })
   await (await import('@/lib/app-market')).synchronizeAppInstallationConnection(projectId, connection.projectToolId, 'NEEDS_ATTENTION')
   return connection
 }
@@ -85,7 +96,7 @@ export async function activeDriveTokens(projectId: string, connectionId: string)
       const refreshed = await oauth.getAccessToken()
       if (!refreshed.token) throw new Error('NO_TOKEN')
       const next: DriveTokens = { ...tokens, accessToken: refreshed.token, expiryDate: oauth.credentials.expiry_date }
-      await prisma.connectionCredential.update({ where: { connectionId }, data: { encryptedPayload: encryptDriveCredential(next), expiresAt: next.expiryDate ? new Date(next.expiryDate) : null } })
+      await prisma.connectionCredential.updateMany({ where: { projectId, connectionId, provider: 'google_drive', status: ConnectionCredentialStatus.ACTIVE }, data: { encryptedPayload: encryptDriveCredential(next), expiresAt: next.expiryDate ? new Date(next.expiryDate) : null } })
       return next
     } catch { return markDriveNeedsAttention(projectId, connectionId, 'DRIVE_REFRESH_DENIED') }
   }

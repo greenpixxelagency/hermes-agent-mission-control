@@ -5,6 +5,7 @@ import type { ToolAdapter, ToolAdapterInput, ToolAdapterResult } from '@/lib/too
 
 const supported = new Set(['application/vnd.google-apps.document', 'text/plain', 'text/markdown', 'application/pdf'])
 type DriveItem = { id: string; name: string; mimeType: string; modifiedTime?: string | null; webViewLink?: string | null; parents?: string[] | null }
+function queryLiteral(value: string) { return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'") }
 async function driveClient(projectId: string, connectionId: string) {
   const tokens = await activeDriveTokens(projectId, connectionId)
   const auth = new google.auth.OAuth2(); auth.setCredentials({ access_token: tokens.accessToken })
@@ -35,7 +36,11 @@ export const googleDriveAdapter: ToolAdapter = { async execute(input: ToolAdapte
   if (input.capabilityKey === 'drive_list' || input.capabilityKey === 'drive_search') {
     const parentId = typeof input.request.parentId === 'string' ? input.request.parentId : ''
     if (!parentId || !await prisma.projectConnectionScope.findFirst({ where: { projectId: input.projectId, connectionId: input.connectionId, type: 'FOLDER', externalId: parentId, active: true } })) throw new Error('DRIVE_SCOPE_DENIED')
-    const q = input.capabilityKey === 'drive_search' && typeof input.request.query === 'string' ? `name contains '${input.request.query.replace(/'/g, "\\'")}' and trashed = false` : parentId ? `'${parentId.replace(/'/g, "\\'")}' in parents and trashed = false` : 'trashed = false'
+    const escapedParentId = queryLiteral(parentId)
+    const parentClause = `'${escapedParentId}' in parents`
+    const q = input.capabilityKey === 'drive_search' && typeof input.request.query === 'string'
+      ? `${parentClause} and name contains '${queryLiteral(input.request.query)}' and trashed = false`
+      : `${parentClause} and trashed = false`
     const result = await drive.files.list({ q, pageSize: 50, fields: 'files(id,name,mimeType,modifiedTime,webViewLink,parents)' })
     return { resultText: text(result.data.files ?? []), metadata: { count: result.data.files?.length ?? 0 } }
   }

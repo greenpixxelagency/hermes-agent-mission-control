@@ -36,14 +36,19 @@ async function resources(input: Request) {
 async function audit(input: { projectId: string; assignmentId: string; executionId: string; projectToolId: string; event: string; summary: string; metadata?: unknown; approvalRequestId?: string }) {
   return recordAuditEvent({ projectId: input.projectId, eventType: input.event, actor: { type: AuditActorType.EMPLOYEE, employeeAssignmentId: input.assignmentId }, targetType: 'ToolExecution', targetId: input.executionId, projectToolId: input.projectToolId, approvalRequestId: input.approvalRequestId, summary: input.summary, metadata: input.metadata })
 }
-async function executeStored(executionId: string) {
+async function executeStored(executionId: string, mode: 'direct' | 'approved' = 'direct') {
   const execution = await prisma.toolExecution.findUnique({ where: { id: executionId }, include: { projectTool: { include: { tool: true } }, connection: true } })
   if (!execution) throw new ToolExecutionError('EXECUTION_NOT_FOUND')
+  if (execution.status !== 'REQUESTED' && execution.status !== 'PENDING_APPROVAL') throw new ToolExecutionError('EXECUTION_NOT_PENDING')
+  const claimed = await prisma.toolExecution.updateMany({ where: { id: execution.id, projectId: execution.projectId, status: execution.status }, data: { status: ToolExecutionStatus.RUNNING, startedAt: new Date() } })
+  if (claimed.count !== 1) throw new ToolExecutionError('EXECUTION_IN_PROGRESS')
   try {
+    await employee({ projectId: execution.projectId, employeeProjectAssignmentId: execution.employeeProjectAssignmentId, projectToolId: execution.projectToolId, capabilityKey: execution.capabilityKey, actionKey: execution.actionKey as 'read' | 'execute', summary: 'execution reauthorization' })
+    const decision = await resolveToolAuthorization({ projectId: execution.projectId, assignmentId: execution.employeeProjectAssignmentId, projectToolId: execution.projectToolId, action: execution.actionKey, capabilityKey: execution.capabilityKey })
+    if (decision === 'DENY' || (mode === 'direct' && decision === 'REQUIRE_APPROVAL')) throw new ToolExecutionError('DENIED')
     if (execution.projectTool.status !== ProjectToolStatus.CONNECTED || execution.connection.status !== ConnectionStatus.CONNECTED || !execution.connection.enabled) throw new ToolExecutionError('CONNECTION_NOT_AVAILABLE')
     const installation = await prisma.projectAppInstallation.findFirst({ where: { projectId: execution.projectId, projectToolId: execution.projectToolId }, select: { status: true } })
     if (installation && installation.status !== AppInstallationStatus.CONNECTED) throw new ToolExecutionError('APP_INSTALLATION_NOT_CONNECTED')
-    await prisma.toolExecution.update({ where: { id: execution.id }, data: { status: ToolExecutionStatus.RUNNING, startedAt: new Date() } })
     await audit({ projectId: execution.projectId, assignmentId: execution.employeeProjectAssignmentId, executionId: execution.id, projectToolId: execution.projectToolId, event: 'tool.execution.started', summary: 'Governed tool execution started' })
     const result = await toolAdapterFor(execution.projectTool.tool.key).execute({ projectId: execution.projectId, connectionId: execution.projectConnectionId, capabilityKey: execution.capabilityKey, actionKey: execution.actionKey as 'read' | 'execute', request: execution.requestMetadata as Record<string, unknown> })
     if (!result || typeof result.resultText !== 'string' || !result.resultText.trim()) throw new ToolExecutionError('ADAPTER_MALFORMED_RESPONSE')
@@ -85,12 +90,13 @@ export async function executeToolAction(input: Request) {
 export async function executeApprovedToolAction(input: { projectId: string; executionId: string }) {
   const execution = await prisma.toolExecution.findFirst({ where: { id: input.executionId, projectId: input.projectId }, include: { approvalRequest: true } })
   if (!execution || !execution.approvalRequestId || !execution.approvalRequest) throw new ToolExecutionError('APPROVAL_EXECUTION_NOT_FOUND')
+  if (execution.status !== ToolExecutionStatus.PENDING_APPROVAL) throw new ToolExecutionError('EXECUTION_NOT_PENDING')
   const approval = execution.approvalRequest
   const context = approval.actionContext as { fingerprint?: unknown; capabilityKey?: unknown; actionKey?: unknown }
   if (approval.status !== ApprovalStatus.APPROVED || context.fingerprint !== execution.requestFingerprint || context.capabilityKey !== execution.capabilityKey || context.actionKey !== execution.actionKey) throw new ToolExecutionError('APPROVAL_SNAPSHOT_MISMATCH')
   const decision = await resolveToolAuthorization({ projectId: input.projectId, assignmentId: execution.employeeProjectAssignmentId, projectToolId: execution.projectToolId, action: execution.actionKey, capabilityKey: execution.capabilityKey })
   if (decision === 'DENY') throw new ToolExecutionError('DENIED')
-  return executeStored(execution.id)
+  return executeStored(execution.id, 'approved')
 }
 
 export async function getToolExecution(projectId: string, executionId: string) { const execution = await prisma.toolExecution.findFirst({ where: { id: executionId, projectId } }); if (!execution) throw new ToolExecutionError('EXECUTION_NOT_FOUND'); return execution }
