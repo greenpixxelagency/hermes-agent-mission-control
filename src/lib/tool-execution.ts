@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { ApprovalStatus, AuditActorType, ConnectionStatus, ToolExecutionStatus } from '@prisma/client'
+import { AppInstallationStatus, ApprovalStatus, AuditActorType, ConnectionStatus, ProjectToolStatus, ToolExecutionStatus } from '@prisma/client'
 import { createApprovalRequestFromAuthorization } from '@/lib/approvals'
 import { recordAuditEvent, safeMetadata } from '@/lib/audit'
 import { prisma } from '@/lib/prisma'
@@ -26,6 +26,8 @@ async function employee(input: Request) {
 async function resources(input: Request) {
   const tool = await prisma.projectTool.findFirst({ where: { id: input.projectToolId, projectId: input.projectId, status: 'CONNECTED' }, include: { tool: { include: { capabilities: true } } } })
   if (!tool) throw new ToolExecutionError('PROJECT_TOOL_NOT_CONNECTED')
+  const installation = await prisma.projectAppInstallation.findFirst({ where: { projectId: input.projectId, projectToolId: tool.id }, select: { status: true } })
+  if (installation && installation.status !== AppInstallationStatus.CONNECTED) throw new ToolExecutionError('APP_INSTALLATION_NOT_CONNECTED')
   if (!tool.tool.capabilities.some(capability => capability.key === input.capabilityKey)) throw new ToolExecutionError('CAPABILITY_NOT_FOUND')
   const connection = await prisma.projectConnection.findFirst({ where: { projectId: input.projectId, projectToolId: tool.id, enabled: true, status: ConnectionStatus.CONNECTED } })
   if (!connection) throw new ToolExecutionError('CONNECTION_NOT_AVAILABLE')
@@ -38,6 +40,9 @@ async function executeStored(executionId: string) {
   const execution = await prisma.toolExecution.findUnique({ where: { id: executionId }, include: { projectTool: { include: { tool: true } }, connection: true } })
   if (!execution) throw new ToolExecutionError('EXECUTION_NOT_FOUND')
   try {
+    if (execution.projectTool.status !== ProjectToolStatus.CONNECTED || execution.connection.status !== ConnectionStatus.CONNECTED || !execution.connection.enabled) throw new ToolExecutionError('CONNECTION_NOT_AVAILABLE')
+    const installation = await prisma.projectAppInstallation.findFirst({ where: { projectId: execution.projectId, projectToolId: execution.projectToolId }, select: { status: true } })
+    if (installation && installation.status !== AppInstallationStatus.CONNECTED) throw new ToolExecutionError('APP_INSTALLATION_NOT_CONNECTED')
     await prisma.toolExecution.update({ where: { id: execution.id }, data: { status: ToolExecutionStatus.RUNNING, startedAt: new Date() } })
     await audit({ projectId: execution.projectId, assignmentId: execution.employeeProjectAssignmentId, executionId: execution.id, projectToolId: execution.projectToolId, event: 'tool.execution.started', summary: 'Governed tool execution started' })
     const result = await toolAdapterFor(execution.projectTool.tool.key).execute({ projectId: execution.projectId, connectionId: execution.projectConnectionId, capabilityKey: execution.capabilityKey, actionKey: execution.actionKey as 'read' | 'execute', request: execution.requestMetadata as Record<string, unknown> })
@@ -46,7 +51,7 @@ async function executeStored(executionId: string) {
     if (execution.projectTool.tool.key === 'google_drive' && execution.capabilityKey === 'drive_read') {
       const metadata = result.metadata ?? {}; const fileId = typeof metadata.fileId === 'string' ? metadata.fileId : ''
       const name = typeof metadata.name === 'string' ? metadata.name : 'Google Drive file'; const mimeType = typeof metadata.mimeType === 'string' ? metadata.mimeType : 'text/plain'
-      const scope = fileId ? await prisma.projectConnectionScope.findFirst({ where: { projectId: execution.projectId, connectionId: execution.projectConnectionId, type: 'FILE', externalId: fileId }, select: { id: true } }) : null
+      const scope = fileId ? await prisma.projectConnectionScope.findFirst({ where: { projectId: execution.projectId, connectionId: execution.projectConnectionId, type: 'FILE', externalId: fileId, active: true }, select: { id: true } }) : null
       if (!fileId || !scope) throw new ToolExecutionError('DRIVE_SCOPE_DENIED')
       await upsertDriveBrainSource({ projectId: execution.projectId, connectionId: execution.projectConnectionId, scopeId: scope.id, externalFileId: fileId, parentExternalId: typeof metadata.parentId === 'string' ? metadata.parentId : undefined, name, mimeType, webUrl: typeof metadata.webUrl === 'string' ? metadata.webUrl : undefined, modifiedAt: typeof metadata.modifiedAt === 'string' ? new Date(metadata.modifiedAt) : undefined, content: result.resultText })
     }

@@ -55,7 +55,7 @@ Blank customer onboarding, templates/bundles, billing, production OAuth verifica
 This is a recommendation for planning, not an approved implementation schedule.
 
 1. **M17 — Employee Market and Safe Hiring.** Establish the curated employee-template and governed hiring boundary on top of the completed Workforce, Skills, Tools, Runtime, and M16 lifecycle foundations.
-2. **M18 — App/Tool/MCP Market and connection lifecycle.** Generalize the existing Tool/Connection patterns into curated, manifest-backed installations without exposing credentials to employees.
+2. **M18 — App/Tool/MCP Market and connection lifecycle.** Generalize the existing Tool/Connection patterns into curated, manifest-backed installations without exposing credentials to employees. Installation lifecycle and health must be server-authorized, idempotent, and unable to claim provider connectivity without a typed connection flow.
 3. **M19 — Connected App Workspaces.** Add a generic human-facing workspace framework only for installed, healthy, project-authorized applications; begin with one reference app.
 4. **M20 — Workforce scorecards and cost evidence.** Produce project-scoped, auditable outcome/cost facts before allowing automatic workforce-improvement recommendations.
 5. **M21 — Agent Coach recommendations.** Make Coach outputs reviewable proposals for Skills, policy, Soul, or permission changes; no silent mutation.

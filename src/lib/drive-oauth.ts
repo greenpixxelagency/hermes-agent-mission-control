@@ -47,6 +47,8 @@ export async function finishDriveOAuth(input: { projectId?: string; userId: stri
   if (projectId !== state.projectId) throw new Error('DRIVE_OAUTH_STATE_DENIED')
   const member = await prisma.projectMember.findFirst({ where: { projectId, organizationMember: { userId: input.userId } }, select: { id: true } })
   if (!member) throw new Error('DRIVE_PROJECT_ACCESS_DENIED')
+  const installation = await prisma.projectAppInstallation.findFirst({ where: { projectId, manifestVersionRecord: { connectionType: 'GOOGLE_DRIVE' } }, select: { status: true } })
+  if (installation?.status === 'DISABLED' || installation?.status === 'UNINSTALLED') throw new Error('APP_INSTALLATION_NOT_ACTIVE')
   const oauth = client(input.origin)
   const { tokens } = await oauth.getToken(input.code)
   if (!tokens.access_token) throw new Error('DRIVE_OAUTH_TOKEN_MISSING')
@@ -61,12 +63,15 @@ export async function finishDriveOAuth(input: { projectId?: string; userId: stri
     prisma.projectTool.update({ where: { id: projectTool.id }, data: { credentialRef: credential.id } }),
   ])
   if (member) await recordAuditEvent({ projectId, eventType: 'drive.connection.connected', actor: { type: AuditActorType.HUMAN, projectMemberId: member.id }, targetType: 'ProjectConnection', targetId: connection.id, projectToolId: projectTool.id, summary: 'Google Drive connection established', metadata: { provider: 'google_drive', account: profile.data.email ? 'connected' : 'not-returned' } })
+  await (await import('@/lib/app-market')).synchronizeAppInstallationConnection(projectId, projectTool.id, 'CONNECTED')
   return { connection, projectSlug: state.project.slug }
 }
 
 export async function disconnectDriveConnection(projectId: string, connectionId: string) {
   await prisma.connectionCredential.updateMany({ where: { projectId, connectionId }, data: { status: ConnectionCredentialStatus.REVOKED } })
-  return prisma.projectConnection.update({ where: { id: connectionId }, data: { status: ConnectionStatus.DISCONNECTED, enabled: false } })
+  const connection = await prisma.projectConnection.update({ where: { id: connectionId }, data: { status: ConnectionStatus.DISCONNECTED, enabled: false } })
+  await (await import('@/lib/app-market')).synchronizeAppInstallationConnection(projectId, connection.projectToolId, 'NEEDS_ATTENTION')
+  return connection
 }
 
 export async function activeDriveTokens(projectId: string, connectionId: string): Promise<DriveTokens> {
@@ -88,6 +93,8 @@ export async function activeDriveTokens(projectId: string, connectionId: string)
 }
 
 async function markDriveNeedsAttention(projectId: string, connectionId: string, code: string): Promise<never> {
+  const connection = await prisma.projectConnection.findFirst({ where: { id: connectionId, projectId }, select: { projectToolId: true } })
   await prisma.$transaction([prisma.connectionCredential.updateMany({ where: { projectId, connectionId }, data: { status: ConnectionCredentialStatus.NEEDS_ATTENTION } }), prisma.projectConnection.updateMany({ where: { projectId, id: connectionId }, data: { status: ConnectionStatus.NEEDS_ATTENTION } })])
+  if (connection) await (await import('@/lib/app-market')).synchronizeAppInstallationConnection(projectId, connection.projectToolId, 'NEEDS_ATTENTION')
   throw new Error(code)
 }

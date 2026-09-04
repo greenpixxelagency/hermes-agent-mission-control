@@ -12,6 +12,7 @@ Last updated: 2026-09-05
 - M15 is fully closed. Real Preview acceptance assigned `1-3-1 Communication`, reconciled it to the Vhalam Chief runtime, persisted `ROGEROS_M15_SKILL_OK`, audited the lifecycle, removed the assignment, and observed zero active governed skills afterward.
 - Stable phase-3 Preview: `https://hermes-agent-missio-git-a9eea4-greenpixxelagency-2153s-projects.vercel.app`.
 - Staging schema: all 22 repository migrations through `20260903090000_add_employee_market_safe_hiring` are applied.
+- M18 Parts 1–2 are local-only implementation work: curated manifests, project-scoped installation provenance, idempotent lifecycle APIs, typed connection-state synchronization, health checks, and execution re-checks are not yet migrated or accepted in staging.
 
 ## Completed product foundations
 

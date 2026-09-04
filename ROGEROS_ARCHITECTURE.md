@@ -73,6 +73,7 @@ Employee (reusable definition)
 - `ApprovalRequest` gates consequential actions. `AuditEvent` records meaningful control-plane and runtime lifecycle actions with project ownership.
 - Provider adapters execute only after RogerOS authorization. They do not decide tenancy or policy.
 - M18 App/Tool/MCP Market uses curated, versioned, non-secret manifests. A `ProjectAppInstallation` is immutable-version provenance plus an explicit lifecycle state; it reuses the linked `ProjectTool` and `ProjectConnection` boundaries and never stores an endpoint, token, or raw credential. Installing creates no employee permission, connection scope, credential, policy exception, or execution authority.
+- M18 lifecycle mutations are Owner/Admin-only, idempotency-keyed server actions. Only a verified typed connection flow may mark an installation connected; disable/uninstall blocks execution, cancels pending Tool approvals, and preserves governed history. Existing adapters re-check installation state immediately before execution.
 
 ## Engineering rules
 

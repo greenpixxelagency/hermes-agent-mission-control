@@ -18,11 +18,11 @@ export async function inspectGoogleDriveItem(projectId: string, connectionId: st
   return file.data as DriveItem
 }
 async function scoped(projectId: string, connectionId: string, fileId: string) {
-  const direct = await prisma.projectConnectionScope.findFirst({ where: { projectId, connectionId, type: 'FILE', externalId: fileId } })
+  const direct = await prisma.projectConnectionScope.findFirst({ where: { projectId, connectionId, type: 'FILE', externalId: fileId, active: true } })
   if (direct) return direct
   // A selected folder authorizes only files whose stored parent was observed
   // through the adapter. Caller-provided parent IDs can never widen access.
-  const source = await prisma.driveSource.findFirst({ where: { projectId, connectionId, externalFileId: fileId, scope: { is: { type: 'FOLDER' } } } })
+  const source = await prisma.driveSource.findFirst({ where: { projectId, connectionId, externalFileId: fileId, scope: { is: { type: 'FOLDER', active: true } } } })
   if (source) return source
   return null
 }
@@ -34,7 +34,7 @@ export const googleDriveAdapter: ToolAdapter = { async execute(input: ToolAdapte
   const id = typeof input.request.fileId === 'string' ? input.request.fileId : ''
   if (input.capabilityKey === 'drive_list' || input.capabilityKey === 'drive_search') {
     const parentId = typeof input.request.parentId === 'string' ? input.request.parentId : ''
-    if (!parentId || !await prisma.projectConnectionScope.findFirst({ where: { projectId: input.projectId, connectionId: input.connectionId, type: 'FOLDER', externalId: parentId } })) throw new Error('DRIVE_SCOPE_DENIED')
+    if (!parentId || !await prisma.projectConnectionScope.findFirst({ where: { projectId: input.projectId, connectionId: input.connectionId, type: 'FOLDER', externalId: parentId, active: true } })) throw new Error('DRIVE_SCOPE_DENIED')
     const q = input.capabilityKey === 'drive_search' && typeof input.request.query === 'string' ? `name contains '${input.request.query.replace(/'/g, "\\'")}' and trashed = false` : parentId ? `'${parentId.replace(/'/g, "\\'")}' in parents and trashed = false` : 'trashed = false'
     const result = await drive.files.list({ q, pageSize: 50, fields: 'files(id,name,mimeType,modifiedTime,webViewLink,parents)' })
     return { resultText: text(result.data.files ?? []), metadata: { count: result.data.files?.length ?? 0 } }

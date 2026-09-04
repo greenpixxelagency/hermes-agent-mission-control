@@ -411,6 +411,7 @@ model Project {
   driveSources                 DriveSource[]
   driveOAuthStates             DriveOAuthState[]
   appInstallations             ProjectAppInstallation[]
+  appMarketMutations           AppMarketMutation[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -484,8 +485,28 @@ model ProjectAppInstallation {
   installedBy                ProjectMember            @relation(fields: [installedByProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
 
   @@unique([projectId, manifestKey])
+  @@unique([projectId, projectToolId])
   @@unique([id, projectId])
   @@index([projectId, status, createdAt])
+}
+
+// A bounded record makes lifecycle mutations replay-safe without storing a
+// credential, provider response, or arbitrary request payload.
+model AppMarketMutation {
+  id                   String        @id @default(cuid())
+  projectId            String
+  actorProjectMemberId String
+  idempotencyKey       String
+  operation            String
+  requestFingerprint   String
+  result               Json          @default("{}")
+  completedAt          DateTime?
+  createdAt            DateTime      @default(now())
+  project              Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorProjectMember   ProjectMember @relation(fields: [actorProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([projectId, idempotencyKey])
+  @@index([projectId, operation, createdAt])
 }
 
 model ToolCapability {
@@ -580,6 +601,7 @@ model ProjectConnectionScope {
   externalId       String
   displayName      String
   parentExternalId String?
+  active           Boolean           @default(true)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -930,6 +952,7 @@ model ProjectMember {
   marketHires          EmployeeMarketHire[]         @relation("EmployeeMarketHireCreator")
   employmentActivities EmployeeEmploymentActivity[] @relation("EmployeeEmploymentActivityActor")
   appInstallations     ProjectAppInstallation[]
+  appMarketMutations   AppMarketMutation[]
 
   @@unique([projectId, organizationMemberId])
   @@unique([id, projectId])

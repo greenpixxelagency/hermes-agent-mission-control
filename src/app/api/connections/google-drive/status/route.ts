@@ -5,6 +5,6 @@ import { projectScopeErrorResponse, requireProjectContextForRequest } from '@/li
 
 export async function GET(request: Request) { try {
   const context = await requireProjectContextForRequest(request)
-  const connection = await prisma.projectConnection.findFirst({ where: { projectId: context.project.id, projectTool: { tool: { key: 'google_drive' } } }, include: { credential: { select: { status: true, accountEmail: true, accountDisplayName: true, expiresAt: true } }, scopes: { select: { id: true, type: true, externalId: true, displayName: true } } } })
+  const connection = await prisma.projectConnection.findFirst({ where: { projectId: context.project.id, projectTool: { tool: { key: 'google_drive' } } }, include: { credential: { select: { status: true, accountEmail: true, accountDisplayName: true, expiresAt: true } }, scopes: { where: { active: true }, select: { id: true, type: true, externalId: true, displayName: true } } } })
   return NextResponse.json({ configured: isDriveOAuthConfigured(), connection })
 } catch (error) { return projectScopeErrorResponse(error) } }

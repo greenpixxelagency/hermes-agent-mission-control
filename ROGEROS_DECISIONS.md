@@ -86,7 +86,7 @@
 
 **Reason:** Installing an app must not become a second execution system or a mechanism for distributing credentials and employee authority.
 
-**Consequences:** OWNER and ADMIN authority is enforced server-side. Installation creates no employee Tool permission, ProjectConnection credential, scope, policy exception, or adapter behavior. Connection health and encrypted credential material remain in the existing Connection models; audit metadata is secret-safe.
+**Consequences:** OWNER and ADMIN authority is enforced server-side. Installation creates no employee Tool permission, ProjectConnection credential, scope, policy exception, or adapter behavior. Lifecycle mutations require a project-scoped idempotency key; only a typed provider callback or explicit manager health check may establish connected health. Disable/uninstall blocks execution and pending approval work while preserving audit/history. Connection health and encrypted credential material remain in the existing Connection models; audit metadata is secret-safe.
 
 ## AI completion requires human review
 
