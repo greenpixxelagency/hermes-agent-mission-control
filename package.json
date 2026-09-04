@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "next dev -p 3001",
+    "db:local:push": "node --env-file=.env.local node_modules/prisma/build/index.js db push --schema prisma/schema.prisma --accept-data-loss",
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
