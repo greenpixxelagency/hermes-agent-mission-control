@@ -8,11 +8,11 @@ Last updated: 2026-09-05
 
 - Authoritative development branch: `phase-3`.
 - Meaningful M15 baseline: `3d82601724e8cb567578649e1c829478a0d64d7c` (`fix: report only active governed skills`).
-- Current session: M17 Employee Market and Safe Hiring is complete and accepted in staging. The additive migration, focused database safety test, production build, and non-main Preview all passed.
+- Current session: M18 Parts 1–3 are implemented locally on the verified Part 1/Part 2 ancestry. TypeScript, Prisma generation/validation, targeted M18 UI lint, focused rules/authority tests, and the production build pass locally. Database-backed staging acceptance remains blocked because no usable staging environment credentials are present in this checkout.
 - M15 is fully closed. Real Preview acceptance assigned `1-3-1 Communication`, reconciled it to the Vhalam Chief runtime, persisted `ROGEROS_M15_SKILL_OK`, audited the lifecycle, removed the assignment, and observed zero active governed skills afterward.
 - Stable phase-3 Preview: `https://hermes-agent-missio-git-a9eea4-greenpixxelagency-2153s-projects.vercel.app`.
 - Staging schema: all 22 repository migrations through `20260903090000_add_employee_market_safe_hiring` are applied.
-- M18 Parts 1–2 are local-only implementation work: curated manifests, project-scoped installation provenance, idempotent lifecycle APIs, typed connection-state synchronization, health checks, and execution re-checks are not yet migrated or accepted in staging.
+- M18 is local-only implementation work: curated manifests, project-scoped installation provenance, idempotent lifecycle APIs, typed connection-state synchronization, health checks, execution re-checks, and the human-facing App Market/connection lifecycle UI are not yet migrated or accepted in staging.
 
 ## Completed product foundations
 
@@ -36,7 +36,7 @@ Last updated: 2026-09-05
 ## Current stop point
 
 - M16 is closed. The Phase 3 blueprint reconciliation and proposed dependency plan are recorded in `ROGEROS_PHASE_3_PLAN.md`.
-- M17 is closed. M18 Part 1 implements the local App/Tool/MCP Market data foundation: additive manifest/install provenance migration, server-authorized lifecycle service/routes, and focused rules tests. It does not migrate staging, deploy Preview, modify Hermes/VPS, or add UI.
+- M17 is closed. M18 Parts 1–3 implement the local App/Tool/MCP Market foundation, lifecycle services/routes, connection synchronization, and human-facing Market UI. Local commits are `9c7effbdaee0d74a70f70851a87d6a0398e6ac1e`, `692416f87756bc0702b31573945bf4fd1a2cf723`, `1e7b73da113b13e7975b25d4c9d0fd0d1d76faf2`, and `d02a6497205f3a57db918722940ee2ece231a683`. Staging migration, Preview deployment, and end-to-end acceptance remain pending.
 - Current local Vercel CLI identity is `rogeros`, with access to `greenpixxelagency-2153s-projects/hermes-agent-mission-control`.
 - Production and `main` remain protected and untouched.
 
