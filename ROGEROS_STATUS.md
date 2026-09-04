@@ -40,6 +40,7 @@ Last updated: 2026-09-05
 - Current local Vercel CLI identity is `rogeros`, with access to `greenpixxelagency-2153s-projects/hermes-agent-mission-control`.
 - Local development profile is available at `http://localhost:3001` with an isolated workspace-local PostgreSQL cluster on port `55432`; `.env.local` and the local database files are gitignored.
 - The local database is synchronized with `prisma db push` via `npm run db:local:push`; a clean `prisma migrate deploy` cannot replay the historical migration ordering on an empty database because the older connections migration references `ProjectTool` before its later catalog migration. Migration files and staging history were not changed.
+- Local verification is complete: the full repository suite passes 27/27 against the local database, and authenticated localhost acceptance covered App Market install, idempotent replay, missing-connection health failure, disable, and uninstall. Real Google OAuth, staging migration, Preview acceptance, and remote push remain separate external gates.
 - Production and `main` remain protected and untouched.
 
 ## M17 closeout evidence

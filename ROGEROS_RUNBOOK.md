@@ -20,6 +20,7 @@
 - Local configuration belongs in the gitignored `.env.local`; never copy staging or production credentials into it.
 - The local profile uses an isolated workspace PostgreSQL cluster at `127.0.0.1:55432`, stored under the gitignored `.local-postgres` directory.
 - Run `npm run db:local:push` to synchronize the local schema. The historical migration chain cannot replay cleanly on an empty local database because an older connections migration references `ProjectTool` before its later catalog migration; this local-only workaround does not modify migration files or staging history.
+- Run `npm run db:local:seed` after the schema push to restore curated non-secret Skills, Employee Market, and App Market catalog rows. When `LOCAL_OWNER_EMAIL` is set, it also creates a generic local Owner membership for the `local` workspace; create that account's password through the login page.
 
 ## Migration safety
 

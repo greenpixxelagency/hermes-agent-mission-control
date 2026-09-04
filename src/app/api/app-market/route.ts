@@ -24,6 +24,6 @@ export async function POST(request: Request) {
   try {
     const body = await request.json() as Record<string, unknown>
     const result = await installAppMarketManifest(await requireProjectContextForBody(body), { ...body, idempotencyKey: request.headers.get('idempotency-key') ?? undefined })
-    return NextResponse.json(result, { status: result.created ? 201 : 200 })
+    return NextResponse.json(result, { status: result.replayed ? 200 : result.created ? 201 : 200 })
   } catch (error) { return response(error) }
 }

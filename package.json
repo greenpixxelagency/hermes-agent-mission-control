@@ -6,6 +6,7 @@
     "dev": "next dev",
     "dev:local": "next dev -H localhost -p 3001",
     "db:local:push": "node --env-file=.env.local node_modules/prisma/build/index.js db push --schema prisma/schema.prisma --accept-data-loss",
+    "db:local:seed": "node --env-file=.env.local --import tsx prisma/seed-local.ts",
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",

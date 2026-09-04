@@ -16,7 +16,7 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 
 ## Current
 
-- M17 is complete and closed in staging. M18 Parts 1–3 (manifest foundation, server-side lifecycle controls, connection synchronization, and human-facing Market UI) are implemented locally; staging migration, Preview, and end-to-end acceptance remain pending.
+- M17 is complete and closed in staging. M18 Parts 1–3 (manifest foundation, server-side lifecycle controls, connection synchronization, and human-facing Market UI) are implemented and accepted locally; staging migration, Preview, and end-to-end acceptance remain pending.
 
 ## Proposed next work — owner review required
 
