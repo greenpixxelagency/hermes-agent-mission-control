@@ -14,6 +14,13 @@
 - Keep `main`, production Vercel, production databases, production OAuth, Hermes/bridge, and automation systems untouched unless explicitly authorized.
 - Dogfood seed scripts are for staging only. Product code must work for arbitrary organizations/projects.
 
+## Local development
+
+- Run the local RogerOS app with `npm run dev:local`; it binds to `http://localhost:3001` so port 3000 remains available for another project.
+- Local configuration belongs in the gitignored `.env.local`; never copy staging or production credentials into it.
+- The local profile uses an isolated workspace PostgreSQL cluster at `127.0.0.1:55432`, stored under the gitignored `.local-postgres` directory.
+- Run `npm run db:local:push` to synchronize the local schema. The historical migration chain cannot replay cleanly on an empty local database because an older connections migration references `ProjectTool` before its later catalog migration; this local-only workaround does not modify migration files or staging history.
+
 ## Migration safety
 
 1. Inspect schema, migration history, and target migration state before generating or applying SQL.
