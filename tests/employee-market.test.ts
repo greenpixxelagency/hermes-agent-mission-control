@@ -13,6 +13,12 @@ function hasCode(error: unknown, code: string) {
 }
 
 test('M17 makes market hiring project-owned, role-gated, idempotent, and default-deny', async t => {
+  const staleTemplates = await prisma.employeeMarketTemplate.findMany({ where: { key: { startsWith: 'operations-m17-' } }, select: { id: true } })
+  const staleTemplateIds = staleTemplates.map(template => template.id)
+  if (staleTemplateIds.length) {
+    await prisma.employeeMarketTemplateVersion.deleteMany({ where: { templateId: { in: staleTemplateIds } } })
+    await prisma.employeeMarketTemplate.deleteMany({ where: { id: { in: staleTemplateIds } } })
+  }
   const organization = await prisma.organization.create({ data: { name: 'M17 Test', slug: suffix } })
   const roles: ProjectRole[] = ['OWNER', 'ADMIN', 'OPERATOR', 'VIEWER']
   const users = await Promise.all(roles.map(role => prisma.user.create({ data: { email: `${suffix}-${role.toLowerCase()}@example.invalid` } })))
@@ -26,6 +32,7 @@ test('M17 makes market hiring project-owned, role-gated, idempotent, and default
 
   t.after(async () => {
     await prisma.organization.delete({ where: { id: organization.id } })
+    await prisma.employeeMarketTemplateVersion.deleteMany({ where: { templateId: template.id } })
     await prisma.employeeMarketTemplate.delete({ where: { id: template.id } })
     await prisma.user.deleteMany({ where: { id: { in: users.map(user => user.id) } } })
     await prisma.$disconnect()
