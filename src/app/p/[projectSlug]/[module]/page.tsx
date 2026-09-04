@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import { BarChart3, Blocks, Settings2, Sparkles } from 'lucide-react'
 
 import { EmptyState, PageHeader, StatusPill } from '@/components/rogeros-ui'
-import { EmployeeMarketWorkspace } from '@/components/employee-market-workspace'
 import { AppMarketWorkspace } from '@/components/app-market-workspace'
 import { ProjectContextError, requireProjectContextBySlug } from '@/lib/project-context'
 
