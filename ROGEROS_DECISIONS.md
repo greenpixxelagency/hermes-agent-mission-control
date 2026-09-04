@@ -80,6 +80,14 @@
 
 **Consequences:** Repeated hiring of the same template is idempotent per project. Recommended Skills and Tools can be selected and audited as metadata but create no Skill assignment, Tool permission, connection, credential, or runtime assignment. Pausing/resuming/retiring employment preserves existing Tasks, executions, review evidence, and history; retirement disables only the existing RogerOS runtime assignment record and does not add runtime transport behavior.
 
+## App Market installations are curated provenance, not capability grants
+
+**Decision:** M18 represents catalog entries as versioned, non-secret manifests and project selections as lifecycle-managed installation provenance that links to the existing governed `ProjectTool`.
+
+**Reason:** Installing an app must not become a second execution system or a mechanism for distributing credentials and employee authority.
+
+**Consequences:** OWNER and ADMIN authority is enforced server-side. Installation creates no employee Tool permission, ProjectConnection credential, scope, policy exception, or adapter behavior. Connection health and encrypted credential material remain in the existing Connection models; audit metadata is secret-safe.
+
 ## AI completion requires human review
 
 **Decision:** A successful Hermes execution makes the latest Task result ready for review; it does not complete authoritative business work. OWNER, ADMIN, or APPROVER must accept it before the Task becomes done.

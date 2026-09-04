@@ -72,6 +72,7 @@ Employee (reusable definition)
 - Policies and SOPs remain RogerOS records. Policy evaluation may allow, block, advise, or require approval.
 - `ApprovalRequest` gates consequential actions. `AuditEvent` records meaningful control-plane and runtime lifecycle actions with project ownership.
 - Provider adapters execute only after RogerOS authorization. They do not decide tenancy or policy.
+- M18 App/Tool/MCP Market uses curated, versioned, non-secret manifests. A `ProjectAppInstallation` is immutable-version provenance plus an explicit lifecycle state; it reuses the linked `ProjectTool` and `ProjectConnection` boundaries and never stores an endpoint, token, or raw credential. Installing creates no employee permission, connection scope, credential, policy exception, or execution authority.
 
 ## Engineering rules
 

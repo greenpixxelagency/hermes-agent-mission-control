@@ -209,6 +209,18 @@ enum ConnectionStatus {
   DISABLED
 }
 
+// M18 installs are project-owned provenance records. A manifest version is
+// immutable catalog metadata; connection and credential health stays on the
+// existing ProjectConnection and ConnectionCredential records.
+enum AppInstallationStatus {
+  INSTALLED
+  CONNECTING
+  CONNECTED
+  NEEDS_ATTENTION
+  DISABLED
+  UNINSTALLED
+}
+
 // M13: credential material is encrypted server-side. A connection never owns
 // plaintext OAuth tokens and these states are safe to render to project users.
 enum ConnectionCredentialStatus {
@@ -398,6 +410,7 @@ model Project {
   connectionScopes             ProjectConnectionScope[]
   driveSources                 DriveSource[]
   driveOAuthStates             DriveOAuthState[]
+  appInstallations             ProjectAppInstallation[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -405,16 +418,74 @@ model Project {
 }
 
 model ToolDefinition {
-  id           String           @id @default(cuid())
-  key          String           @unique
-  name         String
-  description  String?
-  category     String           @default("GENERAL")
-  builtIn      Boolean          @default(true)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  capabilities ToolCapability[]
-  projectTools ProjectTool[]
+  id                     String                     @id @default(cuid())
+  key                    String                     @unique
+  name                   String
+  description            String?
+  category               String                     @default("GENERAL")
+  builtIn                Boolean                    @default(true)
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  capabilities           ToolCapability[]
+  projectTools           ProjectTool[]
+  marketManifestVersions AppMarketManifestVersion[]
+}
+
+// Curated global catalog identity. It is deliberately versioned separately
+// from the governed ToolDefinition so manifest changes cannot alter an
+// existing project's installation provenance.
+model AppMarketManifest {
+  id        String                     @id @default(cuid())
+  key       String                     @unique
+  createdAt DateTime                   @default(now())
+  versions  AppMarketManifestVersion[]
+}
+
+model AppMarketManifestVersion {
+  id               String                   @id @default(cuid())
+  manifestId       String
+  version          Int
+  name             String
+  description      String
+  category         String
+  kind             String
+  toolDefinitionId String
+  capabilityKeys   String[]                 @default([])
+  connectionType   String?
+  isEnabled        Boolean                  @default(true)
+  createdAt        DateTime                 @default(now())
+  manifest         AppMarketManifest        @relation(fields: [manifestId], references: [id], onDelete: Restrict)
+  toolDefinition   ToolDefinition           @relation(fields: [toolDefinitionId], references: [id], onDelete: Restrict)
+  installations    ProjectAppInstallation[]
+
+  @@unique([manifestId, version])
+  @@index([isEnabled, createdAt])
+}
+
+// This record is installation provenance and lifecycle only. It contains no
+// endpoint, OAuth token, secret, or raw credential material. The existing
+// ProjectTool / ProjectConnection records remain the execution boundary.
+model ProjectAppInstallation {
+  id                         String                   @id @default(cuid())
+  projectId                  String
+  projectToolId              String
+  manifestVersionId          String
+  manifestKey                String
+  manifestVersion            Int
+  status                     AppInstallationStatus    @default(INSTALLED)
+  configurationSnapshot      Json                     @default("{}")
+  installedByProjectMemberId String
+  uninstalledAt              DateTime?
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  project                    Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectTool                ProjectTool              @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Restrict)
+  manifestVersionRecord      AppMarketManifestVersion @relation(fields: [manifestVersionId], references: [id], onDelete: Restrict)
+  installedBy                ProjectMember            @relation(fields: [installedByProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([projectId, manifestKey])
+  @@unique([id, projectId])
+  @@index([projectId, status, createdAt])
 }
 
 model ToolCapability {
@@ -444,6 +515,7 @@ model ProjectTool {
   auditEvents      AuditEvent[]
   connections      ProjectConnection[]
   executions       ToolExecution[]
+  appInstallations ProjectAppInstallation[]
 
   @@unique([projectId, toolDefinitionId])
   @@unique([id, projectId])
@@ -857,6 +929,7 @@ model ProjectMember {
   auditEvents          AuditEvent[]
   marketHires          EmployeeMarketHire[]         @relation("EmployeeMarketHireCreator")
   employmentActivities EmployeeEmploymentActivity[] @relation("EmployeeEmploymentActivityActor")
+  appInstallations     ProjectAppInstallation[]
 
   @@unique([projectId, organizationMemberId])
   @@unique([id, projectId])

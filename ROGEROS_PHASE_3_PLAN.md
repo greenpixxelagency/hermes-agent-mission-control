@@ -65,6 +65,10 @@ This is a recommendation for planning, not an approved implementation schedule.
 
 The ordering protects the blueprint's core principle: configure reusable capabilities first, observe their outcomes, then add increasingly autonomous or credential-sensitive features.
 
+## M18 Part 1 — App/Tool/MCP Market data foundation
+
+Part 1 establishes only the data and server-side control boundary: curated versioned non-secret manifests, project-owned installation provenance, explicit lifecycle states, and OWNER/ADMIN-only installation and lifecycle mutation. Each installation links to the existing `ProjectTool`; existing `ProjectConnection`, encrypted credential, scoped access, policy, approval, execution, and audit pathways remain authoritative. Installation is default-deny and creates no employee permission, connection credential/scope, policy exception, or execution adapter. UI, OAuth/provider expansion, staging migration, Preview deployment, and Hermes/VPS work are explicitly out of scope.
+
 ## Proposed M17 — Employee Market and Safe Hiring
 
 ### Goal

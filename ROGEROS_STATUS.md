@@ -35,7 +35,7 @@ Last updated: 2026-09-05
 ## Current stop point
 
 - M16 is closed. The Phase 3 blueprint reconciliation and proposed dependency plan are recorded in `ROGEROS_PHASE_3_PLAN.md`.
-- M17 is closed. The next milestone is M18 App/Tool/MCP Market and connection lifecycle, subject to owner approval.
+- M17 is closed. M18 Part 1 implements the local App/Tool/MCP Market data foundation: additive manifest/install provenance migration, server-authorized lifecycle service/routes, and focused rules tests. It does not migrate staging, deploy Preview, modify Hermes/VPS, or add UI.
 - Current local Vercel CLI identity is `rogeros`, with access to `greenpixxelagency-2153s-projects/hermes-agent-mission-control`.
 - Production and `main` remain protected and untouched.
 

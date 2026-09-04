@@ -16,7 +16,7 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 
 ## Current
 
-- M17 is complete and closed in staging. M18 remains proposed and requires owner approval.
+- M17 is complete and closed in staging. M18 Part 1 App/Tool/MCP Market data foundation is implemented locally; staging migration, Preview, and UI work remain out of scope for this part.
 
 ## Proposed next work — owner review required
 
