@@ -17,7 +17,7 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 
 ## Current
 
-- M17 and M18 are complete and closed in staging. M18 was also verified locally and through authenticated Preview acceptance; no production or `main` changes were made.
+- M17 and M18 are complete and closed in staging. M18 was also verified locally and through authenticated Preview acceptance, with subsequent real localhost Google sign-in, Drive consent/token exchange, installation synchronization, and successful live provider health acceptance; no production or `main` changes were made.
 
 ## Proposed next work — owner review required
 
