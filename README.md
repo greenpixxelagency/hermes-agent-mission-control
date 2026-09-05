@@ -25,6 +25,8 @@ It is a **template and starting point**, not a hosted product. You bring your ow
 database, your own Hermes, and your own API keys. Everything is configured through
 environment variables.
 
+> **RogerOS status (current product work):** this repository also contains RogerOS, a separate multi-tenant, project-scoped control plane under `/p/[projectSlug]`. The Hermy HQ material below is retained upstream/template documentation and does **not** describe RogerOS architecture, deployment, tenancy, or supported product scope. For RogerOS, start with [`AGENTS.md`](./AGENTS.md), then [`ROGEROS_AGENT_INSTRUCTIONS.md`](./ROGEROS_AGENT_INSTRUCTIONS.md) and [`ROGEROS_AUDIT.md`](./ROGEROS_AUDIT.md). Do not use the legacy bridge or this README's production/self-hosting steps as RogerOS operational instructions without an explicit approved migration plan.
+
 ---
 
 > [!IMPORTANT]

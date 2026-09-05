@@ -6,6 +6,7 @@
 2. Read `AGENTS.md`, `ROGEROS_AGENT_INSTRUCTIONS.md`, and the architecture/status/roadmap/decision/runbook documents.
 3. Independently run `git status --short --branch`, inspect recent commits, migrations, relevant code, and tests.
 4. Confirm scope, protected systems, current milestone, and stop condition before editing.
+5. When auditing or planning, classify each claim as verified code/test/acceptance evidence, partial implementation, planned work, or legacy upstream behavior. Do not turn a shell label, a roadmap item, or a historical README into a completion claim.
 
 ## Staging and production
 

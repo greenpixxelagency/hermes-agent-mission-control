@@ -70,6 +70,8 @@ M18 establishes curated versioned non-secret manifests, project-owned installati
 
 ## Proposed M17 — Employee Market and Safe Hiring
 
+> **Historical planning record:** M17 was implemented and closed after this proposal was written; the completed current behavior is recorded in `ROGEROS_STATUS.md`, `ROGEROS_ROADMAP.md`, and `ROGEROS_AUDIT.md`. This retained section explains the original decision and acceptance intent only. It must not be read as current scope or an authorization to repeat M17.
+
 ### Goal
 
 Let an authorized project owner browse a small, curated catalog of reusable AI employee roles and hire one safely into a project. Hiring must create a project-owned employment record and must never grant credentials, cross-project context, or unapproved external power.

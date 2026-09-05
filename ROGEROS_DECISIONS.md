@@ -8,6 +8,14 @@
 
 **Consequences:** Product behavior cannot branch on dogfood names, slugs, IDs, credentials, or business assumptions. Dogfood fixtures remain isolated to staging/tests.
 
+## Legacy Hermy HQ and RogerOS remain explicitly separated
+
+**Decision:** The repository may temporarily contain upstream Hermy HQ screens, bridge code, and legacy schema models beside RogerOS, but only `/p/[projectSlug]` and its project-scoped services are RogerOS product evidence.
+
+**Reason:** Reusing a repository does not safely turn an older single-operator dashboard into a multi-tenant control plane.
+
+**Consequences:** Do not count legacy screens as RogerOS functionality, route RogerOS work through its server-resolved project context, and require an explicit owner-approved migration/retirement plan before coupling or deleting either system. The root README must label its historical Hermy HQ instructions accordingly.
+
 ## RogerOS is the control plane; Hermes is the execution runtime
 
 **Decision:** Hermes performs AI execution. RogerOS owns authoritative business and governance state.

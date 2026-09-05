@@ -18,6 +18,7 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 ## Current
 
 - M17 and M18 are complete and closed in staging. M18 was also verified locally and through authenticated Preview acceptance, with subsequent real localhost Google sign-in, Drive consent/token exchange, installation synchronization, and successful live provider health acceptance; no production or `main` changes were made.
+- The audit separates this completion from customer/production readiness: the feature foundation is real, but production operations, customer onboarding, billing, deletion/export, support, disaster recovery, broader integration coverage, and the planned shell modules remain unfinished.
 
 ## Proposed next work — owner review required
 
@@ -27,7 +28,7 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 - **M22 — Project-wide search and command (proposed).** Search and act only through project-scoped, authorized workflows.
 - Phase 3C advanced workplace and Phase 3D SaaS productization remain planned vision. Customer onboarding, templates/bundles, billing, and production promotion are not M17 work.
 
-See `ROGEROS_PHASE_3_PLAN.md` for completed-vs-blueprint reconciliation, dependencies, and the M17 acceptance gates.
+See `ROGEROS_PHASE_3_PLAN.md` for completed-vs-blueprint reconciliation and dependencies, and `ROGEROS_AUDIT.md` for the current implementation/placeholder boundary.
 
 ## Longer-term product vision
 

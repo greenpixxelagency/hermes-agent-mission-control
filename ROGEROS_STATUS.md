@@ -4,6 +4,8 @@
 
 Last updated: 2026-09-05
 
+> **Audit addendum:** `ROGEROS_AUDIT.md` distinguishes verified functionality from partial RogerOS UI, planned shell pages, and the coexisting legacy Hermy HQ product. It is the current concise evidence snapshot.
+
 ## Current state
 
 - Authoritative development branch: `phase-3`.
@@ -32,6 +34,8 @@ Last updated: 2026-09-05
 - Upstream legacy Hermy HQ routes still coexist with `/p/[projectSlug]`; avoid accidental cross-system refactors.
 - Local dependency resolution uses a linked `node_modules`, and Next.js reports multiple lockfiles/workspace-root inference during builds.
 - Preview/staging evidence does not authorize production migration or deployment. Production and `main` remain protected unless explicitly approved.
+- Reports, Automations, and Settings in the RogerOS shell are intentional “Foundation” placeholders; the command palette navigates only. They are not shipped reporting, workflow automation, settings administration, search, or command features.
+- The full local/staging suite has historical closeout evidence, but this audit reran only safe focused checks. Real concurrent database race testing for M18 remains unexercised.
 
 ## Current stop point
 
