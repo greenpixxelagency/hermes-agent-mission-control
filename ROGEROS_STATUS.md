@@ -54,6 +54,10 @@ Last updated: 2026-09-05
 
 ## M18 closeout evidence
 
+- Local follow-up: real Google sign-in completed and authenticated Owner access to `/p/local` was verified. Fixed the App Market catalog to offer reinstall for an uninstalled app using the existing authorized install API. Browser acceptance reinstalled Drive successfully; TypeScript, scoped ESLint, and 3/3 app-market rules tests passed. Started the separate Drive OAuth flow and reached Google's account chooser requesting `drive.readonly`; Drive consent, token exchange, health, and explicit file/folder selection remain pending.
+
+- Local OAuth setup follow-up (2026-09-05): added localhost:3001 sign-in and Drive callback URIs to the existing RogerOS Drive Preview client, preserving its Preview callback. Added a new secret without disabling the existing secret and configured it only in gitignored `.env.local`. The local owner email is allowlisted and seeded. Restarted the isolated local database and app; Google sign-in now reaches the account chooser instead of `invalid_client`. User sign-in/consent and the subsequent Drive connection acceptance remain pending; this is not evidence of completed token exchange or Drive access.
+
 - Applied only additive migrations `20260905090000_add_app_tool_mcp_market_foundation` and `20260905093000_harden_app_market_lifecycle` to the verified staging Neon database; Prisma reported all 24 repository migrations applied.
 - Full serial staging regression passed 27/27 after migration. Local full regression also passed 27/27, with authenticated localhost acceptance covering install, idempotent replay, connection-required health failure, disable, and uninstall.
 - Preview deployment `dpl_EhoRwohjPLP4zLMGBBnS2tPRNiG7` is Ready at `https://hermes-agent-mission-control-r2k7rry1s.vercel.app` from the completed M18 implementation. Authenticated acceptance covered Market page/API access, install, HTTP 200 idempotent replay, `CONNECTION_REQUIRED` health state, disable, and uninstall.
