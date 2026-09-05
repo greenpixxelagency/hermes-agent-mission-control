@@ -6,6 +6,10 @@ const KEY_LENGTH = 64
 
 export const normalizeEmail = (value: string) => value.trim().toLowerCase()
 export const passwordError = (password: string) => password.length < 12 ? 'Use at least 12 characters.' : null
+export function isAllowedEmail(email: string) {
+  const allowed = (process.env.ALLOWED_EMAILS ?? '').split(',').map(normalizeEmail).filter(Boolean)
+  return allowed.length > 0 && allowed.includes(normalizeEmail(email))
+}
 
 function scrypt(password: string, salt: Buffer, length: number) {
   return new Promise<Buffer>((resolve, reject) => nodeScrypt(password, salt, length, { N: COST, r: BLOCK_SIZE, p: PARALLELIZATION, maxmem: 64 * 1024 * 1024 }, (error, derived) => error ? reject(error) : resolve(derived)))

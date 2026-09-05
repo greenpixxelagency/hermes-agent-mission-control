@@ -2,7 +2,7 @@ import type { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
-import { normalizeEmail, verifyPassword } from '@/lib/native-auth'
+import { isAllowedEmail, normalizeEmail, verifyPassword } from '@/lib/native-auth'
 
 // Pure JWT auth — no DB adapter required.
 // Users are verified via allowedEmails; session is a signed cookie.
@@ -29,15 +29,10 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (account?.provider === 'credentials') return true
+      if (account?.provider === 'credentials') return isAllowedEmail(user.email ?? '')
       // Comma-separated allowlist from env, e.g. ALLOWED_EMAILS="you@example.com,teammate@example.com"
-      const allowedEmails = (process.env.ALLOWED_EMAILS ?? '')
-        .split(',')
-        .map((e) => e.trim().toLowerCase())
-        .filter(Boolean)
-      if (allowedEmails.length === 0) return false // lock down by default until configured
       const verified = account?.provider !== 'google' || (profile as { email_verified?: boolean } | null)?.email_verified === true
-      return verified && allowedEmails.includes(normalizeEmail(user.email ?? ''))
+      return verified && isAllowedEmail(normalizeEmail(user.email ?? ''))
     },
     async jwt({ token, user }) {
       if (user) {
