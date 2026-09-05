@@ -19,6 +19,7 @@
 
 # production
 /build
+/.m9-build/
 
 # misc
 .DS_Store
