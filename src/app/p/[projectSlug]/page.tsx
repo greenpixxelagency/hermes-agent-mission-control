@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { Activity, ArrowRight, Bot, CheckCircle2, Clock3, ShieldCheck } from 'lucide-react'
 
 import { Avatar, EmptyState, Metric, PageHeader, SectionTitle, StatusPill, friendlyLabel } from '@/components/rogeros-ui'
+import { ProjectSetupChecklist } from '@/components/project-setup-checklist'
 import { ProjectContextError, requireProjectContextBySlug } from '@/lib/project-context'
 import { prisma } from '@/lib/prisma'
 
@@ -11,17 +12,27 @@ export default async function CommandCenter({ params }: { params: Promise<{ proj
   try {
     const context = await requireProjectContextBySlug((await params).projectSlug)
     const projectId = context.project.id
-    const [activeWork, pendingApprovals, activeEmployees, attentionRuntimes, recentTasks, recentEvents] = await Promise.all([
+    const [activeWork, pendingApprovals, activeEmployees, attentionRuntimes, taskCount, brainRecordCount, recentTasks, recentEvents] = await Promise.all([
       prisma.task.count({ where: { projectId, status: { in: ['TODO', 'IN_PROGRESS', 'REVIEW', 'BLOCKED'] } } }),
       prisma.approvalRequest.count({ where: { projectId, status: 'PENDING' } }),
       prisma.employeeProjectAssignment.count({ where: { projectId, status: 'ACTIVE' } }),
       prisma.hermesRuntimeAssignment.count({ where: { projectId, OR: [{ reconciliationState: 'FAILED' }, { provisioningState: 'FAILED' }, { assignmentState: 'SUSPENDED' }] } }),
+      prisma.task.count({ where: { projectId } }),
+      Promise.all([
+        prisma.projectConstitution.count({ where: { projectId } }),
+        prisma.knowledgeItem.count({ where: { projectId } }),
+        prisma.decision.count({ where: { projectId } }),
+        prisma.projectMemory.count({ where: { projectId } }),
+        prisma.sOP.count({ where: { projectId } }),
+        prisma.policy.count({ where: { projectId } }),
+      ]).then(counts => counts.reduce((total, count) => total + count, 0)),
       prisma.task.findMany({ where: { projectId }, orderBy: { updatedAt: 'desc' }, take: 6, include: { assignments: { include: { employeeProjectAssignment: { include: { employee: true } }, projectMember: { include: { organizationMember: { include: { user: true } } } } } } } }),
       prisma.auditEvent.findMany({ where: { projectId }, orderBy: { createdAt: 'desc' }, take: 7, include: { actorEmployeeAssignment: { include: { employee: true } }, actorProjectMember: { include: { organizationMember: { include: { user: true } } } } } }),
     ])
 
     return <div className="hq-rise">
       <PageHeader eyebrow={`${context.organization.name} · Command Center`} title={`Good to see you. ${context.project.name} is ready.`} description="A live view of work, decisions and your AI workforce—drawn only from this project." action={<StatusPill tone="good">Project active</StatusPill>} />
+      <ProjectSetupChecklist project={context.project} taskCount={taskCount} employeeCount={activeEmployees} brainRecordCount={brainRecordCount} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Work in motion" value={activeWork} hint="Todo, active, review or blocked" tone={activeWork ? 'neutral' : 'good'} />
         <Metric label="Needs approval" value={pendingApprovals} hint={pendingApprovals ? 'Waiting for a decision' : 'Nothing waiting'} tone={pendingApprovals ? 'warn' : 'good'} />
