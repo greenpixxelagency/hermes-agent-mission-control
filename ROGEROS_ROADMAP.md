@@ -17,17 +17,17 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 - M19 Connected App Workspaces (Google Drive reference slice): an Owner/Admin-only, policy-checked human workspace for explicitly scoped Drive sources, with installed/healthy lifecycle state and read-only typed-adapter access.
 - M20 Workforce scorecards and cost evidence: bounded, project-scoped read-only outcome facts from authoritative Task, HermesExecution, and ToolExecution records. Actual provider cost is explicitly unknown when no provider usage record exists; no estimate or billing workflow was added. M21 may consume only its redacted aggregates.
 - M21 Agent Coach recommendations: bounded, project-scoped, deterministic review proposals from M20 redacted aggregates. The GET-only Coach has no apply path or side effect; it creates no permission, Skill, policy, SOUL, runtime, task, approval, billing, production, or Hermes/VPS change.
+- M22 Project-wide search and command: bounded project-scoped search over redacted Task, employee-assignment, and native Project Brain metadata. The palette is search/go-to only and cannot mutate, dispatch, approve, or configure anything.
 
 ## Current
 
 - M17 and M18 are complete and closed in staging. M18 was also verified locally and through authenticated Preview acceptance, with subsequent real localhost Google sign-in, Drive consent/token exchange, installation synchronization, and successful live provider health acceptance; no production or `main` changes were made.
+- M19–M22 are complete as local, bounded foundations. M21 and M22 still need a separately authorized Preview/staging acceptance run; neither requires a migration.
 - The audit separates this completion from customer/production readiness: the feature foundation is real, but production operations, customer onboarding, billing, deletion/export, support, disaster recovery, broader integration coverage, and the planned shell modules remain unfinished.
 
 ## Proposed next work — owner review required
 
-- **M21 — Agent Coach recommendations (local implementation).** Bounded, deterministic GET-only review proposals based on M20 redacted aggregates, with no apply path or state change.
-- **M22 — Project-wide search and command (local implementation).** Bounded project-scoped search returns only redacted Task, employee-assignment, and native Project Brain metadata. The command palette is search/go-to only and has no mutation, dispatch, approval, or configuration action.
-- Phase 3C advanced workplace and Phase 3D SaaS productization remain planned vision. Customer onboarding, templates/bundles, billing, and production promotion are not M17 work.
+- Phase 3C advanced workplace and Phase 3D SaaS productization remain planned vision. Customer onboarding, templates/bundles, billing, and production promotion are not M19–M22 work.
 
 See `ROGEROS_PHASE_3_PLAN.md` for completed-vs-blueprint reconciliation and dependencies, and `ROGEROS_AUDIT.md` for the current implementation/placeholder boundary.
 
