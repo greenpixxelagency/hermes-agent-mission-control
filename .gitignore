@@ -20,6 +20,8 @@
 # production
 /build
 /.m9-build/
+/.auth-migration-worktree/
+/%SystemDrive%/
 
 # misc
 .DS_Store
