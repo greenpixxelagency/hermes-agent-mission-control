@@ -121,3 +121,11 @@
 **Consequences:** Callback payloads contain only the external execution identity and terminal result. RogerOS derives project ownership from stored records, rejects forged, stale, oversized, malformed, conflicting, and replayed state changes, treats exact duplicates as idempotent, and enforces the byte limit while streaming before JSON parsing. Runtime refresh uses dispatch authority because reconciliation can change authoritative state.
 
 Vercel Deployment Protection requires a project-scoped automation bypass credential for the isolated adapter callback. The credential is stored only in the protected staging adapter environment, sent only to the fixed Preview callback URL, rotated as a secret, and never treated as a production or tenancy authorization boundary.
+
+## Workforce scorecards are computed evidence, not cost estimation
+
+**Decision:** M20 computes bounded project workforce outcome evidence from existing Task, HermesExecution, and ToolExecution records without adding a cost ledger or provider payload storage.
+
+**Reason:** The authoritative schema proves assignment, lifecycle, review, and governed capability facts, but contains no trustworthy provider usage or actual-cost record. Converting absent information into a synthetic estimate would overclaim and create false billing evidence.
+
+**Consequences:** OWNER, ADMIN, OPERATOR, and APPROVER can read redacted aggregates for their project; VIEWER cannot. Costs are returned as unavailable with `NO_PROVIDER_USAGE_RECORD`, not zero or estimated. The slice adds no Coach, recommendations, automation, billing, provider calls, or durable scorecard record.

@@ -4,6 +4,8 @@
 
 Last updated: 2026-09-05
 
+> **M20 local implementation:** The Workforce workspace now contains a bounded read-only evidence panel and `/api/workforce/scorecard`. OWNER, ADMIN, OPERATOR, and APPROVER may view project-only aggregates; VIEWER is denied. It derives assigned-work, reviewed runtime, and governed ToolExecution facts from existing records. Provider cost is explicitly returned as unknown (`NO_PROVIDER_USAGE_RECORD`) because no authoritative usage/cost field exists. No migration, provider call, Coach, recommendation, billing, or durable scorecard record was added. Focused disposable-database coverage passes. The pre-existing authenticated `localhost:3001` service was confirmed to be serving another worktree’s pre-M20 code, so this checkout did not restart it or claim a browser acceptance result.
+
 > **Audit addendum:** `ROGEROS_AUDIT.md` distinguishes verified functionality from partial RogerOS UI, planned shell pages, and the coexisting legacy Hermy HQ product. It is the current concise evidence snapshot.
 
 ## Current state

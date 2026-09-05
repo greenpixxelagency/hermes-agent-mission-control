@@ -87,3 +87,9 @@ Employee (reusable definition)
 - Any architectural change must update this file.
 - Future concepts must be marked planned until implemented and approved.
 - `ROGEROS_PHASE_3_PLAN.md` reconciles the original Phase 3 blueprint with verified repository state and is the dependency plan for proposed work after M16. It does not itself approve a milestone.
+
+## Workforce evidence
+
+- M20 exposes a bounded, project-scoped, read-only workforce evidence view. It computes assigned-work state from `TaskAssignment`/`Task`, runtime attempt/review state from `HermesExecution`, and governed capability attempt state from `ToolExecution`.
+- Scorecards are observed facts, not productivity ratings, recommendations, billing records, or Coach inputs that can mutate state. OWNER, ADMIN, OPERATOR, and APPROVER may read safe aggregates; VIEWER is denied. Server-resolved project context remains mandatory.
+- Current authoritative execution records do not contain provider usage or actual provider cost. M20 returns that cost as explicitly unknown with `NO_PROVIDER_USAGE_RECORD`; it never invents estimates or exposes prompts, outputs, provider payloads, credentials, or result text.
