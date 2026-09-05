@@ -26,3 +26,15 @@ test('M21 does not recommend changes from healthy or absent evidence', () => {
   }])
   assert.deepEqual(recommendations, [])
 })
+
+test('M21 bounds its deterministic review queue', () => {
+  const recommendations = buildAgentCoachRecommendations(Array.from({ length: 101 }, (_, index) => ({
+    employee: { assignmentId: `assignment-${index}`, name: `Worker ${index}`, role: 'Operations', employmentStatus: 'ACTIVE' },
+    assignedWork: { assignedInRange: 1, completedInRange: 0 },
+    runtimeAttempts: { createdInRange: 0, succeededInRange: 0, acceptedInRange: 0 },
+    governedToolExecutions: { createdInRange: 0, succeededInRange: 0, failedInRange: 0 },
+  })))
+  assert.equal(recommendations.length, 100)
+  assert.equal(recommendations[0].employee.assignmentId, 'assignment-0')
+  assert.equal(recommendations.at(-1)?.employee.assignmentId, 'assignment-99')
+})

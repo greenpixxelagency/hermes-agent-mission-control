@@ -15,7 +15,7 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 - M17 Employee Market and Safe Hiring, including versioned curated templates, project-owned provenance, Owner/Admin controls, default-deny capabilities, employment lifecycle, staging migration, and focused Preview acceptance.
 - M18 App/Tool/MCP Market and connection lifecycle, including curated versioned manifests, project-owned idempotent installation lifecycle, Owner/Admin controls, connection health synchronization, execution guards, and authenticated Preview acceptance.
 - M19 Connected App Workspaces (Google Drive reference slice): an Owner/Admin-only, policy-checked human workspace for explicitly scoped Drive sources, with installed/healthy lifecycle state and read-only typed-adapter access.
-- M20 Workforce scorecards and cost evidence: bounded, project-scoped read-only outcome facts from authoritative Task, HermesExecution, and ToolExecution records. Actual provider cost is explicitly unknown when no provider usage record exists; no estimate, Coach, recommendation, or billing workflow was added.
+- M20 Workforce scorecards and cost evidence: bounded, project-scoped read-only outcome facts from authoritative Task, HermesExecution, and ToolExecution records. Actual provider cost is explicitly unknown when no provider usage record exists; no estimate or billing workflow was added. M21 may consume only its redacted aggregates.
 - M21 Agent Coach recommendations: bounded, project-scoped, deterministic review proposals from M20 redacted aggregates. The GET-only Coach has no apply path or side effect; it creates no permission, Skill, policy, SOUL, runtime, task, approval, billing, production, or Hermes/VPS change.
 
 ## Current

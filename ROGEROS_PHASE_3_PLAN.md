@@ -39,7 +39,7 @@ Some blueprint ambitions remain deliberately narrower than their final form: Tas
 | Connections and credential abstraction | Partly complete. Project Connections, encrypted Drive credentials/scopes, connection health, and governed execution exist. General OAuth providers, connection lifecycle breadth, and a simple install journey remain. | Continue after the App/Tool Market foundation. |
 | App Workspaces | Missing as a framework. Hermes has controlled Workforce/runtime views, but there is no generic connected-app operational workspace system. | Build only after a market/manifest boundary exists. |
 | Google Drive | Complete first reference integration for scoped Brain sources and governed reads, not a claim of universal file storage. | Preserve as the reference pattern. |
-| Agent Coach | Missing. | Do not start before workforce outcomes/scorecards and safe recommendation/approval boundaries are designed. |
+| Agent Coach | Completed bounded foundation: a deterministic GET-only review queue over redacted M20 aggregates, with no apply path or durable recommendation state. | Preserve the read-only boundary; any later governed change remains a separate human-initiated workflow. |
 | Scorecards and cost tracking | Missing as a RogerOS product module. Legacy upstream routes are not proof of project-scoped scorecards or cost governance. | Build before or together with a narrowly scoped Coach foundation. |
 | Global command/search | Navigation-only command palette exists; project-wide search and business commands do not. | Defer until searchable, project-scoped indexes and permission rules are specified. |
 
