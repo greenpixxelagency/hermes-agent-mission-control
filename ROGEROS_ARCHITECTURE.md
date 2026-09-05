@@ -76,6 +76,7 @@ Employee (reusable definition)
 - Provider adapters execute only after RogerOS authorization. They do not decide tenancy or policy.
 - M18 App/Tool/MCP Market uses curated, versioned, non-secret manifests. A `ProjectAppInstallation` is immutable-version provenance plus an explicit lifecycle state; it reuses the linked `ProjectTool` and `ProjectConnection` boundaries and never stores an endpoint, token, or raw credential. Installing creates no employee permission, connection scope, credential, policy exception, or execution authority.
 - M18 lifecycle mutations are Owner/Admin-only, idempotency-keyed server actions. Only a verified typed connection flow may mark an installation connected; disable/uninstall blocks execution, cancels pending Tool approvals, and preserves governed history. Existing adapters re-check installation state immediately before execution.
+- M19 exposes Google Drive as a bounded human workspace, not a generic app executor. A human Drive read is explicitly authorized only for an OWNER or ADMIN project member; it never creates or impersonates an employee Tool permission. The workspace re-checks installed/connected/enabled/active-credential state, active project read policy, project-owned scopes, and the typed read-only adapter before provider I/O. BLOCK and REQUIRE_APPROVAL read policies deny this human viewer because it has no approval-execution path. It records secret-safe human audit evidence and returns no credential material.
 
 ## Engineering rules
 

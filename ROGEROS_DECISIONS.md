@@ -96,6 +96,14 @@
 
 **Consequences:** OWNER and ADMIN authority is enforced server-side. Installation creates no employee Tool permission, ProjectConnection credential, scope, policy exception, or adapter behavior. Lifecycle mutations require a project-scoped idempotency key; only a typed provider callback or explicit manager health check may establish connected health. Disable/uninstall blocks execution and pending approval work while preserving audit/history. Connection health and encrypted credential material remain in the existing Connection models; audit metadata is secret-safe.
 
+## Human Drive workspace reads are role-bound, not employee impersonation
+
+**Decision:** M19 permits human Google Drive browsing only for project OWNER and ADMIN roles, using the installed/healthy connection, explicit project scopes, active read-policy check, and typed read-only adapter. Employee Tool permissions continue to govern employees only.
+
+**Reason:** Reusing an employee assignment for a human would silently grant or misrepresent authority. A durable per-human capability-grant model has not been approved.
+
+**Consequences:** OPERATOR, APPROVER, and VIEWER cannot call the workspace API. Uninstalled, disabled, unhealthy, unavailable-credential, policy-blocked, and out-of-scope requests stop before a successful provider read. REQUIRE_APPROVAL is also denied because human workspace reads have no approval execution lifecycle. No Drive writes, credential exposure, automatic source grants, or new durable permission records are introduced.
+
 ## AI completion requires human review
 
 **Decision:** A successful Hermes execution makes the latest Task result ready for review; it does not complete authoritative business work. OWNER, ADMIN, or APPROVER must accept it before the Task becomes done.

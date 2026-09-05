@@ -14,6 +14,7 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 - M16 reliable AI work lifecycle and human review, including real signed-callback acceptance with `ROGEROS_M16_WORK_REVIEW_OK`, REVIEW-before-DONE proof, audit/activity evidence, role enforcement, and project isolation.
 - M17 Employee Market and Safe Hiring, including versioned curated templates, project-owned provenance, Owner/Admin controls, default-deny capabilities, employment lifecycle, staging migration, and focused Preview acceptance.
 - M18 App/Tool/MCP Market and connection lifecycle, including curated versioned manifests, project-owned idempotent installation lifecycle, Owner/Admin controls, connection health synchronization, execution guards, and authenticated Preview acceptance.
+- M19 Connected App Workspaces (Google Drive reference slice): an Owner/Admin-only, policy-checked human workspace for explicitly scoped Drive sources, with installed/healthy lifecycle state and read-only typed-adapter access.
 
 ## Current
 
@@ -22,7 +23,6 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 
 ## Proposed next work — owner review required
 
-- **M19 — Connected App Workspaces (proposed).** Add project-authorized human operational views for installed apps.
 - **M20 — Workforce scorecards and cost evidence (proposed).** Establish auditable outcome/cost facts before Coach automation.
 - **M21 — Agent Coach recommendations (proposed).** Create reviewable recommendations only; no silent changes.
 - **M22 — Project-wide search and command (proposed).** Search and act only through project-scoped, authorized workflows.

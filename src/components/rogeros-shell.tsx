@@ -4,14 +4,14 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, AppWindow, Bot, Brain, CheckCircle2, ChevronDown, Command, FileBarChart, LayoutDashboard, Menu, Search, Settings, ShieldCheck, Sparkles, Users, X } from 'lucide-react'
+import { Activity, AppWindow, Bot, Brain, CheckCircle2, ChevronDown, Command, FileBarChart, HardDrive, LayoutDashboard, Menu, Search, Settings, ShieldCheck, Sparkles, Users, X } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 type ShellProject = { name: string; slug: string; role?: string }
 type NavItem = { label: string; path: string; icon: typeof LayoutDashboard; foundation?: boolean }
 const groups: Array<{ label: string; items: NavItem[] }> = [
   { label: 'Work', items: [{ label: 'Command Center', path: '', icon: LayoutDashboard }, { label: 'Team', path: 'team', icon: Users }, { label: 'Tasks', path: 'tasks', icon: CheckCircle2 }] },
-  { label: 'Company', items: [{ label: 'Workforce', path: 'workforce', icon: Bot }, { label: 'Project Brain', path: 'brain', icon: Brain }, { label: 'Tools', path: 'tools', icon: AppWindow }, { label: 'Market', path: 'market', icon: Sparkles, foundation: true }] },
+  { label: 'Company', items: [{ label: 'Workforce', path: 'workforce', icon: Bot }, { label: 'Project Brain', path: 'brain', icon: Brain }, { label: 'Google Drive', path: 'drive', icon: HardDrive }, { label: 'Tools', path: 'tools', icon: AppWindow }, { label: 'Market', path: 'market', icon: Sparkles, foundation: true }] },
   { label: 'Control', items: [{ label: 'Approvals', path: 'approvals', icon: ShieldCheck }, { label: 'Reports', path: 'reports', icon: FileBarChart, foundation: true }, { label: 'Automations', path: 'automations', icon: Activity, foundation: true }] },
 ]
 
