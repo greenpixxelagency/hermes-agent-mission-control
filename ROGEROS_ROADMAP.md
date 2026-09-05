@@ -16,6 +16,7 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 - M18 App/Tool/MCP Market and connection lifecycle, including curated versioned manifests, project-owned idempotent installation lifecycle, Owner/Admin controls, connection health synchronization, execution guards, and authenticated Preview acceptance.
 - M19 Connected App Workspaces (Google Drive reference slice): an Owner/Admin-only, policy-checked human workspace for explicitly scoped Drive sources, with installed/healthy lifecycle state and read-only typed-adapter access.
 - M20 Workforce scorecards and cost evidence: bounded, project-scoped read-only outcome facts from authoritative Task, HermesExecution, and ToolExecution records. Actual provider cost is explicitly unknown when no provider usage record exists; no estimate, Coach, recommendation, or billing workflow was added.
+- M21 Agent Coach recommendations: bounded, project-scoped, deterministic review proposals from M20 redacted aggregates. The GET-only Coach has no apply path or side effect; it creates no permission, Skill, policy, SOUL, runtime, task, approval, billing, production, or Hermes/VPS change.
 
 ## Current
 
@@ -24,7 +25,6 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 
 ## Proposed next work — owner review required
 
-- **M21 — Agent Coach recommendations (proposed).** Create reviewable recommendations only; no silent changes.
 - **M22 — Project-wide search and command (proposed).** Search and act only through project-scoped, authorized workflows.
 - Phase 3C advanced workplace and Phase 3D SaaS productization remain planned vision. Customer onboarding, templates/bundles, billing, and production promotion are not M17 work.
 

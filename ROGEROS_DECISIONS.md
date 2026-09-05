@@ -129,3 +129,11 @@ Vercel Deployment Protection requires a project-scoped automation bypass credent
 **Reason:** The authoritative schema proves assignment, lifecycle, review, and governed capability facts, but contains no trustworthy provider usage or actual-cost record. Converting absent information into a synthetic estimate would overclaim and create false billing evidence.
 
 **Consequences:** OWNER, ADMIN, OPERATOR, and APPROVER can read redacted aggregates for their project; VIEWER cannot. Costs are returned as unavailable with `NO_PROVIDER_USAGE_RECORD`, not zero or estimated. The slice adds no Coach, recommendations, automation, billing, provider calls, or durable scorecard record.
+
+## Agent Coach is a read-only human-review projection
+
+**Decision:** M21 derives a small, deterministic review queue from M20's redacted project-only aggregates. It is GET-only and does not persist, apply, approve, dispatch, or otherwise execute a recommendation.
+
+**Reason:** Outcome aggregates can flag a need for human investigation, but cannot safely determine the correct Skill, policy, SOUL, permission, runtime, or business change.
+
+**Consequences:** Coach output states the observed aggregate and a review question with explicit safeguards. It makes no provider/AI call, exposes no execution content or credentials, and creates no permission, Skill, policy, Soul, runtime, task, approval, billing, production, or Hermes/VPS mutation. A human must initiate any subsequent change through the existing project-scoped authorization and audit flow.

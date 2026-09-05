@@ -57,7 +57,7 @@ This is a recommendation for planning, not an approved implementation schedule.
 
 1. **M19 — Connected App Workspaces.** Add a generic human-facing workspace framework only for installed, healthy, project-authorized applications; begin with one reference app.
 2. **M20 — Workforce scorecards and cost evidence.** Produce project-scoped, auditable outcome/cost facts before allowing automatic workforce-improvement recommendations.
-3. **M21 — Agent Coach recommendations.** Make Coach outputs reviewable proposals for Skills, policy, Soul, or permission changes; no silent mutation.
+3. **M21 — Agent Coach recommendations.** Completed as a bounded, deterministic, read-only review queue over M20 redacted aggregates. It deliberately does not propose a specific governed change or add an apply path; Skills, policy, Soul, permission, runtime, and billing changes remain separate human-initiated workflows.
 4. **M22 — Project-wide search and command.** Search only authorized project resources and create work only through existing governed workflows.
 5. **Phase 3C planning gates.** Select one advanced workplace vertical slice at a time. Meetings and Reporter can be planned before browser automation; Virtual Browser, takeover, and Teach Mode require a separate security design and VPS workstream.
 6. **Phase 3D productization gate.** Plan customer onboarding, templates/bundles, billing, operational controls, and production promotion only after an explicit tenant-isolation and production-readiness review.
