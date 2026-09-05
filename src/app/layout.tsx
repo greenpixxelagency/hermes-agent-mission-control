@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ConditionalLayout } from "@/components/conditional-layout";
 
+const display = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-gp-display", display: "swap" });
+const sans = Inter({ subsets: ["latin"], variable: "--font-gp-sans", display: "swap" });
+const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-gp-mono", display: "swap" });
 
 export const metadata: Metadata = {
   title: "RogerOS — Green Pixxel",
@@ -25,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeBootstrap }} /></head>
-      <body className="min-h-screen">
+      <body className={`${display.variable} ${sans.variable} ${mono.variable} min-h-screen`}>
         <ConditionalLayout>{children}</ConditionalLayout>
       </body>
     </html>

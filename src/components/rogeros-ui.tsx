@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description?: string; action?: ReactNode }) {
   return <header className="rogeros-page-header"><div className="min-w-0"><p className="eyebrow">{eyebrow}</p><h1>{title}</h1>{description && <p>{description}</p>}</div>{action && <div className="shrink-0">{action}</div>}</header>
@@ -14,7 +14,20 @@ export function StatusPill({ children, tone = 'neutral' }: { children: ReactNode
 }
 
 export function Metric({ label, value, hint, tone = 'neutral' }: { label: string; value: ReactNode; hint?: string; tone?: 'neutral' | 'good' | 'warn' | 'bad' }) {
-  return <div className={`rogeros-metric rogeros-metric-${tone}`}><p>{label}</p><strong>{value}</strong>{hint && <span>{hint}</span>}</div>
+  const unavailable = value === null || value === undefined
+  return <div className={`rogeros-metric rogeros-metric-${tone}`}><p>{label}</p><strong>{unavailable ? <span className="rogeros-metric-unavailable">Not Yet Available</span> : value}</strong>{hint && <span>{hint}</span>}</div>
+}
+
+export function TactileButton({ variant = 'primary', className = '', type = 'button', ...props }: ComponentPropsWithoutRef<'button'> & { variant?: 'primary' | 'secondary' }) {
+  return <button type={type} className={`${variant === 'primary' ? 'btn-primary' : 'btn-ghost'} rogeros-tactile-button ${className}`.trim()} {...props} />
+}
+
+export function GlassPanel({ className = '', children, ...props }: ComponentPropsWithoutRef<'section'>) {
+  return <section className={`glass-panel gp-enter ${className}`.trim()} {...props}>{children}</section>
+}
+
+export function FinancialTable({ className = '', children, ...props }: ComponentPropsWithoutRef<'div'>) {
+  return <div className={`rogeros-financial-table ${className}`.trim()} {...props}>{children}</div>
 }
 
 export function EmptyState({ icon, title, description, action }: { icon?: ReactNode; title: string; description: string; action?: ReactNode }) {
