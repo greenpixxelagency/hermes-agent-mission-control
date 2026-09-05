@@ -76,6 +76,12 @@
 
 **Decision:** Future Phase 3 work is planned from the original blueprint, reconciled against verified repository evidence, and delivered one bounded milestone at a time. A planning document is not implementation approval.
 
+## M22 search is a bounded metadata projection
+
+**Decision:** M22 searches only Task display metadata, employee project-assignment display metadata, and native Project Brain titles/statuses for the server-authorized current project. It intentionally excludes approvals/workflows until a dedicated safe read projection is specified and verified.
+
+**Rationale:** Matching or returning execution, provider, credential, connection, external-source, legacy Hermy HQ, or free-form content would widen the disclosure boundary. A 24-result, GET-only metadata projection preserves useful go-to behavior without creating an action surface.
+
 **Reason:** The original blueprint contains the product direction, while the current repository contains deliberate scope reductions, added security boundaries, and completed work that must not be recreated or bypassed.
 
 **Consequences:** The remaining order is capability configuration, then outcome evidence, then recommendations/automation, then advanced workplace and SaaS productization. Customer onboarding, billing, production promotion, and credential-sensitive browser work cannot be pulled into M17 by inference.

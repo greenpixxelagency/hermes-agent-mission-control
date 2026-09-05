@@ -25,7 +25,8 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 
 ## Proposed next work — owner review required
 
-- **M22 — Project-wide search and command (proposed).** Search and act only through project-scoped, authorized workflows.
+- **M21 — Agent Coach recommendations (local implementation).** Bounded, deterministic GET-only review proposals based on M20 redacted aggregates, with no apply path or state change.
+- **M22 — Project-wide search and command (local implementation).** Bounded project-scoped search returns only redacted Task, employee-assignment, and native Project Brain metadata. The command palette is search/go-to only and has no mutation, dispatch, approval, or configuration action.
 - Phase 3C advanced workplace and Phase 3D SaaS productization remain planned vision. Customer onboarding, templates/bundles, billing, and production promotion are not M17 work.
 
 See `ROGEROS_PHASE_3_PLAN.md` for completed-vs-blueprint reconciliation and dependencies, and `ROGEROS_AUDIT.md` for the current implementation/placeholder boundary.
