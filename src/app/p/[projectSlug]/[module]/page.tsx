@@ -10,7 +10,6 @@ const modules = {
   market: { title: 'Market', eyebrow: 'Company capabilities', description: 'A curated home for employees, skills and apps.', icon: Sparkles, cards: [['Employees','Specialist AI employees will become available here.'],['Skills','Approved capabilities for your workforce will live here.'],['Apps','Business tools and connections will be discoverable here.']] },
   reports: { title: 'Reports', eyebrow: 'Business intelligence', description: 'Recurring, decision-ready project reporting.', icon: BarChart3, cards: [['Weekly brief','Business Reporter will publish recurring project briefs here.'],['Performance','Validated operating metrics will appear when their sources are connected.']] },
   automations: { title: 'Automations', eyebrow: 'Recurring work', description: 'AI employee routines and governed business workflows.', icon: Blocks, cards: [['Employee routines','Recurring runtime schedules are not enabled yet.'],['Business workflows','Governed cross-tool workflows will be configured in a future milestone.']] },
-  settings: { title: 'Project settings', eyebrow: 'Workspace control', description: 'Project administration remains intentionally limited in this Preview.', icon: Settings2, cards: [['Membership','Project access continues to use RogerOS tenancy and roles.'],['Security','Authorization remains enforced on the server for every action.']] },
 } as const
 
 export default async function ModulePage({ params }: { params: Promise<{ projectSlug: string; module: string }> }) {

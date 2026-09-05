@@ -8,7 +8,7 @@ Hermes is the primary AI execution runtime. RogerOS is the authoritative control
 
 The current RogerOS application lives under `/p/[projectSlug]` and uses a shared project shell. Some untouched upstream Hermy HQ routes remain beside it during the staged product transition.
 
-**Audited UI boundary (2026-09-05):** Team, Tasks, Workforce, Brain, Tools, Approvals, and Market have RogerOS-specific routes or workspaces. Reports, Automations, and Settings deliberately render foundation-only cards; the shell command palette is navigation-only. Root-level Hermy HQ pages, APIs, bridge, and legacy schema models are not RogerOS modules or authority sources. See `ROGEROS_AUDIT.md` before treating either side as product scope.
+**Audited UI boundary (2026-09-06):** Team, Tasks, Workforce, Brain, Tools, Approvals, and Market have RogerOS-specific routes or workspaces. Settings exposes a read-only, project-scoped Hermes runtime connection/status view and links authorized Owners/Admins to the existing Workforce runtime-management flow. Reports and Automations deliberately render foundation-only cards; the shell command palette is navigation-only. Root-level Hermy HQ pages, APIs, bridge, and legacy schema models are not RogerOS modules or authority sources. See `ROGEROS_AUDIT.md` before treating either side as product scope.
 
 ## Tenancy and authorization
 
