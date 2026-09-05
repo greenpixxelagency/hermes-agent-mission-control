@@ -145,7 +145,7 @@ function TrendRadarSection() {
   );
 }
 
-export async function fetchDrafts() {
+async function fetchDrafts() {
   const res = await fetch("/api/x-content", { cache: "no-store" });
   if (!res.ok) throw new Error(`${res.status}`);
   return await res.json();
