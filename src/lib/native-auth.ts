@@ -6,7 +6,9 @@ const KEY_LENGTH = 64
 
 export const normalizeEmail = (value: string) => value.trim().toLowerCase()
 export const passwordError = (password: string) => password.length < 12 ? 'Use at least 12 characters.' : null
+export const isLocalDevelopment = () => process.env.NODE_ENV === 'development' && /^http:\/\/localhost(?::\d+)?$/.test(process.env.NEXTAUTH_URL ?? '')
 export function isAllowedEmail(email: string) {
+  if (isLocalDevelopment()) return true
   const allowed = (process.env.ALLOWED_EMAILS ?? '').split(',').map(normalizeEmail).filter(Boolean)
   return allowed.length > 0 && allowed.includes(normalizeEmail(email))
 }
