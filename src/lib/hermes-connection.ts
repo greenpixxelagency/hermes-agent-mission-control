@@ -19,7 +19,7 @@ function connectionKey() {
   return key
 }
 
-function encrypt(value: object) {
+export function encryptHermesCredential(value: object) {
   const iv = randomBytes(12); const cipher = createCipheriv('aes-256-gcm', connectionKey(), iv)
   const ciphertext = Buffer.concat([cipher.update(JSON.stringify(value), 'utf8'), cipher.final()])
   return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), ciphertext.toString('base64url')].join('.')
@@ -80,7 +80,7 @@ export async function configureHermesConnection(context: ProjectContext, input: 
     const tool = await tx.toolDefinition.upsert({ where: { key: 'hermes-runtime' }, create: { key: 'hermes-runtime', name: 'Hermes runtime', description: 'Governed Hermes execution runtime' }, update: {} })
     const projectTool = await tx.projectTool.upsert({ where: { projectId_toolDefinitionId: { projectId: context.project.id, toolDefinitionId: tool.id } }, create: { projectId: context.project.id, toolDefinitionId: tool.id, status: ProjectToolStatus.CONNECTED }, update: { status: ProjectToolStatus.CONNECTED } })
     const connection = await tx.projectConnection.upsert({ where: { projectId_projectToolId: { projectId: context.project.id, projectToolId: projectTool.id } }, create: { projectId: context.project.id, projectToolId: projectTool.id, name: 'Hermes Agent', status: ConnectionStatus.CONNECTED, metadata: { agentId, hermesConnectionId: registered.connectionId, hermesProjectId: projectId, capabilities: verified.capabilities ?? [] } }, update: { status: ConnectionStatus.CONNECTED, metadata: { agentId, hermesConnectionId: registered.connectionId, hermesProjectId: projectId, capabilities: verified.capabilities ?? [] } } })
-    await tx.connectionCredential.upsert({ where: { connectionId: connection.id }, create: { projectId: context.project.id, connectionId: connection.id, provider: 'hermes', encryptedPayload: encrypt({ agentId, connectionId: registered.connectionId, projectId, connectionSecret }), status: ConnectionCredentialStatus.ACTIVE }, update: { encryptedPayload: encrypt({ agentId, connectionId: registered.connectionId, projectId, connectionSecret }), status: ConnectionCredentialStatus.ACTIVE } })
+    await tx.connectionCredential.upsert({ where: { connectionId: connection.id }, create: { projectId: context.project.id, connectionId: connection.id, provider: 'hermes', encryptedPayload: encryptHermesCredential({ agentId, connectionId: registered.connectionId, projectId, connectionSecret }), status: ConnectionCredentialStatus.ACTIVE }, update: { encryptedPayload: encryptHermesCredential({ agentId, connectionId: registered.connectionId, projectId, connectionSecret }), status: ConnectionCredentialStatus.ACTIVE } })
     await recordAuditEvent({ projectId: context.project.id, eventType: 'hermes.connection.verified', actor: { type: AuditActorType.HUMAN, projectMemberId: member.id }, targetType: 'ProjectConnection', targetId: connection.id, projectToolId: projectTool.id, summary: 'Hermes installation connection verified', metadata: { capabilities: verified.capabilities ?? [], environment: 'staging' } }, tx)
     return { connectionId: connection.id, capabilities: verified.capabilities ?? [] }
   })
