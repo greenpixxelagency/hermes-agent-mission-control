@@ -54,6 +54,11 @@ async function registerWithHermes(input: { agentId: string; projectId: string; c
 
 export class HermesConnectionError extends Error { constructor(readonly code: string) { super(code) } }
 
+export async function hermesConnectionStatus(context: ProjectContext) {
+  const connection = await prisma.projectConnection.findFirst({ where: { projectId: context.project.id, enabled: true, status: ConnectionStatus.CONNECTED, projectTool: { tool: { key: 'hermes-runtime' } } }, select: { id: true, metadata: true } })
+  return { connected: Boolean(connection), connectionId: connection?.id ?? null }
+}
+
 export async function configureHermesConnection(context: ProjectContext, input: { agentId: string; connectionSecret: string }) {
   if (context.project.role !== 'OWNER' && context.project.role !== 'ADMIN') throw new HermesConnectionError('FORBIDDEN')
   const agentId = input.agentId || randomUUID()
@@ -80,4 +85,18 @@ export async function configureHermesConnection(context: ProjectContext, input: 
     return { connectionId: connection.id, capabilities: verified.capabilities ?? [] }
   })
   return result
+}
+
+/** Removes RogerOS access immediately. Hermes registration is left inert server-side. */
+export async function disconnectHermesConnection(context: ProjectContext) {
+  if (context.project.role !== 'OWNER' && context.project.role !== 'ADMIN') throw new HermesConnectionError('FORBIDDEN')
+  const member = await prisma.projectMember.findFirst({ where: { projectId: context.project.id, organizationMember: { userId: context.user.id } }, select: { id: true } })
+  const connection = await prisma.projectConnection.findFirst({ where: { projectId: context.project.id, projectTool: { tool: { key: 'hermes-runtime' } } }, select: { id: true, projectToolId: true } })
+  if (!connection || !member) return { disconnected: false }
+  await prisma.$transaction(async tx => {
+    await tx.connectionCredential.deleteMany({ where: { connectionId: connection.id } })
+    await tx.projectConnection.update({ where: { id: connection.id }, data: { status: ConnectionStatus.DISCONNECTED, enabled: false, credentialRef: null } })
+    await recordAuditEvent({ projectId: context.project.id, eventType: 'hermes.connection.disconnected', actor: { type: AuditActorType.HUMAN, projectMemberId: member.id }, targetType: 'ProjectConnection', targetId: connection.id, projectToolId: connection.projectToolId, summary: 'Hermes connection disconnected', metadata: {} }, tx)
+  })
+  return { disconnected: true }
 }

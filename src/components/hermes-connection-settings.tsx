@@ -24,6 +24,7 @@ type Health = { healthy: boolean; hermesVersion: string; runtimeIdentity: string
 export function HermesConnectionSettings({ project }: { project: { id: string; slug: string; name: string; role: string } }) {
   const [assignments, setAssignments] = useState<RuntimeAssignment[]>([])
   const [health, setHealth] = useState<Health | null>(null)
+  const [configured, setConfigured] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [configureOpen, setConfigureOpen] = useState(false)
@@ -34,21 +35,23 @@ export function HermesConnectionSettings({ project }: { project: { id: string; s
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const [assignmentResponse, healthResponse] = await Promise.all([
+      const [assignmentResponse, healthResponse, connectionResponse] = await Promise.all([
         fetch(`/api/runtime/assignments?projectId=${encodeURIComponent(project.id)}`, { cache: 'no-store' }),
         fetch(`/api/runtime/health?projectId=${encodeURIComponent(project.id)}`, { cache: 'no-store' }),
+        fetch(`/api/runtime/connection?projectId=${encodeURIComponent(project.id)}`, { cache: 'no-store' }),
       ])
-      if (!assignmentResponse.ok || !healthResponse.ok) throw new Error('RUNTIME_STATUS_UNAVAILABLE')
+      if (!assignmentResponse.ok || !healthResponse.ok || !connectionResponse.ok) throw new Error('RUNTIME_STATUS_UNAVAILABLE')
       const assignmentBody = await assignmentResponse.json() as { assignments: RuntimeAssignment[] }
       setAssignments(assignmentBody.assignments)
       setHealth(await healthResponse.json() as Health)
+      setConfigured((await connectionResponse.json() as { connected: boolean }).connected)
     } catch { setError('Hermes connection status is unavailable. No configuration was changed.') }
     finally { setLoading(false) }
   }, [project.id])
 
   useEffect(() => { void load() }, [load])
   const canManage = project.role === 'OWNER' || project.role === 'ADMIN'
-  const connected = Boolean(health?.healthy && !error)
+  const connected = Boolean(configured && health?.healthy && !error)
   const submitConfiguration = async (event: FormEvent) => {
     event.preventDefault()
     setConfigureNotice('Verifying the Hermes installation…')
@@ -61,6 +64,14 @@ export function HermesConnectionSettings({ project }: { project: { id: string; s
       setConfigureOpen(false)
     } catch { setConfigureNotice('Hermes could not be verified. Check the agent ID and connection secret, then try again.') }
   }
+  const disconnect = async () => {
+    if (!window.confirm('Disconnect Hermes from this project? RogerOS will delete its stored connection credential.')) return
+    try {
+      const response = await fetch('/api/runtime/connection', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id }) })
+      if (!response.ok) throw new Error('DISCONNECT_FAILED')
+      await load()
+    } catch { setError('Hermes could not be disconnected. No credentials were changed.') }
+  }
 
   return <div className="hq-rise">
     <PageHeader eyebrow={`${project.name} · Workspace control`} title="Project settings" description="Project-scoped runtime status and governed execution controls." />
@@ -68,7 +79,7 @@ export function HermesConnectionSettings({ project }: { project: { id: string; s
       <div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-3"><span className="grid h-10 w-10 place-items-center overflow-hidden rounded-xl border border-[rgba(126,208,173,.2)] bg-[radial-gradient(circle_at_35%_30%,rgba(126,208,173,.18),rgba(126,208,173,.04)_58%,transparent_72%)]"><Image src="/hermes-agent-light.webp" alt="Hermes Agent" width={40} height={40} className="h-full w-full object-contain p-1.5" /></span><div><h2 className="text-sm font-semibold">Hermes connection</h2><p className="mt-1 max-w-2xl text-[11px] leading-5 text-[var(--ros-muted)]">Hermes is an execution runtime. RogerOS remains authoritative for this project’s membership, policies, approvals, tools, Project Brain, and audit history.</p></div></div><StatusPill tone={loading ? 'neutral' : connected ? 'good' : 'warn'}>{loading ? 'Checking' : connected ? 'Connected' : 'Not connected'}</StatusPill></div>
       <div className="mt-5 grid gap-3 sm:grid-cols-3"><Info label="Runtime service" value={health?.runtimeIdentity || (loading ? 'Checking…' : 'Unavailable')} /><Info label="Runtime health" value={health?.healthy ? 'Healthy' : loading ? 'Checking…' : 'Unavailable'} /><Info label="Hermes version" value={health?.hermesVersion || 'Not observed'} /></div>
       {error && <p role="alert" className="mt-4 rounded-lg bg-[rgba(235,130,122,.08)] p-3 text-[11px] text-[var(--ros-bad)]">{error}</p>}
-      <div className="mt-5 flex flex-wrap gap-2"><button onClick={() => void load()} className="btn-ghost inline-flex items-center gap-2 px-3 py-2 text-[11px]"><RefreshCw className="w-3.5" /> Refresh status</button>{canManage && !connected && <button onClick={() => { setConfigureNotice(''); setConfigureOpen(true) }} className="btn-primary inline-flex items-center gap-2 px-3 py-2 text-[11px]"><PlugZap className="w-3.5" /> Configure Hermes</button>}{canManage && connected && <Link href={`/p/${project.slug}/workforce`} className="btn-primary inline-flex items-center gap-2 px-3 py-2 text-[11px]"><Bot className="w-3.5" /> Manage workforce runtimes</Link>}</div>
+      <div className="mt-5 flex flex-wrap gap-2"><button onClick={() => void load()} className="btn-ghost inline-flex items-center gap-2 px-3 py-2 text-[11px]"><RefreshCw className="w-3.5" /> Refresh status</button>{canManage && !connected && <button onClick={() => { setConfigureNotice(''); setConfigureOpen(true) }} className="btn-primary inline-flex items-center gap-2 px-3 py-2 text-[11px]"><PlugZap className="w-3.5" /> Connect Hermes</button>}{canManage && connected && <><Link href={`/p/${project.slug}/workforce`} className="btn-primary inline-flex items-center gap-2 px-3 py-2 text-[11px]"><Bot className="w-3.5" /> Manage workforce runtimes</Link><button onClick={() => void disconnect()} className="btn-ghost px-3 py-2 text-[11px]">Disconnect Hermes</button></>}</div>
       <p className="mt-4 flex gap-2 text-[10px] leading-5 text-[var(--ros-faint)]"><ShieldCheck className="mt-0.5 w-3.5 shrink-0" />The connection secret is sent once over a secure server-side handshake and is never displayed or returned. A runtime assignment does not grant an employee Tool permissions or approval authority.</p>
     </section>
     <section className="mt-5"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">Project runtime assignments</h2><span className="text-[10px] text-[var(--ros-faint)]">{assignments.length} configured</span></div>{!loading && assignments.length === 0 ? <div className="panel"><EmptyState icon={<Bot />} title="No Hermes runtime assigned" description={canManage ? 'Configure Hermes, then assign an AI employee from Workforce.' : 'An Owner or Admin can configure Hermes and assign an AI employee from Workforce.'} /></div> : <div className="grid gap-3 md:grid-cols-2">{assignments.map(assignment => <article className="panel p-4" key={assignment.id}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold">{assignment.employeeAssignment?.employee.name || 'Unassigned runtime'}</p><p className="mt-1 text-[10px] text-[var(--ros-faint)]">{assignment.runtime.name} · profile {assignment.profileKey}</p></div><StatusPill tone={assignment.active && assignment.assignmentState === 'ACTIVE' && assignment.runtimeStatus === 'HEALTHY' ? 'good' : 'warn'}>{assignment.active ? assignment.runtimeStatus || assignment.reconciliationState : 'Inactive'}</StatusPill></div><p className="mt-4 text-[10px] text-[var(--ros-muted)]">Last reconciled: {assignment.lastReconciledAt ? new Date(assignment.lastReconciledAt).toLocaleString() : 'Not yet'}</p></article>)}</div>}</section>
