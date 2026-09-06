@@ -373,6 +373,7 @@ model Project {
   id                           String                       @id @default(cuid())
   organizationId               String
   name                         String
+  description                  String?
   slug                         String
   status                       ProjectStatus                @default(ACTIVE)
   createdAt                    DateTime                     @default(now())

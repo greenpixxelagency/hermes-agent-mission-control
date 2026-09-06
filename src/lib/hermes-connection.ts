@@ -1,4 +1,4 @@
-import { createCipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
+import { createCipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -61,8 +61,8 @@ export async function hermesConnectionStatus(context: ProjectContext) {
 
 export async function configureHermesConnection(context: ProjectContext, input: { agentId: string; connectionSecret: string }) {
   if (context.project.role !== 'OWNER' && context.project.role !== 'ADMIN') throw new HermesConnectionError('FORBIDDEN')
-  const agentId = input.agentId || randomUUID()
-  const connectionSecret = input.connectionSecret || randomBytes(32).toString('base64url')
+  const agentId = input.agentId
+  const connectionSecret = input.connectionSecret
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(agentId)) throw new HermesConnectionError('INVALID_AGENT_ID')
   const base = baseUrl()
   if (!base) throw new HermesConnectionError('ADAPTER_NOT_CONFIGURED')
