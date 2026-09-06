@@ -13,5 +13,5 @@ export async function GET(request: Request) {
   const state = encryptHermesCredential({ verifier, projectId: context.project.id, issuedAt: Date.now() })
   const target = new URL(`${base()}/auth/native/authorize`)
   target.searchParams.set('redirect_uri', callback); target.searchParams.set('state', state); target.searchParams.set('code_challenge', challenge); target.searchParams.set('code_challenge_method', 'S256')
-  return NextResponse.redirect(target)
+  return NextResponse.json({ authorizationUrl: target.toString() })
 }
