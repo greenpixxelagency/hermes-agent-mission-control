@@ -48,6 +48,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+.rogeros-local-oauth.json
 /.local-postgres/
 /.local-postgres.log
 /services/client-pulse-bot/dist/

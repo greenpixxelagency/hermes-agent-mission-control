@@ -1,8 +1,22 @@
 import type { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { prisma } from '@/lib/prisma'
 import { isAllowedEmail, normalizeEmail, verifyPassword } from '@/lib/native-auth'
+
+type LocalGoogleOAuth = { clientId: string; clientSecret: string }
+
+function localGoogleOAuth(): LocalGoogleOAuth | null {
+  if (process.env.NODE_ENV !== 'development' || !/^http:\/\/localhost(?::\d+)?$/.test(process.env.NEXTAUTH_URL ?? '')) return null
+  try {
+    const value = JSON.parse(readFileSync(join(process.cwd(), '.rogeros-local-oauth.json'), 'utf8')) as Partial<LocalGoogleOAuth>
+    return typeof value.clientId === 'string' && typeof value.clientSecret === 'string' ? { clientId: value.clientId, clientSecret: value.clientSecret } : null
+  } catch { return null }
+}
+
+const localOAuth = localGoogleOAuth()
 
 // Pure JWT auth — no DB adapter required.
 // Users are verified via allowedEmails; session is a signed cookie.
@@ -11,8 +25,8 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: localOAuth?.clientId || process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: localOAuth?.clientSecret || process.env.GOOGLE_CLIENT_SECRET!,
     }),
     CredentialsProvider({
       name: 'Email and password',
