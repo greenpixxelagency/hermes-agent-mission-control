@@ -1,5 +1,7 @@
-import { createCipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
+import { createCipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 import { AuditActorType, ConnectionCredentialStatus, ConnectionStatus, ProjectToolStatus } from '@prisma/client'
 
@@ -35,7 +37,11 @@ function nonce() { return randomBytes(32).toString('base64url') }
 async function registerWithHermes(input: { agentId: string; projectId: string; connectionSecret: string }) {
   const host = process.env.HERMES_STAGING_SSH_HOST || (process.env.NODE_ENV === 'development' ? 'rogeros-register@srv1899670.hstgr.cloud' : '')
   if (!host) throw new HermesConnectionError('ADAPTER_REGISTRATION_NOT_CONFIGURED')
-  const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', host, '/usr/local/sbin/rogeros-hermes-register-connection'], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true })
+  const identity = process.env.HERMES_STAGING_SSH_IDENTITY || (process.env.NODE_ENV === 'development' ? join(homedir(), '.ssh', 'codex_hermes_vps') : '')
+  const args = ['-T', '-p', process.env.HERMES_STAGING_SSH_PORT || '22', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=15']
+  if (identity) args.push('-i', identity)
+  args.push(host, '/usr/local/sbin/rogeros-hermes-register-connection')
+  const child = spawn('ssh', args, { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true })
   let output = ''
   child.stdout.on('data', chunk => { output += String(chunk) })
   child.stdin.end(JSON.stringify(input))
@@ -50,24 +56,26 @@ export class HermesConnectionError extends Error { constructor(readonly code: st
 
 export async function configureHermesConnection(context: ProjectContext, input: { agentId: string; connectionSecret: string }) {
   if (context.project.role !== 'OWNER' && context.project.role !== 'ADMIN') throw new HermesConnectionError('FORBIDDEN')
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.agentId)) throw new HermesConnectionError('INVALID_AGENT_ID')
+  const agentId = input.agentId || randomUUID()
+  const connectionSecret = input.connectionSecret || randomBytes(32).toString('base64url')
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(agentId)) throw new HermesConnectionError('INVALID_AGENT_ID')
   const base = baseUrl()
   if (!base) throw new HermesConnectionError('ADAPTER_NOT_CONFIGURED')
-  const secret = decodeSecret(input.connectionSecret)
+  const secret = decodeSecret(connectionSecret)
   const projectId = 'rogeros-vhalam'
-  const registered = await registerWithHermes({ agentId: input.agentId, projectId, connectionSecret: input.connectionSecret })
+  const registered = await registerWithHermes({ agentId, projectId, connectionSecret })
   const issuedAt = new Date().toISOString(); const requestNonce = nonce()
-  const verifyBody = { protocolVersion: protocol, agentId: input.agentId, projectId, nonce: requestNonce, issuedAt }
-  const verify = await fetch(`${base}/v1/connection/verify`, { method: 'POST', headers: { Authorization: `Hermes-HMAC-SHA256 ${signature(secret, [protocol, input.agentId, projectId, requestNonce, issuedAt].join('\n'))}`, 'Content-Type': 'application/json' }, body: JSON.stringify(verifyBody), cache: 'no-store' })
+  const verifyBody = { protocolVersion: protocol, agentId, projectId, nonce: requestNonce, issuedAt }
+  const verify = await fetch(`${base}/v1/connection/verify`, { method: 'POST', headers: { Authorization: `Hermes-HMAC-SHA256 ${signature(secret, [protocol, agentId, projectId, requestNonce, issuedAt].join('\n'))}`, 'Content-Type': 'application/json' }, body: JSON.stringify(verifyBody), cache: 'no-store' })
   const verified = await verify.json().catch(() => null) as { connectionId?: string; agentId?: string; projectId?: string; status?: string; nonce?: string; capabilities?: string[] } | null
-  if (!verify.ok || verified?.status !== 'VERIFIED' || verified.connectionId !== registered.connectionId || verified.agentId !== input.agentId || verified.projectId !== projectId || verified.nonce !== requestNonce) throw new HermesConnectionError('VERIFICATION_FAILED')
+  if (!verify.ok || verified?.status !== 'VERIFIED' || verified.connectionId !== registered.connectionId || verified.agentId !== agentId || verified.projectId !== projectId || verified.nonce !== requestNonce) throw new HermesConnectionError('VERIFICATION_FAILED')
   const member = await prisma.projectMember.findFirst({ where: { projectId: context.project.id, organizationMember: { userId: context.user.id } }, select: { id: true } })
   if (!member) throw new HermesConnectionError('FORBIDDEN')
   const result = await prisma.$transaction(async tx => {
     const tool = await tx.toolDefinition.upsert({ where: { key: 'hermes-runtime' }, create: { key: 'hermes-runtime', name: 'Hermes runtime', description: 'Governed Hermes execution runtime' }, update: {} })
     const projectTool = await tx.projectTool.upsert({ where: { projectId_toolDefinitionId: { projectId: context.project.id, toolDefinitionId: tool.id } }, create: { projectId: context.project.id, toolDefinitionId: tool.id, status: ProjectToolStatus.CONNECTED }, update: { status: ProjectToolStatus.CONNECTED } })
-    const connection = await tx.projectConnection.upsert({ where: { projectId_projectToolId: { projectId: context.project.id, projectToolId: projectTool.id } }, create: { projectId: context.project.id, projectToolId: projectTool.id, name: 'Hermes Agent', status: ConnectionStatus.CONNECTED, metadata: { agentId: input.agentId, hermesConnectionId: registered.connectionId, hermesProjectId: projectId, capabilities: verified.capabilities ?? [] } }, update: { status: ConnectionStatus.CONNECTED, metadata: { agentId: input.agentId, hermesConnectionId: registered.connectionId, hermesProjectId: projectId, capabilities: verified.capabilities ?? [] } } })
-    await tx.connectionCredential.upsert({ where: { connectionId: connection.id }, create: { projectId: context.project.id, connectionId: connection.id, provider: 'hermes', encryptedPayload: encrypt({ agentId: input.agentId, connectionId: registered.connectionId, projectId, connectionSecret: input.connectionSecret }), status: ConnectionCredentialStatus.ACTIVE }, update: { encryptedPayload: encrypt({ agentId: input.agentId, connectionId: registered.connectionId, projectId, connectionSecret: input.connectionSecret }), status: ConnectionCredentialStatus.ACTIVE } })
+    const connection = await tx.projectConnection.upsert({ where: { projectId_projectToolId: { projectId: context.project.id, projectToolId: projectTool.id } }, create: { projectId: context.project.id, projectToolId: projectTool.id, name: 'Hermes Agent', status: ConnectionStatus.CONNECTED, metadata: { agentId, hermesConnectionId: registered.connectionId, hermesProjectId: projectId, capabilities: verified.capabilities ?? [] } }, update: { status: ConnectionStatus.CONNECTED, metadata: { agentId, hermesConnectionId: registered.connectionId, hermesProjectId: projectId, capabilities: verified.capabilities ?? [] } } })
+    await tx.connectionCredential.upsert({ where: { connectionId: connection.id }, create: { projectId: context.project.id, connectionId: connection.id, provider: 'hermes', encryptedPayload: encrypt({ agentId, connectionId: registered.connectionId, projectId, connectionSecret }), status: ConnectionCredentialStatus.ACTIVE }, update: { encryptedPayload: encrypt({ agentId, connectionId: registered.connectionId, projectId, connectionSecret }), status: ConnectionCredentialStatus.ACTIVE } })
     await recordAuditEvent({ projectId: context.project.id, eventType: 'hermes.connection.verified', actor: { type: AuditActorType.HUMAN, projectMemberId: member.id }, targetType: 'ProjectConnection', targetId: connection.id, projectToolId: projectTool.id, summary: 'Hermes installation connection verified', metadata: { capabilities: verified.capabilities ?? [], environment: 'staging' } }, tx)
     return { connectionId: connection.id, capabilities: verified.capabilities ?? [] }
   })
