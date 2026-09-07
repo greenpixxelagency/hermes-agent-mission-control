@@ -8,6 +8,44 @@
 
 **Consequences:** Product behavior cannot branch on dogfood names, slugs, IDs, credentials, or business assumptions. Dogfood fixtures remain isolated to staging/tests.
 
+## Single-project-first UX preserves multi-project authority
+
+**Decision:** RogerOS may hide project selection and route a member into one server-resolved active workspace during the Hermes control-desk rollout. It will retain the existing project-scoped schema, authorization, adapter binding, policy, approval, audit, tool, connection, schedule, and browser-session boundaries.
+
+**Reason:** The first operational experience should be easy to use without creating a future migration that can mix employees, Hermes profiles, credentials, or browser sessions across customer workspaces.
+
+**Consequences:** A single-project route is a presentation/default-context choice only. `projectId` remains authoritative and must be derived server-side on every read or mutation. Future multi-project work restores a context switcher; it must not introduce global profile inventories, slug-derived ownership, client-supplied project authority, or cross-project profile reuse. Each Hermes profile binding is single-project by default; reuse requires an explicit, audited clone/import action.
+
+## Hermes adapter bindings are signed projections, not authority
+
+**Decision:** RogerOS registers an existing Hermes profile through the staging adapter using its opaque database IDs, a short-lived timestamp, single-use random nonce, and HMAC created with the existing server-only adapter credential. The protected adapter binding registry projects, but does not replace, the `HermesRuntimeAssignment` authority record.
+
+**Consequences:** Project roster and assignment-capability reads use the registered opaque binding; a profile name, slug, UI selection, or raw Hermes profile list cannot establish ownership. Registration is immutable and idempotent, has no capability-grant side effect, and failure keeps the UI/default policy unavailable. The signer and credential never reach browser code, logs, audits, or the adapter's returned errors.
+
+## Browser-only Hermes environments are isolated per bot
+
+**Decision:** RogerOS will use a browser-only—not full-desktop—environment for each Hermes runtime assignment. Viewer and takeover access must be mediated by short-lived, signed, user-bound leases that bind opaque `projectId`, `runtimeAssignmentId`, `profileId`, and authorized user identity. Human takeover is available only after the adapter has exclusively revoked the agent's browser input for that specific assignment.
+
+**Reason:** The product needs focused browser work and supervised intervention, not a shared remote desktop. A browser-only design lowers the exposed surface while retaining the governance boundary RogerOS needs.
+
+**Consequences:** A shared Camofox/VNC session, raw browser URL, profile key, display name, or client-supplied project ID cannot grant viewing or input. The adapter must advertise browser/takeover capability as false until it can enforce assignment isolation, lease expiry/revocation, exclusive input handoff, and user-claim validation. Observation recording must consume redacted, assignment-bound semantic events and produce review-only drafts; it must never capture raw VNC/CDP traffic, credentials, cookies, or unrelated tabs.
+
+## Custom staging browser-control relay is approved
+
+**Decision:** Until Hermes/Camofox provides native assignment-scoped input ownership, RogerOS may use a separately reviewed, staging-only custom browser-control relay. It must be the sole network ingress for both Hermes browser commands and human viewer/input traffic to a dedicated browser process, enforce an atomic per-assignment owner lock, and default to deny.
+
+**Reason:** The official integration cannot prove that human takeover excludes every Hermes browser-input path, and a process-wide view-only setting cannot safely hand a live session to a human.
+
+**Consequences:** A VNC/RFB input filter alone is insufficient. Network policy must prevent direct Hermes, dashboard, cron, human, and public access to the browser; all browser-producing paths must traverse the relay. The relay must terminate active agent input before allowing human input, terminate human input before resuming the agent, bind short-lived signed leases to an opaque assignment and user, and preserve auditable transition evidence. Teaching may use only a redacted semantic event stream from this relay/instrumentation; raw frames, typed values, cookies, clipboard, uploads, and unrelated-tab activity are prohibited.
+
+## Dedicated Hermes runtime per browser-controlled assignment is approved
+
+**Decision:** Each staging assignment that receives the custom browser-control relay will run in its own dedicated Hermes runtime with a distinct relay credential and an isolated network path only to that assignment's browser. The approved migration copies only that assignment's protected staging profile and required provider configuration.
+
+**Reason:** Hermes v0.20.5 sends shared-runtime Camofox requests with client-controlled identity values; the relay cannot derive trustworthy assignment ownership from them. A dedicated runtime gives the relay an unforgeable service-level origin to bind to the existing opaque RogerOS assignment.
+
+**Consequences:** Runtime creation, credential issuance, profile/configuration migration, start/stop, and retirement are staging-only lifecycle operations and must be audited by the adapter/RogerOS binding workflow. Credentials stay in protected runtime/relay configuration and are never copied to client code, logs, return payloads, or source control. A runtime may reach only its assigned relay/browser network; no shared runtime may use the browser-control path.
+
 ## Legacy Hermy HQ and RogerOS remain explicitly separated
 
 **Decision:** The repository may temporarily contain upstream Hermy HQ screens, bridge code, and legacy schema models beside RogerOS, but only `/p/[projectSlug]` and its project-scoped services are RogerOS product evidence.

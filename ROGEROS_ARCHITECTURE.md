@@ -8,6 +8,14 @@ Hermes is the primary AI execution runtime. RogerOS is the authoritative control
 
 The current RogerOS application lives under `/p/[projectSlug]` and uses a shared project shell. Some untouched upstream Hermy HQ routes remain beside it during the staged product transition.
 
+## Single-project-first experience
+
+RogerOS may intentionally present one active workspace while its control-plane data remains project-scoped. This is a product-experience simplification, not a tenancy simplification: `projectId` remains mandatory on employees, Hermes profile bindings, conversations, tasks, tools, connections, approvals, audit events, schedules, browser sessions, and every runtime action. The single-project router resolves the current member's active project server-side; it does not use a client-selected project identifier as authority.
+
+When the multi-project experience returns, the project switcher must restore a server-resolved context and every workspace query/action must continue to use that immutable project ID. AI agents and future changes must not remove, infer, or replace this boundary with a profile-name prefix, project slug, prompt instruction, browser URL, or client filter. A Hermes profile/runtime binding is owned by one project unless an explicit, audited clone/import workflow creates a separate binding.
+
+The staging adapter's protected binding registry is a signed, server-to-server projection of the authoritative RogerOS `HermesRuntimeAssignment`. RogerOS sends its opaque `projectId`, `runtimeId`, `runtimeAssignmentId`, and existing Hermes `profileId`; it never uses a slug, display name, or a raw Hermes inventory as ownership proof. The adapter accepts only immutable/idempotent bindings and project roster/capability reads are bound to those opaque IDs. The binding credential, HMAC, nonce, timestamp, adapter URL, raw IDs, and runtime details remain server-side. A binding grants no browser, takeover, MCP, scheduling, model mutation, restart, skill, or approval capability; each is separately advertised false-by-default through the assignment capability contract.
+
 **Audited UI boundary (2026-09-06):** Team, Tasks, Workforce, Brain, Tools, Approvals, and Market have RogerOS-specific routes or workspaces. Settings exposes a read-only, project-scoped Hermes runtime connection/status view and links authorized Owners/Admins to the existing Workforce runtime-management flow. Reports and Automations deliberately render foundation-only cards; the shell command palette is navigation-only. Root-level Hermy HQ pages, APIs, bridge, and legacy schema models are not RogerOS modules or authority sources. See `ROGEROS_AUDIT.md` before treating either side as product scope.
 
 ## Tenancy and authorization

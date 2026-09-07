@@ -681,6 +681,37 @@ textarea, input {
   letter-spacing: -0.011em;
 }
 
+/* Keep the Green Pixxel system authoritative in dark mode. The older
+   [data-theme='dark'] .rogeros-app block above has higher specificity than
+   .rogeros-app and otherwise leaks the retired blue palette into RogerOS. */
+[data-theme='dark'] .rogeros-app {
+  --ros-bg: var(--gp-canvas);
+  --ros-sidebar: var(--gp-canvas);
+  --ros-surface: var(--gp-surface);
+  --ros-surface-raised: var(--gp-raised);
+  --ros-line: var(--gp-line);
+  --ros-line-strong: var(--gp-line-strong);
+  --ros-text: var(--gp-text);
+  --ros-muted: var(--gp-muted);
+  --ros-faint: var(--gp-faint);
+  --ros-accent: var(--gp-accent);
+  --ros-accent-strong: var(--gp-accent-strong);
+  --ros-good: var(--gp-good);
+  --ros-warn: var(--gp-warn);
+  --ros-bad: var(--gp-danger);
+  --ros-ambient: color-mix(in srgb, var(--gp-accent) 11%, transparent);
+  --ros-subtle: color-mix(in srgb, var(--gp-accent) 4%, transparent);
+  --ros-subtle-hover: color-mix(in srgb, var(--gp-accent) 9%, transparent);
+  --ros-brand-bg: linear-gradient(145deg, var(--gp-accent), var(--gp-accent-strong));
+  --ros-brand-text: #FFFFFF;
+  --ros-avatar-bg: color-mix(in srgb, var(--gp-accent) 12%, var(--gp-surface));
+  --ros-avatar-bg-strong: color-mix(in srgb, var(--gp-accent) 20%, var(--gp-surface));
+  --ros-primary-bg: var(--gp-accent);
+  --ros-primary-text: #FFFFFF;
+  --ros-topbar: var(--gp-glass);
+  --ros-command-backdrop: rgb(0 0 0 / .72);
+}
+
 .rogeros-app::before { background: linear-gradient(115deg, transparent 0 52%, color-mix(in srgb, var(--gp-surface) 40%, transparent) 100%); }
 .rogeros-sidebar, .rogeros-topbar { background: var(--gp-glass); border-color: var(--gp-line); }
 .rogeros-app .panel { background: var(--gp-surface); border-color: var(--gp-line); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--gp-surface) 90%, transparent); }
@@ -740,6 +771,11 @@ textarea, input {
 
 .rogeros-app :where(input, textarea, select):focus { border-color: var(--gp-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gp-accent) 18%, transparent); }
 .rogeros-app :where(a, button, [role='button'], input, textarea, select):focus-visible { outline-color: var(--gp-accent); outline-offset: 3px; }
+
+/* The control-desk rollout intentionally presents one active workspace. The
+   project selector is hidden in this phase; routing and every server action
+   still resolve the existing project context and remain multi-project-safe. */
+.rogeros-topbar > .relative { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .gp-enter, .rogeros-app .panel-interactive, .rogeros-app .btn-primary, .rogeros-app .btn-ghost, .rogeros-tactile-button { animation: none; transition-duration: 1ms; }
