@@ -75,6 +75,8 @@ type Message = {
 };
 type RosterBot = { profile: Profile; employee?: Employee; runtime?: Runtime };
 type Project = { id: string; name: string; slug: string; role: string };
+type DeskClaim = { claimId: string; displayName: string; role: string | null; description: string | null };
+type Desk = { state: "SETUP_REQUIRED" | "ADAPTER_UNAVAILABLE" | "READY_EMPTY" | "ACTIVE_ROSTER" | "NEEDS_ATTENTION"; failureCode: string | null; claimableProfiles: DeskClaim[]; allowedActions: { add: boolean; adopt: boolean; retry: boolean }; retained: Array<{ employeeAssignmentId: string; displayName: string; role: string; description: string | null; taskCount: number; assignmentState: string; provisioningState: string; reconciliationState: string; runtimeStatus: string | null; active: boolean }> };
 type Capabilities = {
   browser: { viewerLease: boolean; takeover: boolean };
   teach: { observation: boolean };
@@ -177,29 +179,30 @@ export function TeamWorkspace({ project }: { project: Project }) {
   const [sending, setSending] = useState(false);
   const [settings, setSettings] = useState(false);
   const [addBot, setAddBot] = useState(false);
-  const [importBot, setImportBot] = useState<RosterBot | null>(null);
   const [adoptProfile, setAdoptProfile] = useState(false);
   const [capabilities, setCapabilities] = useState<Capabilities>(
     unavailableCapabilities,
   );
   const [error, setError] = useState("");
+  const [desk, setDesk] = useState<Desk | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const canManage = managers.has(project.role);
   const canOperate = operators.has(project.role);
   const load = useCallback(async () => {
-    const q = `projectId=${encodeURIComponent(project.id)}`;
-    const [workforce, inventory] = await Promise.all([
-      fetch(`/api/workforce?${q}`),
-      fetch(`/api/runtime/bots?${q}`),
-    ]);
-    if (!workforce.ok)
-      throw Error("Your project workforce could not be loaded.");
-    setEmployees((await workforce.json()).employees);
-    if (inventory.ok) setProfiles((await inventory.json()).bots);
-    else
-      setError(
-        "Hermes roster is temporarily unavailable. Existing RogerOS assignments remain visible; retry when the protected adapter is healthy.",
-      );
+    const response = await fetch(`/api/team/desk?projectId=${encodeURIComponent(project.id)}`);
+    if (!response.ok) throw Error("Your project Team desk could not be loaded.");
+    const next = await response.json() as Desk;
+    setDesk(next);
+    setProfiles([]);
+    setEmployees(next.retained.map((row) => ({
+      id: row.employeeAssignmentId, roleOverride: row.role,
+      employee: { name: row.displayName, role: row.role, description: row.description }, skillAssignments: [],
+      runtimeAssignments: [{ active: row.active, profileKey: row.employeeAssignmentId, assignmentState: row.assignmentState, provisioningState: row.provisioningState, reconciliationState: row.reconciliationState, runtimeStatus: row.runtimeStatus, desiredModelId: null, desiredModelProvider: null, externalRuntimeMetadata: null }],
+      _count: { taskAssignments: row.taskCount },
+    })));
+    if (next.state === "SETUP_REQUIRED") setError("Setup required: no isolated Hermes adapter is configured for this workspace. Roster counts are retained RogerOS assignments, not live runtime inventory.");
+    else if (next.state === "ADAPTER_UNAVAILABLE") setError(`Adapter unavailable (${next.failureCode || "ADAPTER_UNAVAILABLE"}). Retained RogerOS assignments remain visible; restore the protected adapter, then retry.`);
+    else setError("");
   }, [project.id]);
   const roster = useMemo<RosterBot[]>(() => {
     const assigned = new Map(
@@ -431,13 +434,17 @@ export function TeamWorkspace({ project }: { project: Project }) {
                 <TactileButton
                   variant="secondary"
                   onClick={() => setAdoptProfile(true)}
+                  disabled={!desk?.allowedActions.adopt}
+                  title={!desk?.allowedActions.adopt ? "Profile claims require a healthy, configured protected adapter." : undefined}
                   className="inline-flex items-center gap-2 px-3 text-xs"
                 >
                   <Bot className="w-3.5" />
-                  Adopt profile
+                  Claim profile
                 </TactileButton>
                 <TactileButton
                   onClick={() => setAddBot(true)}
+                  disabled={!desk?.allowedActions.add}
+                  title={!desk?.allowedActions.add ? "Adding a bot requires a healthy, configured protected adapter." : undefined}
                   className="inline-flex items-center gap-2 px-3 text-xs"
                 >
                   <Plus className="w-3.5" />
@@ -452,7 +459,7 @@ export function TeamWorkspace({ project }: { project: Project }) {
         <Metric
           label="Hermes bots"
           value={roster.length}
-          hint="Bound to this workspace"
+          hint={desk?.state === "SETUP_REQUIRED" ? "Retained assignments; adapter setup required" : "Bound to this workspace"}
         />
         <Metric
           label="Online now"
@@ -555,7 +562,7 @@ export function TeamWorkspace({ project }: { project: Project }) {
                     </StatusPill>
                   </div>
                   <p className="mt-1 break-all text-[10px] text-[var(--gp-faint)]">
-                    Hermes profile · {selected.profile.profileId}
+                    Signed RogerOS assignment · project-bound
                   </p>
                 </div>
                 <button
@@ -604,10 +611,10 @@ export function TeamWorkspace({ project }: { project: Project }) {
                     action={
                       canManage ? (
                         <TactileButton
-                          onClick={() => setImportBot(selected)}
                           className="px-3 text-xs"
+                          onClick={() => setAdoptProfile(true)}
                         >
-                          Import profile
+                          Claim a profile
                         </TactileButton>
                       ) : undefined
                     }
@@ -725,20 +732,10 @@ export function TeamWorkspace({ project }: { project: Project }) {
       {adoptProfile && (
         <AdoptProfile
           project={project}
+          claims={desk?.claimableProfiles || []}
           close={() => setAdoptProfile(false)}
           done={async () => {
             setAdoptProfile(false);
-            await load();
-          }}
-        />
-      )}
-      {importBot && (
-        <ImportBot
-          project={project}
-          bot={importBot}
-          close={() => setImportBot(null)}
-          done={async () => {
-            setImportBot(null);
             await load();
           }}
         />
@@ -1169,14 +1166,16 @@ function AddBot({
 }
 function AdoptProfile({
   project,
+  claims,
   close,
   done,
 }: {
   project: Project;
+  claims: DeskClaim[];
   close: () => void;
   done: () => Promise<void>;
 }) {
-  const [profileId, setProfileId] = useState("");
+  const [claimId, setClaimId] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1191,7 +1190,7 @@ function AdoptProfile({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId: project.id,
-          profileId,
+          claimId,
           name,
           role,
         }),
@@ -1242,10 +1241,9 @@ function AdoptProfile({
           </button>
         </header>
         <p className="mt-3 text-[11px] leading-5 text-[var(--gp-muted)]">
-          Enter the exact Hermes profile ID. RogerOS binds it with this
-          workspace&apos;s opaque IDs; Hermes rejects an unavailable or
-          already-bound profile. This grants no tools, browser, MCP, schedule,
-          or approval access.
+          Choose a profile the protected adapter explicitly made claimable.
+          The one-time claim is consumed into a signed project binding; this
+          grants no tools, browser, MCP, schedule, or approval access.
         </p>
         {error && (
           <p role="alert" className="mt-3 text-xs text-[var(--gp-danger)]">
@@ -1253,15 +1251,21 @@ function AdoptProfile({
           </p>
         )}
         <label className="mt-4 block text-xs font-semibold">
-          Hermes profile ID
-          <input
+          Claimable profile
+          <select
             required
-            pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,120}"
-            value={profileId}
-            onChange={(event) => setProfileId(event.target.value)}
-            placeholder="existing-hermes-profile"
+            value={claimId}
+            onChange={(event) => {
+              const selected = claims.find((claim) => claim.claimId === event.target.value);
+              setClaimId(event.target.value);
+              if (selected) { setName(selected.displayName); setRole(selected.role || ""); }
+            }}
             className="mt-1.5 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3 py-2.5"
-          />
+          >
+            <option value="">Select an available profile</option>
+            {claims.map((claim) => <option key={claim.claimId} value={claim.claimId}>{claim.displayName}{claim.role ? ` · ${claim.role}` : ""}</option>)}
+          </select>
+          {!claims.length && <span className="mt-1 block text-[10px] font-normal text-[var(--gp-muted)]">No profiles are currently claimable for this protected adapter.</span>}
         </label>
         <label className="mt-3 block text-xs font-semibold">
           Employee name
@@ -1293,7 +1297,7 @@ function AdoptProfile({
           </TactileButton>
           <TactileButton
             disabled={
-              saving || !profileId.trim() || !name.trim() || !role.trim()
+              saving || !claimId || !name.trim() || !role.trim()
             }
             type="submit"
             className="px-3 text-xs"
@@ -1305,123 +1309,6 @@ function AdoptProfile({
     </div>
   );
 }
-function ImportBot({
-  project,
-  bot,
-  close,
-  done,
-}: {
-  project: Project;
-  bot: RosterBot;
-  close: () => void;
-  done: () => Promise<void>;
-}) {
-  const [role, setRole] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const response = await fetch("/api/runtime/bots/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: project.id,
-          profileId: bot.profile.profileId,
-          name: bot.profile.displayName,
-          role,
-          description: bot.profile.description,
-        }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || "Profile could not be imported.");
-      }
-      await done();
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Profile could not be imported.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="import-bot-title"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 backdrop-blur-sm sm:items-center"
-    >
-      <form
-        onSubmit={submit}
-        className="glass-panel w-full max-w-lg rounded-2xl p-5"
-      >
-        <header className="flex justify-between gap-4">
-          <div>
-            <p className="eyebrow">Bound Hermes profile</p>
-            <h2
-              id="import-bot-title"
-              className="mt-1 font-display text-xl font-extrabold"
-            >
-              Import {bot.profile.displayName}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Close profile import"
-            className="rogeros-tactile-button grid min-h-11 min-w-11 place-items-center rounded-xl border border-[var(--gp-line)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <p className="mt-3 text-[11px] leading-5 text-[var(--gp-muted)]">
-          RogerOS will adopt only a profile the protected adapter already binds
-          to this workspace. Skills, tools, MCP, browser access, schedules, and
-          approvals start default-deny.
-        </p>
-        {error && (
-          <p role="alert" className="mt-3 text-xs text-[var(--gp-danger)]">
-            {error}
-          </p>
-        )}
-        <label className="mt-4 block text-xs font-semibold">
-          RogerOS role
-          <input
-            required
-            value={role}
-            onChange={(event) => setRole(event.target.value)}
-            placeholder="Operations lead"
-            className="mt-1.5 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3 py-2.5"
-          />
-        </label>
-        <div className="mt-5 flex justify-end gap-2">
-          <TactileButton
-            type="button"
-            variant="secondary"
-            onClick={close}
-            className="px-3 text-xs"
-          >
-            Cancel
-          </TactileButton>
-          <TactileButton
-            disabled={saving || !role.trim()}
-            type="submit"
-            className="px-3 text-xs"
-          >
-            {saving ? "Importing…" : "Import governed profile"}
-          </TactileButton>
-        </div>
-      </form>
-    </div>
-  );
-}
-
 function Card({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] p-3">

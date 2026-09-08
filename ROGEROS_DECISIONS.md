@@ -86,6 +86,14 @@
 
 **Consequences:** Cross-project access is indistinguishable from missing data, default access is denied, and isolation regressions are required near tenancy changes.
 
+## Hermes profile adoption uses one-time opaque claims
+
+**Decision:** An unbound Hermes profile can be adopted only through a bounded adapter-issued opaque claim, consumed once when registering the exact signed RogerOS project/runtime/assignment binding. Raw profile identifiers and global inventory results are not Team-browser inputs.
+
+**Reason:** A profile label, slug, or pasted identifier cannot establish project ownership. The claim gives the adapter one auditable opportunity to prove that a specifically eligible profile can be bound without turning discovery into a cross-project inventory leak.
+
+**Consequences:** The adapter rejects malformed, expired, replayed, or conflicting claims before any live capability is granted. A claim gives no browser, takeover, tool, MCP, routine, model, credential, approval, or scheduling permission; those remain independently default-deny. This decision is implementation-pending until the isolated staging adapter endpoint and acceptance evidence exist.
+
 ## RogerOS enforces permissions, policies, approvals, and audit
 
 **Decision:** External actions require RogerOS Tool permission and policy evaluation; consequential actions may require approval and always produce governed lifecycle records.

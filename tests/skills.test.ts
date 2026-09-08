@@ -60,6 +60,8 @@ function adapterHarness() {
     }),
     listBots: async () => (bot ? [bot] : []),
     listProjectBots: async () => (bot ? [bot] : []),
+    listClaimableProfiles: async () => [],
+    claimProfileBinding: async () => { throw new Error("not used in skill harness"); },
     registerBinding: async (input) => ({
       ...input,
       displayName: bot?.displayName ?? input.profileId,

@@ -18,6 +18,7 @@ import type {
 } from "../src/lib/hermes-runtime-adapter";
 import {
   normalizeHermesBotMessageResult,
+  parseClaimableProfiles,
   parseProjectBotInventory,
   safeAdapterErrorHint,
 } from "../src/lib/hermes-runtime-adapter";
@@ -71,6 +72,8 @@ function adapterHarness() {
     }),
     listBots: async () => (bot ? [bot] : []),
     listProjectBots: async () => (bot ? [bot] : []),
+    listClaimableProfiles: async () => [],
+    claimProfileBinding: async () => { throw new Error("not used in bot harness"); },
     registerBinding: async (input) => {
       bindings.push(input);
       return {
@@ -252,6 +255,12 @@ test("project bot inventory is bounded and rejects malformed or duplicate adapte
       })),
     }),
   );
+});
+
+test("claim discovery exposes only bounded opaque claims, never profile IDs", () => {
+  assert.deepEqual(parseClaimableProfiles({ claims: [{ claimId: "a".repeat(16), displayName: "Available research lead", role: "Research", description: null }] }), [{ claimId: "a".repeat(16), displayName: "Available research lead", role: "Research", description: null }]);
+  assert.throws(() => parseClaimableProfiles({ claims: [{ claimId: "short", displayName: "Bad" }] }));
+  assert.throws(() => parseClaimableProfiles({ claims: Array.from({ length: 26 }, () => ({ claimId: "b".repeat(16), displayName: "Bad" })) }));
 });
 
 test("M14B provisions deterministic project-scoped bots and enforces runtime authorization", async (t) => {

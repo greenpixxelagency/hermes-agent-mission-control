@@ -75,6 +75,14 @@ export type HermesBinding = {
   modelProvider?: string | null;
   modelId?: string | null;
 };
+// This opaque, short-lived claim capability is the only discoverable handle
+// for an unbound profile. A profile ID is never returned by claim discovery.
+export type HermesClaimableProfile = {
+  claimId: string;
+  displayName: string;
+  role: string | null;
+  description: string | null;
+};
 export type HermesBotSpec = {
   profileId: string;
   projectKey: string;
@@ -127,6 +135,8 @@ export type HermesRuntimeAdapter = HermesExecutionRuntimeAdapter & {
   // The adapter, rather than the browser, enforces the project/profile boundary.
   // Never substitute listBots() for this on a RogerOS project surface.
   listProjectBots: (projectId: string) => Promise<HermesBot[]>;
+  listClaimableProfiles: () => Promise<HermesClaimableProfile[]>;
+  claimProfileBinding: (input: { claimId: string; projectId: string; runtimeId: string; runtimeAssignmentId: string }) => Promise<HermesBinding>;
   registerBinding: (input: {
     projectId: string;
     runtimeId: string;
@@ -180,6 +190,7 @@ export type HermesRuntimeAdapter = HermesExecutionRuntimeAdapter & {
 
 const url = () => process.env.HERMES_STAGING_ADAPTER_URL?.replace(/\/$/, "");
 const token = () => process.env.ROGEROS_HERMES_STAGING_ADAPTER_TOKEN;
+export const hermesAdapterConfigured = () => Boolean(url() && token());
 function config() {
   const base = url();
   const secret = token();
@@ -248,6 +259,7 @@ export function safeAdapterErrorHint(payload: null | Record<string, unknown>) {
     .slice(0, 160);
 }
 function adapterOperation(path: string) {
+  if (path === "/claims" || path === "/claims/consume") return "CLAIM";
   if (path === "/bindings/register") return "BINDING_REGISTER";
   if (path.endsWith("/capabilities")) return "BINDING_CAPABILITIES";
   if (path.endsWith("/identity")) return "IDENTITY";
@@ -288,6 +300,7 @@ type BindingRegistrationInput = {
   runtimeAssignmentId: string;
   profileId: string;
 };
+type ClaimBindingInput = Omit<BindingRegistrationInput, "profileId"> & { claimId: string };
 const opaqueBindingId = /^[A-Za-z0-9_-]{8,128}$/;
 const safeBindingProfileId = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$/;
 
@@ -310,6 +323,13 @@ function canonicalBindingBody(input: BindingRegistrationInput) {
     runtimeAssignmentId: input.runtimeAssignmentId,
     runtimeId: input.runtimeId,
   });
+}
+function canonicalClaimBody(input: ClaimBindingInput) {
+  for (const value of [input.projectId, input.runtimeId, input.runtimeAssignmentId]) {
+    if (!opaqueBindingId.test(value)) throw new Error("HERMES_ADAPTER_400_CLAIM");
+  }
+  if (!/^[A-Za-z0-9_-]{16,256}$/.test(input.claimId)) throw new Error("HERMES_ADAPTER_400_CLAIM");
+  return JSON.stringify({ claimId: input.claimId, projectId: input.projectId, runtimeAssignmentId: input.runtimeAssignmentId, runtimeId: input.runtimeId });
 }
 
 function bindingIntegrityHeaders(body: string) {
@@ -440,6 +460,24 @@ export function parseProjectBotInventory(value: unknown): HermesBot[] {
     };
   });
 }
+
+export function parseClaimableProfiles(value: unknown): HermesClaimableProfile[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("HERMES_ADAPTER_502_CLAIMS");
+  const claims = (value as Record<string, unknown>).claims;
+  if (!Array.isArray(claims) || claims.length > 25) throw new Error("HERMES_ADAPTER_502_CLAIMS");
+  const seen = new Set<string>();
+  return claims.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("HERMES_ADAPTER_502_CLAIMS");
+    const row = item as Record<string, unknown>;
+    const claimId = typeof row.claimId === "string" ? row.claimId : "";
+    const displayName = typeof row.displayName === "string" ? row.displayName.trim() : "";
+    const optional = (key: string, max: number) => row[key] == null ? null : typeof row[key] === "string" && row[key].length <= max ? row[key] : undefined;
+    const role = optional("role", 160), description = optional("description", 1000);
+    if (!/^[A-Za-z0-9_-]{16,256}$/.test(claimId) || !displayName || displayName.length > 160 || seen.has(claimId) || role === undefined || description === undefined) throw new Error("HERMES_ADAPTER_502_CLAIMS");
+    seen.add(claimId);
+    return { claimId, displayName, role, description };
+  });
+}
 export function normalizeHermesBotMessageResult(
   value: RawHermesBotMessageResult,
 ): HermesBotMessageResult {
@@ -478,6 +516,14 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
     parseProjectBotInventory(
       await request<unknown>(`/projects/${encodeURIComponent(projectId)}/bots`),
     ),
+  listClaimableProfiles: async () => parseClaimableProfiles(await request<unknown>("/claims")),
+  claimProfileBinding: async (input) => {
+    const body = canonicalClaimBody(input);
+    const response = await request<unknown>("/claims/consume", { method: "POST", body, headers: bindingIntegrityHeaders(body) });
+    const binding = unwrap<HermesBinding>(response, "binding");
+    if (!binding || binding.projectId !== input.projectId || binding.runtimeId !== input.runtimeId || binding.runtimeAssignmentId !== input.runtimeAssignmentId || !safeBindingProfileId.test(binding.profileId)) throw new Error("HERMES_ADAPTER_502_CLAIM");
+    return binding;
+  },
   registerBinding: async (input) => {
     const body = canonicalBindingBody(input);
     const response = await request<unknown>("/bindings/register", {

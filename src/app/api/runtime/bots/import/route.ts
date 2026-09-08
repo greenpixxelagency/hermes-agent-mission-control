@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AuditActorType } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 
 import { recordAuditEvent } from "@/lib/audit";
 import { reconcileHermesBotAssignment } from "@/lib/hermes-bots";
@@ -18,9 +19,9 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const context = await requireProjectContextForBody(body);
-    const profileId = typeof body.profileId === "string" ? body.profileId : "";
-    if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$/.test(profileId))
-      return NextResponse.json({ error: "INVALID_PROFILE" }, { status: 400 });
+    const claimId = typeof body.claimId === "string" ? body.claimId : "";
+    if (!/^[A-Za-z0-9_-]{16,256}$/.test(claimId))
+      return NextResponse.json({ error: "INVALID_CLAIM" }, { status: 400 });
     const runtime = await prisma.hermesRuntime.findFirst({
       where: { key: "rogeros-hermes-staging", status: "ACTIVE" },
       select: { id: true },
@@ -31,34 +32,22 @@ export async function POST(request: Request) {
         { status: 409 },
       );
 
-    // This is an explicit Owner/Admin adoption request. Reconciliation sends
-    // the opaque RogerOS IDs to the adapter, which verifies profile existence
-    // and rejects a profile already immutably bound elsewhere. We deliberately
-    // never enumerate Hermes' raw profile inventory in RogerOS.
-    if (
-      await prisma.hermesRuntimeAssignment.findFirst({
-        where: { projectId: context.project.id, profileKey: profileId },
-        select: { id: true },
-      })
-    ) {
-      return NextResponse.json(
-        { error: "BOT_PROFILE_ALREADY_EXISTS" },
-        { status: 409 },
-      );
-    }
-
     const created = await createCustomEmployee(context, {
-      name: typeof body.name === "string" ? body.name : profileId,
+      name: typeof body.name === "string" ? body.name : "Claimed Hermes profile",
       role: body.role,
       description:
         typeof body.description === "string" ? body.description : null,
     });
+    // The opaque UUID lets the adapter atomically consume the claim and bind
+    // this exact future RogerOS record. The client never submits a profile ID.
+    const runtimeAssignmentId = randomUUID();
     const runtimeAssignment = await prisma.hermesRuntimeAssignment.create({
       data: {
+        id: runtimeAssignmentId,
         projectId: context.project.id,
         runtimeId: runtime.id,
         employeeProjectAssignmentId: created.assignment.id,
-        profileKey: profileId,
+        profileKey: `claim-pending-${runtimeAssignmentId}`,
         active: true,
       },
     });
@@ -81,9 +70,11 @@ export async function POST(request: Request) {
       targetType: "HermesRuntimeAssignment",
       targetId: runtimeAssignment.id,
       summary: "Hermes profile adoption requested for RogerOS workforce",
-      metadata: { profileId, capabilityGrants: "NONE" },
+      metadata: { claimConsumed: true, capabilityGrants: "NONE" },
     });
     try {
+      const binding = await hermesRuntimeAdapter.claimProfileBinding({ claimId, projectId: context.project.id, runtimeId: runtime.id, runtimeAssignmentId });
+      await prisma.hermesRuntimeAssignment.update({ where: { id: runtimeAssignment.id }, data: { profileKey: binding.profileId } });
       const assignment = await reconcileHermesBotAssignment(
         context,
         created.assignment.id,
@@ -96,11 +87,14 @@ export async function POST(request: Request) {
         },
         { status: 201 },
       );
-    } catch {
+    } catch (error) {
+      const code = error instanceof Error && /^HERMES_ADAPTER_(?:NOT_CONFIGURED|\d{3}_[A-Z0-9_]{1,200})$/.test(error.message) ? error.message : "ADOPTION_REQUIRES_RETRY";
+      await prisma.hermesRuntimeAssignment.update({ where: { id: runtimeAssignment.id }, data: { provisioningState: "FAILED", reconciliationState: "FAILED", lastReconcileError: code } });
       return NextResponse.json(
         {
           employeeAssignment: created.assignment,
           provisioning: "PENDING_RECONCILIATION",
+          error: code,
         },
         { status: 202 },
       );
