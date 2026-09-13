@@ -12,3 +12,7 @@ export function isInternalServiceBypassAllowed(pathname: string) {
 export function isSignedRuntimeCallbackPath(pathname: string) {
   return pathname === '/api/runtime/callback'
 }
+
+export function isVoiceAssetRedemptionPath(pathname: string) {
+  return /^\/assets\/[^/]+\/redeem$/.test(pathname)
+}

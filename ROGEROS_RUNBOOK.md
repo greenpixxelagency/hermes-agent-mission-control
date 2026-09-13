@@ -30,6 +30,14 @@
 3. Apply only to the verified target environment. Recover failed Prisma migrations using documented Prisma state, not blind history edits.
 4. Run Prisma validation/generation/status afterward. Never infer production state from staging.
 
+## Local T2 voice acceptance
+
+- Keep RogerOS on `http://localhost:3001` and the isolated T2A adapter on a local loopback endpoint such as `http://127.0.0.1:9098`. Do not point the local app at the connected/public Hermes adapter.
+- Configure `HERMES_T2A_BASE_URL`, `HERMES_T2A_AUTH_TOKEN`, and `HERMES_T2A_HMAC_SECRET` only in gitignored `.env.local`. Matching adapter-side secrets remain in its mode-`0600` environment file and are never copied into chat, logs, or source control.
+- The adapter must use one fixed redemption origin and call `POST /assets/{assetId}/redeem`; RogerOS never accepts a caller-selected redemption URL. For a cross-host localhost acceptance, use a bounded SSH local forward for adapter requests and a bounded reverse forward for adapter redemption callbacks. The dedicated VPS task owns both tunnel endpoints and any isolated-service configuration or restart.
+- Before enabling voice, verify the isolated service is still bound to loopback, its compose runtime has no published port, `T2A_ENABLED` is false by default, and the protected connected/public Hermes adapter and six-profile runtime remain unchanged.
+- Acceptance requires a real browser-recorded note for two project-owned assignments, selected-profile transcription, one normal Bot Chat response, replay/expiry/cross-scope denial, no duplicate send on retry, safe logs, and restoration to default-deny after the test unless the owner explicitly approves continued operation.
+
 ## Implementation and testing
 
 - Inspect the existing feature and reuse its service, authorization, component, adapter, and audit patterns.

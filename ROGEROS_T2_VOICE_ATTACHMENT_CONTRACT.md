@@ -75,6 +75,8 @@ The request uses the established server-to-server authentication plus canonical-
 
 The adapter redeems once from a configured fixed RogerOS origin over authenticated TLS. It must not accept a client-selected host, redirect, embedded credential, filesystem path, provider URL, or permanent bearer URL. It streams within the declared and absolute byte limits, calculates SHA-256 while streaming, sniffs media independently, and rejects length/digest/type disagreement before invoking Hermes.
 
+The concrete RogerOS endpoint is `POST /assets/{percentEncodedAssetId}/redeem` with `Authorization: Bearer <redemptionToken>` and `Accept: <declared sniffed MIME>`. It returns the exact private audio bytes with `Content-Length`, the validated `Content-Type`, `Cache-Control: private, no-store`, and `X-Content-Type-Options: nosniff`, and never redirects. Interactive session middleware must allow this exact path through to its one-time bearer verifier; no other asset path receives that exemption.
+
 The adapter routes transcription through the exact bound profile's supported Hermes v0.21.0 speech-to-text path. Provider credentials remain in protected profile/server configuration. No key is sent to the browser or returned to RogerOS. The adapter does not give the agent an audio filesystem path.
 
 ### Sanitized response

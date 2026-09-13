@@ -69,6 +69,8 @@ Hermes may receive a voice note only through the versioned assignment-bound cont
 
 Direct filesystem paths, arbitrary URLs, redirects, provider credentials, client-supplied storage locations, and permanent bearer URLs are forbidden. Hermes Desktop's client-direct credential flow and its internal cached-path fallback are not suitable RogerOS web contracts. Live duplex voice, TTS replies, Discord/Telegram voice behavior, and wake-word operation are separate future capabilities and are not part of T2 voice notes.
 
+The adapter redeems a voice asset only through `POST /assets/{assetId}/redeem` on its configured fixed RogerOS origin. This route bypasses interactive session middleware because the short-lived single-use bearer token is its sole authentication boundary; the handler still verifies the asset, MIME, expiry, replay state, byte length, and digest before returning private no-store bytes. The browser-facing `/api/team/assets/{assetId}` route remains separately session-authorized and is not an adapter credential.
+
 ## Tasks and execution
 
 - `Task` is authoritative project work with status, priority, dependencies, activities, and assignments to project members or employees.
