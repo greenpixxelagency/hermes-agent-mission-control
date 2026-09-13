@@ -1,5 +1,13 @@
 # RogerOS decision log
 
+## Team is a conversational workplace with capability-truthful controls
+
+**Decision:** Team will use a messenger-first interface with project-specific employee avatars, a closed-by-default context panel, rich-message foundations, and an accessible Employee Studio. Delivery follows T1 through T5 in `ROGEROS_TEAM_EXPERIENCE_PLAN.md`.
+
+**Reason:** The existing control desk proves the governed Hermes connection but does not yet feel like a natural team conversation or make employee configuration understandable.
+
+**Consequences:** T1 may add preset avatars and messenger UX. Uploaded assets and attachments require T2 managed storage; model/files/Skills/MCP require T3 signed contracts; browser takeover and lesson observation require T4 isolation and single input ownership. UI presence never represents an unavailable capability as working.
+
 ## Main Hermes Bot Mode profiles map one-to-one to RogerOS bots
 
 **Decision:** The existing main Hermes installation is the execution source. One Hermes Bot Mode profile is one runtime identity and maps to one project-bound RogerOS bot. RogerOS Add Bot creates or ensures a profile in that main namespace; governed retirement removes the same identity only after the signed adapter operation succeeds, and the `default` profile is protected.

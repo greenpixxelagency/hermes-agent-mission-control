@@ -2,7 +2,7 @@
 
 These instructions apply to Codex, Antigravity, Claude Code, and other coding agents.
 
-1. Read `ROGEROS_ARCHITECTURE.md`, `ROGEROS_STATUS.md`, `ROGEROS_ROADMAP.md`, `ROGEROS_DECISIONS.md`, and `ROGEROS_RUNBOOK.md`.
+1. Read `ROGEROS_ARCHITECTURE.md`, `ROGEROS_STATUS.md`, `ROGEROS_ROADMAP.md`, `ROGEROS_DECISIONS.md`, `ROGEROS_RUNBOOK.md`, and `ROGEROS_TEAM_EXPERIENCE_PLAN.md`.
 2. Independently inspect the current branch, Git status, recent commits, relevant code, migrations, and tests. Documentation alone is never the source of truth.
 3. Identify the authoritative checkout. Never work from a stale worktree merely because it exists.
 4. Inspect an existing feature before rebuilding or replacing it.

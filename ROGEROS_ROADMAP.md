@@ -21,6 +21,7 @@ This roadmap summarizes repository evidence. Undefined future work requires expl
 
 ## Current
 
+- The owner approved the phased Team Experience direction on 2026-09-14. `ROGEROS_TEAM_EXPERIENCE_PLAN.md` is the durable dependency-ordered handoff for T1 messenger/preset-avatar work, T2 managed attachments/voice/custom avatars, T3 Employee Studio/model/files/Skills/MCP, T4 isolated browser/lesson recording, and T5 hardening. Only T1 is authorized to begin; later phases follow accepted predecessor commits rather than parallel stale branches.
 - M17 and M18 are complete and closed in staging. M18 was also verified locally and through authenticated Preview acceptance, with subsequent real localhost Google sign-in, Drive consent/token exchange, installation synchronization, and successful live provider health acceptance; no production or `main` changes were made.
 - M19–M22 are complete as local, bounded foundations. M21 and M22 still need a separately authorized Preview/staging acceptance run; neither requires a migration.
 - The audit separates this completion from customer/production readiness: the feature foundation is real, but production operations, customer onboarding, billing, deletion/export, support, disaster recovery, broader integration coverage, and the planned shell modules remain unfinished.
