@@ -1160,6 +1160,7 @@ model EmployeeProjectAssignment {
   projectId                String
   status                   EmployeeStatus               @default(ACTIVE)
   roleOverride             String?
+  avatarPresetKey          String?
   joinedAt                 DateTime                     @default(now())
   pausedAt                 DateTime?
   createdAt                DateTime                     @default(now())

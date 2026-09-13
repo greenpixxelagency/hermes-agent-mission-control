@@ -41,6 +41,7 @@ export async function readTeamDesk(context: ProjectContext, adapter: HermesRunti
     displayName: employee.employee.name,
     role: employee.roleOverride || employee.employee.role,
     description: employee.employee.description,
+    avatarPresetKey: employee.avatarPresetKey,
     taskCount: employee._count.taskAssignments,
     assignmentState: runtime.assignmentState,
     provisioningState: runtime.provisioningState,

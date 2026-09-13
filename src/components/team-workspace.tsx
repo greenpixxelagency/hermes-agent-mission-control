@@ -1,1361 +1,159 @@
 "use client";
 
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  AtSign,
-  Bot,
-  CircleDot,
-  Clock3,
-  Eye,
-  MessageCircle,
-  Monitor,
-  Pause,
-  Play,
-  Plus,
-  Radio,
-  RefreshCw,
-  Send,
-  Settings2,
-  ShieldCheck,
-  Sparkles,
-  Trash2,
-  Users,
-  WandSparkles,
-  X,
-} from "lucide-react";
-import {
-  Avatar,
-  EmptyState,
-  Metric,
-  PageHeader,
-  StatusPill,
-  TactileButton,
-} from "@/components/rogeros-ui";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, AtSign, Bot, ChevronRight, Command, Info, Monitor, PanelRight, Plus, RefreshCw, Search, Send, Settings2, ShieldCheck, Users, X } from "lucide-react";
+import { EmptyState, StatusPill, TactileButton } from "@/components/rogeros-ui";
+import { composerAction, fallbackAvatarPresetKey, isTeamAvatarPresetKey, teamAvatarPresets, type TeamAvatarPresetKey } from "@/lib/team-ui-logic";
 
-type Runtime = {
-  active: boolean;
-  profileKey: string;
-  assignmentState: string;
-  provisioningState: string;
-  reconciliationState: string;
-  runtimeStatus: string | null;
-  desiredModelId: string | null;
-  desiredModelProvider: string | null;
-  externalRuntimeMetadata: {
-    routines?: Array<{ id: string; name: string; enabled: boolean }>;
-  } | null;
-};
-type Employee = {
-  id: string;
-  roleOverride: string | null;
-  employee: { name: string; role: string; description: string | null };
-  skillAssignments: Array<{ skill: { id: string; name: string } }>;
-  runtimeAssignments: Runtime[];
-  _count: { taskAssignments: number };
-};
-type Profile = {
-  profileId: string;
-  displayName: string;
-  description: string | null;
-  state: string;
-  modelProvider: string | null;
-  modelId: string | null;
-};
-type Message = {
-  id: string;
-  body: string;
-  authorSystemIdentity: string | null;
-};
+type Runtime = { active: boolean; profileKey: string; assignmentState: string; provisioningState: string; reconciliationState: string; runtimeStatus: string | null; desiredModelId: string | null; desiredModelProvider: string | null };
+type Employee = { id: string; roleOverride: string | null; avatarPresetKey: TeamAvatarPresetKey | null; employee: { name: string; role: string; description: string | null }; runtimeAssignments: Runtime[]; _count: { taskAssignments: number } };
+type Profile = { profileId: string; displayName: string; description: string | null; state: string; modelProvider: string | null; modelId: string | null };
+type Message = { id: string; body: string; createdAt: string; authorUserId: string | null; authorSystemIdentity: string | null; author?: { name: string | null } | null };
 type RosterBot = { profile: Profile; employee?: Employee; runtime?: Runtime };
 type Project = { id: string; name: string; slug: string; role: string };
 type DeskClaim = { claimId: string; displayName: string; role: string | null; description: string | null };
-type Desk = { state: "SETUP_REQUIRED" | "ADAPTER_UNAVAILABLE" | "READY_EMPTY" | "ACTIVE_ROSTER" | "NEEDS_ATTENTION"; failureCode: string | null; claimFailureCode?: string | null; claimableProfiles: DeskClaim[]; inventory: Profile[]; allowedActions: { add: boolean; adopt: boolean; retry: boolean }; retained: Array<{ employeeAssignmentId: string; profileKey: string; displayName: string; role: string; description: string | null; taskCount: number; assignmentState: string; provisioningState: string; reconciliationState: string; runtimeStatus: string | null; active: boolean }> };
-const deskStateCopy: Record<Desk["state"], { label: string; detail: string }> = {
-  SETUP_REQUIRED: { label: "Setup required", detail: "No isolated Hermes adapter is configured. Counts show retained RogerOS assignments only; configure a local adapter or use the approved staging workspace." },
-  ADAPTER_UNAVAILABLE: { label: "Adapter unavailable", detail: "Live inventory could not be refreshed. Retained assignments remain visible; restore the protected adapter and retry." },
-  READY_EMPTY: { label: "Ready · empty roster", detail: "The protected adapter is healthy and no profile is bound to this project. Add a governed bot or claim an explicitly available profile." },
-  ACTIVE_ROSTER: { label: "Active roster", detail: "The protected adapter is healthy. Roster evidence comes from signed project bindings and retained RogerOS assignments." },
-  NEEDS_ATTENTION: { label: "Needs attention", detail: "At least one retained assignment needs reconciliation. Review its status and retry after resolving the stated dependency." },
-};
-type Capabilities = {
-  browser: { viewerLease: boolean; takeover: boolean };
-  teach: { observation: boolean };
-  model: {
-    catalog: boolean;
-    approved: Array<{ provider: string; modelId: string }>;
-  };
-  mcp: { managed: boolean };
-  routines: { managed: boolean };
-  runtime: { gatewayRestart: boolean };
-};
-const unavailableCapabilities: Capabilities = {
-  browser: { viewerLease: false, takeover: false },
-  teach: { observation: false },
-  model: { catalog: false, approved: [] },
-  mcp: { managed: false },
-  routines: { managed: false },
-  runtime: { gatewayRestart: false },
-};
-const normalizeCapabilities = (value: unknown): Capabilities => {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return unavailableCapabilities;
-  const record = value as Record<string, unknown>;
-  const section = (key: string) =>
-    record[key] &&
-    typeof record[key] === "object" &&
-    !Array.isArray(record[key])
-      ? (record[key] as Record<string, unknown>)
-      : {};
-  const browser = section("browser");
-  const teach = section("teach");
-  const model = section("model");
-  const mcp = section("mcp");
-  const routines = section("routines");
-  const runtime = section("runtime");
-  return {
-    browser: {
-      viewerLease: browser.viewerLease === true,
-      takeover: browser.takeover === true && browser.viewerLease === true,
-    },
-    teach: { observation: teach.observation === true },
-    model: {
-      catalog: model.catalog === true,
-      approved: Array.isArray(model.approved)
-        ? model.approved.flatMap((item) => {
-            if (!item || typeof item !== "object" || Array.isArray(item))
-              return [];
-            const option = item as Record<string, unknown>;
-            return typeof option.provider === "string" &&
-              typeof option.modelId === "string" &&
-              option.provider.length > 0 &&
-              option.provider.length <= 120 &&
-              option.modelId.length > 0 &&
-              option.modelId.length <= 240
-              ? [{ provider: option.provider, modelId: option.modelId }]
-              : [];
-          })
-        : [],
-    },
-    mcp: { managed: mcp.managed === true },
-    routines: { managed: routines.managed === true },
-    runtime: { gatewayRestart: runtime.gatewayRestart === true },
-  };
-};
+type Desk = { state: "SETUP_REQUIRED" | "ADAPTER_UNAVAILABLE" | "READY_EMPTY" | "ACTIVE_ROSTER" | "NEEDS_ATTENTION"; failureCode: string | null; claimFailureCode?: string | null; claimableProfiles: DeskClaim[]; inventory: Profile[]; allowedActions: { add: boolean; adopt: boolean; retry: boolean }; retained: Array<{ employeeAssignmentId: string; profileKey: string; displayName: string; role: string; avatarPresetKey: TeamAvatarPresetKey | null; description: string | null; taskCount: number; assignmentState: string; provisioningState: string; reconciliationState: string; runtimeStatus: string | null; active: boolean }> };
+type Capabilities = { browser: { viewerLease: boolean; takeover: boolean }; model: { catalog: boolean } };
+
 const managers = new Set(["OWNER", "ADMIN"]);
 const operators = new Set(["OWNER", "ADMIN", "OPERATOR"]);
-const status = (r?: Runtime) =>
-  !r
-    ? "Needs assignment"
-    : r.assignmentState === "SUSPENDED"
-      ? "Paused"
-      : r.provisioningState === "FAILED" || r.reconciliationState === "FAILED"
-        ? "Needs attention"
-        : r.runtimeStatus === "HEALTHY" || r.reconciliationState === "IN_SYNC"
-          ? "Online"
-          : "Connecting";
-const tone = (r?: Runtime): "good" | "warn" | "bad" | "neutral" =>
-  status(r) === "Online"
-    ? "good"
-    : status(r) === "Needs attention"
-      ? "bad"
-      : r
-        ? "warn"
-        : "neutral";
-const mention = (bot: RosterBot) =>
-  `@${bot.profile.displayName.replace(/\s+/g, "")}`;
-const activeMentionQuery = (value: string) => {
-  const match = value.match(/(?:^|\s)@([^\s@]*)$/);
-  return match ? match[1].toLocaleLowerCase() : null;
+const deskCopy: Record<Desk["state"], string> = {
+  SETUP_REQUIRED: "Adapter setup is required. Retained RogerOS assignments remain visible.",
+  ADAPTER_UNAVAILABLE: "Live status is unavailable. Retained RogerOS assignments remain visible.",
+  READY_EMPTY: "The protected adapter is ready. Add a governed employee to begin.",
+  ACTIVE_ROSTER: "Connected through signed project bindings.",
+  NEEDS_ATTENTION: "One or more employees need reconciliation.",
 };
+const unavailableCapabilities: Capabilities = { browser: { viewerLease: false, takeover: false }, model: { catalog: false } };
+
+function runtimeStatus(runtime?: Runtime) {
+  if (!runtime) return "Needs assignment";
+  if (runtime.assignmentState === "SUSPENDED") return "Paused";
+  if (runtime.provisioningState === "FAILED" || runtime.reconciliationState === "FAILED") return "Needs attention";
+  return runtime.runtimeStatus === "HEALTHY" || runtime.reconciliationState === "IN_SYNC" ? "Online" : "Connecting";
+}
+function statusTone(runtime?: Runtime): "good" | "warn" | "bad" | "neutral" {
+  const value = runtimeStatus(runtime);
+  return value === "Online" ? "good" : value === "Needs attention" ? "bad" : runtime ? "warn" : "neutral";
+}
+function roleFor(bot: RosterBot) { return bot.employee?.roleOverride || bot.employee?.employee.role || "Hermes profile"; }
+function avatarKey(bot: RosterBot) { return isTeamAvatarPresetKey(bot.employee?.avatarPresetKey) ? bot.employee.avatarPresetKey : fallbackAvatarPresetKey(bot.profile.profileId); }
+function mention(bot: RosterBot) { return `@${bot.profile.displayName.replace(/\s+/g, "")}`; }
+function activeMentionQuery(value: string) { const match = value.match(/(?:^|\s)@([^\s@]*)$/); return match ? match[1].toLocaleLowerCase() : null; }
+function dayLabel(value: string) { const date = new Date(value); const now = new Date(); return date.toDateString() === now.toDateString() ? "Today" : date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: date.getFullYear() === now.getFullYear() ? undefined : "numeric" }); }
+function timeLabel(value: string) { return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
+
+function AnimalAvatar({ presetKey, name, size = "md" }: { presetKey: TeamAvatarPresetKey; name: string; size?: "sm" | "md" | "lg" }) {
+  const preset = teamAvatarPresets.find((item) => item.key === presetKey)!;
+  const dimensions = size === "sm" ? "h-8 w-8" : size === "lg" ? "h-12 w-12" : "h-10 w-10";
+  const ears = preset.animal === "rabbit" ? <><ellipse cx="29" cy="17" rx="8" ry="15"/><ellipse cx="67" cy="17" rx="8" ry="15"/></> : preset.animal === "owl" ? <><path d="M20 24 29 8l13 18Z"/><path d="m54 26 13-18 9 16Z"/></> : <><path d="M21 30 25 9l20 19Z"/><path d="m51 28 20-19 4 21Z"/></>;
+  return <span className={`${dimensions} shrink-0 overflow-hidden rounded-[32%] border border-black/10 shadow-sm`} role="img" aria-label={`${name}, ${preset.name} avatar`} title={preset.name}>
+    <svg viewBox="0 0 96 96" className="h-full w-full" aria-hidden="true"><rect width="96" height="96" rx="28" fill={preset.background}/><g fill={preset.foreground}>{ears}<ellipse cx="48" cy="53" rx="31" ry="29"/></g><ellipse cx="37" cy="50" rx="4" ry="5" fill="white"/><ellipse cx="59" cy="50" rx="4" ry="5" fill="white"/><circle cx="37" cy="51" r="2" fill="#172033"/><circle cx="59" cy="51" r="2" fill="#172033"/><path d="M43 64c3 4 7 4 10 0" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"/><path d="m45 59 3 3 3-3" fill="#172033"/></svg>
+  </span>;
+}
 
 export function TeamWorkspace({ project }: { project: Project }) {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [message, setMessage] = useState("");
-  const [mentionedIds, setMentionedIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [settings, setSettings] = useState(false);
-  const [addBot, setAddBot] = useState(false);
-  const [adoptProfile, setAdoptProfile] = useState(false);
-  const [capabilities, setCapabilities] = useState<Capabilities>(
-    unavailableCapabilities,
-  );
-  const [error, setError] = useState("");
-  const [desk, setDesk] = useState<Desk | null>(null);
-  const [rosterQuery, setRosterQuery] = useState("");
-  const input = useRef<HTMLTextAreaElement>(null);
-  const canManage = managers.has(project.role);
-  const canOperate = operators.has(project.role);
+  const [employees, setEmployees] = useState<Employee[]>([]), [profiles, setProfiles] = useState<Profile[]>([]), [desk, setDesk] = useState<Desk | null>(null);
+  const [selectedId, setSelectedId] = useState(""), [messages, setMessages] = useState<Message[]>([]), [message, setMessage] = useState(""), [mentionedIds, setMentionedIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true), [chatLoading, setChatLoading] = useState(false), [sending, setSending] = useState(false), [working, setWorking] = useState(false), [error, setError] = useState("");
+  const [query, setQuery] = useState(""), [mobileView, setMobileView] = useState<"roster" | "chat" | "context">("roster"), [contextOpen, setContextOpen] = useState(false), [settingsOpen, setSettingsOpen] = useState(false), [modelShell, setModelShell] = useState(false), [addBot, setAddBot] = useState(false), [adoptProfile, setAdoptProfile] = useState(false);
+  const [capabilities, setCapabilities] = useState<Capabilities>(unavailableCapabilities);
+  const input = useRef<HTMLTextAreaElement>(null), bottom = useRef<HTMLDivElement>(null), submitLock = useRef(false), composing = useRef(false);
+  const canManage = managers.has(project.role), canOperate = operators.has(project.role);
+
   const load = useCallback(async () => {
-    const response = await fetch(`/api/team/desk?projectId=${encodeURIComponent(project.id)}`);
-    if (!response.ok) throw Error("Your project Team desk could not be loaded.");
-    const next = await response.json() as Desk;
-    setDesk(next);
-    setProfiles(next.inventory || []);
-    setEmployees(next.retained.map((row) => ({
-      id: row.employeeAssignmentId, roleOverride: row.role,
-      employee: { name: row.displayName, role: row.role, description: row.description }, skillAssignments: [],
-      runtimeAssignments: [{ active: row.active, profileKey: row.profileKey, assignmentState: row.assignmentState, provisioningState: row.provisioningState, reconciliationState: row.reconciliationState, runtimeStatus: row.runtimeStatus, desiredModelId: null, desiredModelProvider: null, externalRuntimeMetadata: null }],
-      _count: { taskAssignments: row.taskCount },
-    })));
-    if (next.state === "SETUP_REQUIRED") setError("Setup required: no isolated Hermes adapter is configured for this workspace. Roster counts are retained RogerOS assignments, not live runtime inventory.");
-    else if (next.state === "ADAPTER_UNAVAILABLE") setError(`Adapter unavailable (${next.failureCode || "ADAPTER_UNAVAILABLE"}). Retained RogerOS assignments remain visible; restore the protected adapter, then retry.`);
-    else setError("");
+    const response = await fetch(`/api/team/desk?projectId=${encodeURIComponent(project.id)}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Your project Team could not be loaded.");
+    const next = await response.json() as Desk; setDesk(next); setProfiles(next.inventory || []);
+    setEmployees(next.retained.map((row) => ({ id: row.employeeAssignmentId, roleOverride: row.role, avatarPresetKey: row.avatarPresetKey, employee: { name: row.displayName, role: row.role, description: row.description }, runtimeAssignments: [{ active: row.active, profileKey: row.profileKey, assignmentState: row.assignmentState, provisioningState: row.provisioningState, reconciliationState: row.reconciliationState, runtimeStatus: row.runtimeStatus, desiredModelId: null, desiredModelProvider: null }], _count: { taskAssignments: row.taskCount } })));
   }, [project.id]);
   const roster = useMemo<RosterBot[]>(() => {
-    const assigned = new Map(
-      employees.flatMap((employee) =>
-        employee.runtimeAssignments.map(
-          (runtime) => [runtime.profileKey, { employee, runtime }] as const,
-        ),
-      ),
-    );
-    const reported = profiles.map((profile) => ({
-      profile,
-      ...assigned.get(profile.profileId),
-    }));
+    const assigned = new Map(employees.flatMap((employee) => employee.runtimeAssignments.map((runtime) => [runtime.profileKey, { employee, runtime }] as const)));
+    const reported = profiles.map((profile) => ({ profile, ...assigned.get(profile.profileId) }));
     const known = new Set(reported.map((bot) => bot.profile.profileId));
-    const retained = employees
-      .flatMap((employee) =>
-        employee.runtimeAssignments.map((runtime) => ({
-          profile: {
-            profileId: runtime.profileKey,
-            displayName: employee.employee.name,
-            description: employee.employee.description,
-            state: runtime.assignmentState,
-            modelProvider: runtime.desiredModelProvider,
-            modelId: runtime.desiredModelId,
-          },
-          employee,
-          runtime,
-        })),
-      )
-      .filter((bot) => !known.has(bot.profile.profileId));
-    return [...reported, ...retained].sort((a, b) =>
-      a.profile.displayName.localeCompare(b.profile.displayName),
-    );
+    const retained = employees.flatMap((employee) => employee.runtimeAssignments.map((runtime) => ({ profile: { profileId: runtime.profileKey, displayName: employee.employee.name, description: employee.employee.description, state: runtime.assignmentState, modelProvider: runtime.desiredModelProvider, modelId: runtime.desiredModelId }, employee, runtime }))).filter((bot) => !known.has(bot.profile.profileId));
+    return [...reported, ...retained].sort((a, b) => a.profile.displayName.localeCompare(b.profile.displayName));
   }, [employees, profiles]);
-  const selected =
-    roster.find((bot) => bot.profile.profileId === selectedId) || roster[0];
-  const filteredRoster = roster.filter((bot) => `${bot.profile.displayName} ${bot.employee?.roleOverride || bot.employee?.employee.role || ""}`.toLocaleLowerCase().includes(rosterQuery.trim().toLocaleLowerCase()));
+  const selected = roster.find((bot) => bot.profile.profileId === selectedId) || roster[0];
   const selectedEmployeeId = selected?.employee?.id;
-  const mentionableBots = useMemo(
-    () =>
-      roster.filter(
-        (bot) =>
-          bot.employee &&
-          bot.employee.id !== selectedEmployeeId &&
-          bot.runtime?.active,
-      ),
-    [roster, selectedEmployeeId],
-  );
+  const filteredRoster = roster.filter((bot) => `${bot.profile.displayName} ${roleFor(bot)}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+  const mentionableBots = roster.filter((bot) => bot.employee && bot.employee.id !== selectedEmployeeId && bot.runtime?.active);
   const mentionQuery = activeMentionQuery(message);
-  const matchingMentionBots =
-    mentionQuery === null
-      ? []
-      : mentionableBots.filter((bot) =>
-          `${mention(bot).slice(1)} ${bot.profile.displayName}`
-            .toLocaleLowerCase()
-            .includes(mentionQuery),
-        );
-  const loadChat = useCallback(
-    async (id: string) => {
-      const r = await fetch(
-        `/api/runtime/bots/chat?projectId=${encodeURIComponent(project.id)}&employeeProjectAssignmentId=${encodeURIComponent(id)}`,
-      );
-      setMessages(r.ok ? (await r.json()).messages : []);
-    },
-    [project.id],
-  );
-  useEffect(() => {
-    void load()
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : "Roster unavailable."),
-      )
-      .finally(() => setLoading(false));
-  }, [load]);
-  useEffect(() => {
-    if (selectedEmployeeId) void loadChat(selectedEmployeeId);
-    else setMessages([]);
-    setMentionedIds([]);
-  }, [selectedEmployeeId, loadChat]);
-  useEffect(() => {
-    if (!selectedEmployeeId) {
-      setCapabilities(unavailableCapabilities);
-      return;
-    }
-    const controller = new AbortController();
-    void fetch(
-      `/api/runtime/bots/capabilities?projectId=${encodeURIComponent(project.id)}&employeeProjectAssignmentId=${encodeURIComponent(selectedEmployeeId)}`,
-      { signal: controller.signal },
-    )
-      .then(async (response) =>
-        response.ok
-          ? response.json().then(normalizeCapabilities)
-          : unavailableCapabilities,
-      )
-      .then((value) => {
-        if (!controller.signal.aborted) setCapabilities(value);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted)
-          setCapabilities(unavailableCapabilities);
-      });
-    return () => controller.abort();
-  }, [project.id, selectedEmployeeId]);
-  useEffect(() => {
-    const refresh = () => void load().catch(() => undefined);
-    window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
-  }, [load]);
-  const tag = (bot: RosterBot) => {
-    if (
-      !bot.employee ||
-      !selected?.employee ||
-      bot.employee.id === selected.employee.id
-    )
-      return;
-    setMentionedIds((old) =>
-      old.includes(bot.employee!.id) ? old : [...old, bot.employee!.id],
-    );
-    setMessage((old) => {
-      if (old.includes(mention(bot))) return old;
-      const typedAt = old.match(/(?:^|\s)@[^\s@]*$/);
-      if (typedAt) {
-        const prefix = old.slice(0, old.length - typedAt[0].length);
-        return `${prefix}${typedAt[0].startsWith(" ") ? " " : ""}${mention(bot)} `;
-      }
-      return `${old}${old && !old.endsWith(" ") ? " " : ""}${mention(bot)} `;
-    });
-    requestAnimationFrame(() => input.current?.focus());
-  };
-  const send = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!selected?.employee || !selected.runtime?.active || !message.trim())
-      return;
-    setSending(true);
-    setError("");
+  const matchingMentions = mentionQuery === null ? [] : mentionableBots.filter((bot) => `${mention(bot)} ${bot.profile.displayName}`.toLocaleLowerCase().includes(mentionQuery));
+
+  const loadChat = useCallback(async (id: string) => { setChatLoading(true); try { const response = await fetch(`/api/runtime/bots/chat?projectId=${encodeURIComponent(project.id)}&employeeProjectAssignmentId=${encodeURIComponent(id)}`, { cache: "no-store" }); if (!response.ok) throw new Error("Conversation history is unavailable."); setMessages(((await response.json()) as { messages: Message[] }).messages); } catch (cause) { setError(cause instanceof Error ? cause.message : "Conversation history is unavailable."); } finally { setChatLoading(false); } }, [project.id]);
+  useEffect(() => { void load().catch((cause) => setError(cause instanceof Error ? cause.message : "Team unavailable.")).finally(() => setLoading(false)); }, [load]);
+  useEffect(() => { if (selectedEmployeeId) void loadChat(selectedEmployeeId); else setMessages([]); setMentionedIds([]); }, [selectedEmployeeId, loadChat]);
+  useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages, working]);
+  useEffect(() => { if (!selectedEmployeeId) { setCapabilities(unavailableCapabilities); return; } const controller = new AbortController(); void fetch(`/api/runtime/bots/capabilities?projectId=${encodeURIComponent(project.id)}&employeeProjectAssignmentId=${encodeURIComponent(selectedEmployeeId)}`, { signal: controller.signal }).then((response) => response.ok ? response.json() : null).then((value) => { if (!controller.signal.aborted) setCapabilities({ browser: { viewerLease: value?.browser?.viewerLease === true, takeover: value?.browser?.viewerLease === true && value?.browser?.takeover === true }, model: { catalog: value?.model?.catalog === true } }); }).catch(() => setCapabilities(unavailableCapabilities)); return () => controller.abort(); }, [project.id, selectedEmployeeId]);
+
+  const selectBot = (bot: RosterBot) => { setSelectedId(bot.profile.profileId); setMobileView("chat"); setSettingsOpen(false); };
+  const tag = (bot: RosterBot) => { if (!bot.employee) return; setMentionedIds((old) => old.includes(bot.employee!.id) ? old : [...old, bot.employee!.id]); setMessage((old) => { const typed = old.match(/(?:^|\s)@[^\s@]*$/); if (typed) return `${old.slice(0, old.length - typed[0].length)}${typed[0].startsWith(" ") ? " " : ""}${mention(bot)} `; return `${old}${old && !old.endsWith(" ") ? " " : ""}${mention(bot)} `; }); requestAnimationFrame(() => input.current?.focus()); };
+  const openModelShell = () => { setMessage(""); setModelShell(true); };
+  const send = async () => {
+    if (submitLock.current || sending || !selected?.employee || !selected.runtime?.active || !message.trim()) return;
+    if (message.trim().toLocaleLowerCase() === "/model") return openModelShell();
+    submitLock.current = true; setSending(true); setWorking(true); setError("");
+    const sentMessage = message; const sentMentions = mentionedIds;
     try {
-      const r = await fetch("/api/runtime/bots/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: project.id,
-          employeeProjectAssignmentId: selected.employee.id,
-          message,
-          mentionedEmployeeProjectAssignmentIds: mentionedIds,
-        }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok)
-        throw Error(data.error || "Hermes could not complete this message.");
-      setMessage("");
-      setMentionedIds([]);
-      await Promise.all([loadChat(selected.employee.id), load()]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Message failed.");
-    } finally {
-      setSending(false);
-    }
+      const response = await fetch("/api/runtime/bots/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: project.id, employeeProjectAssignmentId: selected.employee.id, message: sentMessage, mentionedEmployeeProjectAssignmentIds: sentMentions }) });
+      const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || "Hermes could not complete this message.");
+      setMessage(""); setMentionedIds([]); await Promise.all([loadChat(selected.employee.id), load()]);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Message failed."); } finally { submitLock.current = false; setSending(false); setWorking(false); }
   };
-  const lifecycle = async (
-    action: "suspend" | "resume" | "reconcile" | "retire",
-  ) => {
-    if (!selected?.employee) return;
-    if (
-      action === "retire" &&
-      !window.confirm(
-        `Remove ${selected.profile.displayName}? This permanently removes its non-default Hermes profile and retires the matching RogerOS employee. Existing tasks, messages, executions, and audit history are preserved.`,
-      )
-    )
-      return;
-    const endpoint =
-      action === "retire"
-        ? "/api/runtime/bots/retire"
-        : action === "reconcile"
-          ? "/api/runtime/bots/reconcile"
-          : "/api/runtime/bots/state";
-    const body =
-      action === "retire"
-        ? {
-            projectId: project.id,
-            employeeProjectAssignmentId: selected.employee.id,
-          }
-        : action === "reconcile"
-          ? {
-              projectId: project.id,
-              employeeProjectAssignmentId: selected.employee.id,
-            }
-          : {
-              projectId: project.id,
-              employeeProjectAssignmentId: selected.employee.id,
-              action,
-            };
-    const r = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok)
-      setError((await r.json().catch(() => ({}))).error || "Action failed.");
-    else {
-      setSettings(false);
-      await load();
-    }
-  };
-  const setModel = async (model: { provider: string; modelId: string }) => {
-    if (!selected?.employee) return;
-    setError("");
-    const response = await fetch("/api/runtime/bots/model", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        projectId: project.id,
-        employeeProjectAssignmentId: selected.employee.id,
-        provider: model.provider,
-        modelId: model.modelId,
-      }),
-    });
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.error || "Model could not be changed.");
-    }
-    await load();
-  };
-  return (
-    <div className="hq-rise">
-      <PageHeader
-        eyebrow={`${project.name} · Hermes control desk`}
-        title="Your AI team"
-        description="A focused single-workspace experience. RogerOS still carries the hidden project boundary for every bot, tool, browser session, schedule, approval, and audit event."
-        action={
-          <div className="flex gap-2">
-            <TactileButton
-              variant="secondary"
-              onClick={() => void load()}
-              className="inline-flex items-center gap-2 px-3 text-xs"
-            >
-              <RefreshCw className="w-3.5" />
-              Refresh
-            </TactileButton>
-            {canManage && (
-              <>
-                <TactileButton
-                  variant="secondary"
-                  onClick={() => setAdoptProfile(true)}
-                  disabled={!desk?.allowedActions.adopt}
-                  title={!desk?.allowedActions.adopt ? "Profile claims require a healthy, configured protected adapter." : undefined}
-                  className="inline-flex items-center gap-2 px-3 text-xs"
-                >
-                  <Bot className="w-3.5" />
-                  Claim profile
-                </TactileButton>
-                <TactileButton
-                  onClick={() => setAddBot(true)}
-                  disabled={!desk?.allowedActions.add}
-                  title={!desk?.allowedActions.add ? "Adding a bot requires a healthy, configured protected adapter." : undefined}
-                  className="inline-flex items-center gap-2 px-3 text-xs"
-                >
-                  <Plus className="w-3.5" />
-                  Add bot
-                </TactileButton>
-              </>
-            )}
-          </div>
-        }
-      />
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Metric
-          label="Hermes bots"
-          value={roster.length}
-          hint={desk?.state === "SETUP_REQUIRED" ? "Retained assignments; adapter setup required" : "Bound to this workspace"}
-        />
-        <Metric
-          label="Online now"
-          value={
-            roster.filter((bot) => status(bot.runtime) === "Online").length
-          }
-          hint="Observed runtime assignments"
-          tone="good"
-        />
-        <Metric
-          label="Open work"
-          value={employees.reduce(
-            (sum, e) => sum + e._count.taskAssignments,
-            0,
-          )}
-          hint="Assigned through RogerOS"
-        />
-      </div>
-      {desk && (
-        <div role="status" aria-live="polite" className="mt-4 rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-4 py-3 text-xs">
-          <strong>{deskStateCopy[desk.state].label}</strong>
-          <span className="ml-2 text-[var(--gp-muted)]">{deskStateCopy[desk.state].detail}</span>
-          {desk.failureCode && <span className="ml-2 font-mono text-[10px] text-[var(--gp-faint)]">{desk.failureCode}</span>}
-          {desk.claimFailureCode && <span className="ml-2 text-[10px] text-[var(--gp-faint)]">Existing-profile claims are temporarily unavailable; the signed roster remains connected.</span>}
-        </div>
+  const onComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { const action = composerAction({ key: event.key, shiftKey: event.shiftKey, isComposing: composing.current || event.nativeEvent.isComposing, sending: submitLock.current || sending, value: message }); if (action === "newline") return; event.preventDefault(); if (action === "model") openModelShell(); else void send(); };
+  const lifecycle = async (action: "suspend" | "resume" | "reconcile" | "retire") => { if (!selected?.employee) return; if (action === "retire" && !window.confirm(`Remove ${selected.profile.displayName}? Existing work and audit history will remain.`)) return; const endpoint = action === "retire" ? "/api/runtime/bots/retire" : action === "reconcile" ? "/api/runtime/bots/reconcile" : "/api/runtime/bots/state"; const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: project.id, employeeProjectAssignmentId: selected.employee.id, ...(action === "suspend" || action === "resume" ? { action } : {}) }) }); if (!response.ok) setError((await response.json().catch(() => ({}))).error || "Action failed."); else { setSettingsOpen(false); await load(); } };
+  const saveAvatar = async (key: TeamAvatarPresetKey) => { if (!selected?.employee) return; const response = await fetch("/api/team/avatar", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: project.id, employeeProjectAssignmentId: selected.employee.id, avatarPresetKey: key }) }); if (!response.ok) setError((await response.json().catch(() => ({}))).error || "Avatar could not be saved."); else await load(); };
+
+  return <div className="hq-rise -mx-3 sm:mx-0">
+    <header className="mb-4 flex flex-wrap items-end justify-between gap-3 px-3 sm:px-0">
+      <div><p className="eyebrow">{project.name} · Team</p><h1 className="mt-1 font-display text-2xl font-extrabold tracking-tight sm:text-3xl">Your AI workplace</h1><p className="mt-1 text-xs text-[var(--gp-muted)]">Distinct employees, one project-bound conversation space.</p></div>
+      <div className="flex gap-2"><TactileButton variant="secondary" onClick={() => void load()} className="px-3 text-xs"><RefreshCw className="h-3.5 w-3.5"/> Refresh</TactileButton>{canManage && <TactileButton onClick={() => setAddBot(true)} disabled={!desk?.allowedActions.add} className="px-3 text-xs"><Plus className="h-3.5 w-3.5"/> Add bot</TactileButton>}</div>
+    </header>
+    {(desk || error) && <div className={`mx-3 mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] sm:mx-0 ${error ? "border-red-500/30 bg-red-500/10 text-[var(--gp-danger)]" : "border-[var(--gp-line)] bg-[var(--gp-surface)] text-[var(--gp-muted)]"}`} role={error ? "alert" : "status"}><ShieldCheck className="h-3.5 w-3.5 shrink-0"/><span>{error || (desk && deskCopy[desk.state])}</span></div>}
+    <main className={`grid h-[calc(100dvh-220px)] min-h-[560px] overflow-hidden border-y border-[var(--gp-line)] bg-[var(--gp-surface)] sm:rounded-[22px] sm:border ${contextOpen ? "lg:grid-cols-[280px_minmax(0,1fr)_360px]" : "lg:grid-cols-[280px_minmax(0,1fr)]"}`}>
+      <aside className={`${mobileView === "roster" ? "flex" : "hidden"} min-h-0 flex-col border-[var(--gp-line)] lg:flex lg:border-r`}>
+        <div className="border-b border-[var(--gp-line)] p-3"><div className="mb-3 flex items-center justify-between"><div><p className="text-xs font-semibold">Team</p><p className="mt-0.5 text-[10px] text-[var(--gp-faint)]">{roster.filter((bot) => runtimeStatus(bot.runtime) === "Online").length}/{roster.length} online</p></div><Users className="h-4 w-4 text-[var(--gp-faint)]"/></div><label className="relative block"><Search className="absolute left-3 top-3.5 h-3.5 w-3.5 text-[var(--gp-faint)]"/><span className="sr-only">Search employees</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search employees" className="min-h-11 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-canvas)] pl-9 pr-3 text-xs outline-none focus:border-[var(--gp-accent)]"/></label></div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">{loading ? <div className="space-y-2"><div className="sk h-16"/><div className="sk h-16"/><div className="sk h-16"/></div> : filteredRoster.length ? filteredRoster.map((bot) => <button key={bot.profile.profileId} onClick={() => selectBot(bot)} className={`mb-1 flex min-h-[64px] w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-[transform,background-color,border-color] duration-200 ease-[cubic-bezier(.16,1,.3,1)] active:scale-[.975] ${selected?.profile.profileId === bot.profile.profileId ? "border-[var(--gp-accent)] bg-[var(--gp-accent-soft)]" : "border-transparent hover:bg-[var(--gp-accent-soft)]"}`}><AnimalAvatar presetKey={avatarKey(bot)} name={bot.profile.displayName}/><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className="text-xs">{bot.profile.displayName}</strong><span className={`h-2 w-2 rounded-full ${runtimeStatus(bot.runtime) === "Online" ? "bg-emerald-500" : "bg-amber-500"}`} aria-label={runtimeStatus(bot.runtime)}/></span><span className="mt-1 block text-[10px] text-[var(--gp-muted)]">{roleFor(bot)}</span></span><ChevronRight className="h-3.5 w-3.5 text-[var(--gp-faint)] lg:hidden"/></button>) : <EmptyState icon={<Bot/>} title="No employees found" description="Try another name or role."/>}</div>
+        {canManage && <div className="border-t border-[var(--gp-line)] p-3"><button onClick={() => setAdoptProfile(true)} disabled={!desk?.allowedActions.adopt} className="min-h-11 w-full rounded-xl border border-[var(--gp-line)] text-xs font-medium transition active:scale-[.975] disabled:opacity-40"><Plus className="mr-2 inline h-3.5 w-3.5"/>Claim existing profile</button></div>}
+      </aside>
+      <section className={`${mobileView === "chat" ? "flex" : "hidden"} min-h-0 min-w-0 flex-col lg:flex`}>
+        {selected ? <><header className="flex min-h-[72px] items-center gap-3 border-b border-[var(--gp-line)] px-3 sm:px-5"><button onClick={() => setMobileView("roster")} className="grid min-h-11 min-w-11 place-items-center rounded-xl lg:hidden" aria-label="Back to Team"><ArrowLeft className="h-4 w-4"/></button><AnimalAvatar presetKey={avatarKey(selected)} name={selected.profile.displayName} size="lg"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="font-display text-sm font-bold sm:text-base">{selected.profile.displayName}</h2><StatusPill tone={statusTone(selected.runtime)}>{runtimeStatus(selected.runtime)}</StatusPill></div><p className="mt-1 text-[10px] text-[var(--gp-muted)]">{roleFor(selected)} · Project-bound</p></div><button onClick={() => setSettingsOpen(true)} className="grid min-h-11 min-w-11 place-items-center rounded-xl border border-[var(--gp-line)] transition active:scale-[.975]" aria-label="Employee settings"><Settings2 className="h-4 w-4"/></button><button onClick={() => { setContextOpen(true); setMobileView("context"); }} className={`grid min-h-11 min-w-11 place-items-center rounded-xl border transition active:scale-[.975] ${contextOpen ? "border-[var(--gp-accent)] bg-[var(--gp-accent-soft)]" : "border-[var(--gp-line)]"}`} aria-label="Open context panel"><PanelRight className="h-4 w-4"/></button></header>
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[color-mix(in_srgb,var(--gp-canvas)_72%,var(--gp-surface))] px-3 py-5 sm:px-6">{chatLoading ? <div className="space-y-4"><div className="sk h-16 w-2/3"/><div className="sk ml-auto h-14 w-1/2"/></div> : messages.length ? messages.map((item, index) => { const employeeMessage = Boolean(item.authorSystemIdentity); const previous = messages[index - 1]; const showDay = !previous || dayLabel(previous.createdAt) !== dayLabel(item.createdAt); return <div key={item.id}>{showDay && <div className="my-5 flex items-center gap-3"><span className="h-px flex-1 bg-[var(--gp-line)]"/><span className="text-[10px] font-medium text-[var(--gp-faint)]">{dayLabel(item.createdAt)}</span><span className="h-px flex-1 bg-[var(--gp-line)]"/></div>}<article className={`mb-4 flex items-end gap-2.5 ${employeeMessage ? "" : "flex-row-reverse"}`}><AnimalAvatar presetKey={employeeMessage ? avatarKey(selected) : fallbackAvatarPresetKey("human")} name={employeeMessage ? selected.profile.displayName : (item.author?.name || "You")} size="sm"/><div className={`max-w-[82%] sm:max-w-[72%] ${employeeMessage ? "" : "text-right"}`}><div className={`rounded-2xl px-3.5 py-2.5 text-left text-[13px] leading-5 shadow-sm ${employeeMessage ? "rounded-bl-md border border-[var(--gp-line)] bg-[var(--gp-surface)]" : "rounded-br-md bg-[var(--gp-accent)] text-white"}`}><p className="whitespace-pre-wrap break-words">{item.body}</p></div><p className="mt-1 px-1 text-[9px] text-[var(--gp-faint)]">{employeeMessage ? selected.profile.displayName : "You"} · {timeLabel(item.createdAt)} {employeeMessage ? "" : "· Delivered"}</p></div></article></div>; }) : <div className="grid h-full place-items-center"><EmptyState icon={<Bot/>} title={`Start with ${selected.profile.displayName}`} description="Ask a question, assign work, or use @ to invite another employee."/></div>}{working && <div className="flex items-center gap-2 text-[11px] text-[var(--gp-muted)]"><AnimalAvatar presetKey={avatarKey(selected)} name={selected.profile.displayName} size="sm"/><span className="rounded-2xl rounded-bl-md border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3 py-2"><span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--gp-accent)]"/> {selected.profile.displayName} is working…</span></div>}<div ref={bottom}/></div>
+          {selected.employee && <form onSubmit={(event: FormEvent) => { event.preventDefault(); void send(); }} className="border-t border-[var(--gp-line)] bg-[var(--gp-surface)] p-3 sm:p-4"><div className="relative rounded-2xl border border-[var(--gp-line)] bg-[var(--gp-canvas)] p-2 focus-within:border-[var(--gp-accent)]"><textarea ref={input} value={message} disabled={!canOperate || !selected.runtime?.active} onChange={(event) => setMessage(event.target.value)} onKeyDown={onComposerKeyDown} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} placeholder={`Message ${selected.profile.displayName}…`} aria-label={`Message ${selected.profile.displayName}`} rows={1} className="max-h-40 min-h-12 w-full resize-none bg-transparent px-2 py-2 text-[13px] outline-none placeholder:text-[var(--gp-faint)]"/>{mentionQuery !== null && <div className="absolute bottom-[70px] left-2 z-10 w-[min(320px,calc(100vw-2rem))] rounded-xl border border-[var(--gp-line)] bg-[var(--gp-raised)] p-1.5 shadow-xl">{matchingMentions.length ? matchingMentions.map((bot) => <button type="button" key={bot.profile.profileId} onClick={() => tag(bot)} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-xs hover:bg-[var(--gp-accent-soft)]"><AnimalAvatar presetKey={avatarKey(bot)} name={bot.profile.displayName} size="sm"/><span>{mention(bot)}</span></button>) : <p className="p-2 text-[10px] text-[var(--gp-muted)]">No matching active employee.</p>}</div>}<div className="flex items-center justify-between"><div className="flex"><button type="button" onClick={() => setMessage((value) => `${value}${value && !value.endsWith(" ") ? " " : ""}@`)} className="grid min-h-11 min-w-11 place-items-center rounded-xl text-[var(--gp-muted)] transition hover:bg-[var(--gp-accent-soft)] active:scale-[.975]" aria-label="Mention an employee"><AtSign className="h-4 w-4"/></button><button type="button" onClick={openModelShell} className="grid min-h-11 min-w-11 place-items-center rounded-xl text-[var(--gp-muted)] transition hover:bg-[var(--gp-accent-soft)] active:scale-[.975]" aria-label="Open model command"><Command className="h-4 w-4"/></button></div><div className="flex items-center gap-2"><span className="hidden text-[9px] text-[var(--gp-faint)] sm:inline">Enter to send · Shift+Enter for newline</span><button type="submit" disabled={!canOperate || sending || !message.trim() || !selected.runtime?.active} className="grid min-h-11 min-w-11 place-items-center rounded-xl bg-[var(--gp-accent)] text-white transition active:scale-[.975] disabled:opacity-40" aria-label={sending ? "Sending message" : "Send message"}><Send className="h-4 w-4"/></button></div></div></div></form>}
+        </> : <EmptyState icon={<Bot/>} title="Choose an employee" description="Select someone from your Team roster."/>}
+      </section>
+      {contextOpen && (
+        <ContextPanel bot={selected} capabilities={capabilities} mobileView={mobileView} close={() => { setContextOpen(false); setMobileView("chat"); }}/>
       )}
-      {error && (
-        <div
-          role="alert"
-          className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-[var(--gp-danger)]"
-        >
-          {error}
-        </div>
-      )}
-      <div className="mt-6 grid min-h-[700px] overflow-hidden rounded-[20px] border border-[var(--gp-line)] bg-[var(--gp-surface)] xl:grid-cols-[290px_minmax(0,1fr)_minmax(340px,.76fr)]">
-        <aside className="border-b border-[var(--gp-line)] p-3 xl:border-b-0 xl:border-r">
-          <div className="mb-3 flex items-center justify-between px-2">
-            <p className="eyebrow">Active roster</p>
-            <Users className="w-4 text-[var(--gp-faint)]" />
-          </div>
-          <label className="mb-3 block">
-            <span className="sr-only">Search Team roster</span>
-            <input value={rosterQuery} onChange={(event) => setRosterQuery(event.target.value)} placeholder="Search bots and roles" className="min-h-11 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3 text-xs outline-none focus:border-[var(--gp-accent)]" />
-          </label>
-          {loading ? (
-            <div className="space-y-2">
-              <div className="sk h-16" />
-              <div className="sk h-16" />
-            </div>
-          ) : roster.length && filteredRoster.length ? (
-            filteredRoster.map((bot, index) => (
-              <button
-                key={bot.profile.profileId}
-                onClick={() => {
-                  setSelectedId(bot.profile.profileId);
-                  setSettings(false);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-                  event.preventDefault();
-                  const next = (index + (event.key === "ArrowDown" ? 1 : -1) + filteredRoster.length) % filteredRoster.length;
-                  setSelectedId(filteredRoster[next].profile.profileId);
-                  (event.currentTarget.parentElement?.querySelectorAll("button")[next] as HTMLButtonElement | undefined)?.focus();
-                }}
-                className={`mb-1.5 w-full rounded-xl border p-3 text-left transition active:scale-[.975] ${selected?.profile.profileId === bot.profile.profileId ? "border-[var(--gp-accent)] bg-[var(--gp-accent-soft)]" : "border-transparent hover:border-[var(--gp-line)] hover:bg-[var(--gp-accent-soft)]"}`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Avatar name={bot.profile.displayName} />
-                  <span className="min-w-0 flex-1">
-                    <strong className="block text-[12px]">
-                      {bot.profile.displayName}
-                    </strong>
-                    <span className="block text-[10px] text-[var(--gp-muted)]">
-                      {bot.employee?.roleOverride ||
-                        bot.employee?.employee.role ||
-                        "Hermes profile"}
-                    </span>
-                  </span>
-                </div>
-                <span className="mt-2 flex items-center gap-1 text-[9px] text-[var(--gp-faint)]">
-                  <CircleDot className="h-2.5 w-2.5" />
-                  {status(bot.runtime)}
-                  {bot.employee
-                    ? ` · ${bot.employee._count.taskAssignments} assigned`
-                    : " · Needs import"}
-                </span>
-              </button>
-            ))
-          ) : roster.length ? (
-            <EmptyState icon={<Bot />} title="No roster matches" description="Try a different bot name or role." />
-          ) : (
-            <EmptyState
-              icon={<Bot />}
-              title="No bots yet"
-              description={desk ? deskStateCopy[desk.state].detail : "Loading the server-authorized Team desk."}
-              action={
-                canManage && desk?.allowedActions.add ? (
-                  <TactileButton
-                    onClick={() => setAddBot(true)}
-                    className="px-3 text-xs"
-                  >
-                    Add bot
-                  </TactileButton>
-                ) : undefined
-              }
-            />
-          )}
-        </aside>
-        <section className="flex min-w-0 flex-col border-b border-[var(--gp-line)] xl:border-b-0 xl:border-r">
-          {selected ? (
-            <>
-              <header className="flex items-center gap-3 border-b border-[var(--gp-line)] px-5 py-4">
-                <Avatar name={selected.profile.displayName} size="lg" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-base font-semibold">
-                      {selected.profile.displayName}
-                    </h2>
-                    <StatusPill tone={tone(selected.runtime)}>
-                      {status(selected.runtime)}
-                    </StatusPill>
-                  </div>
-                  <p className="mt-1 break-all text-[10px] text-[var(--gp-faint)]">
-                    Signed RogerOS assignment · project-bound
-                  </p>
-                </div>
-                <button
-                  onClick={() => setSettings(true)}
-                  aria-label="Open profile settings"
-                  className="rogeros-tactile-button grid min-h-11 min-w-11 place-items-center rounded-xl border border-[var(--gp-line)]"
-                >
-                  <Settings2 className="h-4 w-4" />
-                </button>
-              </header>
-              <div className="flex-1 space-y-4 overflow-y-auto p-5">
-                {selected.employee ? (
-                  messages.length ? (
-                    messages.map((item) => (
-                      <article
-                        key={item.id}
-                        className={`flex gap-2.5 ${item.authorSystemIdentity ? "" : "flex-row-reverse"}`}
-                      >
-                        <Avatar
-                          name={
-                            item.authorSystemIdentity
-                              ? selected.profile.displayName
-                              : "You"
-                          }
-                          size="sm"
-                        />
-                        <div
-                          className={`max-w-[82%] rounded-2xl px-3 py-2.5 text-[12px] leading-5 ${item.authorSystemIdentity ? "bg-[var(--gp-accent-soft)]" : "bg-[var(--gp-accent)] text-white"}`}
-                        >
-                          {item.body}
-                        </div>
-                      </article>
-                    ))
-                  ) : (
-                    <EmptyState
-                      icon={<MessageCircle />}
-                      title={`Talk to ${selected.profile.displayName}`}
-                      description="Use @ to invite another active project bot into this controlled coordination turn."
-                    />
-                  )
-                ) : (
-                  <EmptyState
-                    icon={<ShieldCheck />}
-                    title="Profile needs a RogerOS assignment"
-                    description="Chat, tools, browser access, schedules, and teach mode remain disabled until an Owner or Admin imports this profile."
-                    action={
-                      canManage ? (
-                        <TactileButton
-                          className="px-3 text-xs"
-                          onClick={() => setAdoptProfile(true)}
-                        >
-                          Claim a profile
-                        </TactileButton>
-                      ) : undefined
-                    }
-                  />
-                )}
-              </div>
-              {selected.employee && (
-                <form
-                  onSubmit={send}
-                  className="border-t border-[var(--gp-line)] p-4"
-                >
-                  <div className="mb-2 flex flex-wrap gap-1.5">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--gp-line)] px-2 py-1 text-[10px] text-[var(--gp-muted)]">
-                      <AtSign className="h-3 w-3" />
-                      Invite bots
-                    </span>
-                    {mentionableBots.map((bot) => (
-                        <button
-                          key={bot.profile.profileId}
-                          type="button"
-                          onClick={() => tag(bot)}
-                          className={`rounded-full border px-2 py-1 text-[10px] ${mentionedIds.includes(bot.employee!.id) ? "border-[var(--gp-accent)] bg-[var(--gp-accent-soft)] text-[var(--gp-accent)]" : "border-[var(--gp-line)] text-[var(--gp-muted)]"}`}
-                        >
-                          {mention(bot)}
-                        </button>
-                      ))}
-                  </div>
-                  <textarea
-                    ref={input}
-                    aria-label={`Message ${selected.profile.displayName}`}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder={`Give ${selected.profile.displayName} a task, or type @ to involve another bot…`}
-                    className="min-h-20 w-full resize-none rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] p-3 text-[12px]"
-                  />
-                  {mentionQuery !== null && (
-                    <div
-                      aria-label="Bot mention suggestions"
-                      className="mt-2 rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] p-2"
-                    >
-                      {matchingMentionBots.length ? (
-                        matchingMentionBots.map((bot) => (
-                          <button
-                            key={`mention-${bot.profile.profileId}`}
-                            type="button"
-                            onClick={() => tag(bot)}
-                            className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs hover:bg-[var(--gp-accent-soft)]"
-                          >
-                            <span>{mention(bot)}</span>
-                            <span className="text-[10px] text-[var(--gp-muted)]">
-                              {bot.profile.displayName}
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="px-2 py-1 text-[10px] text-[var(--gp-muted)]">
-                          No other active project bot matches this mention.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-[9px] text-[var(--gp-faint)]">
-                      {mentionedIds.length
-                        ? `${mentionedIds.length} bot${mentionedIds.length === 1 ? "" : "s"} will provide a bounded brief`
-                        : "Hermes-routed · retained in RogerOS"}
-                    </span>
-                    <TactileButton
-                      disabled={
-                        !canOperate ||
-                        sending ||
-                        !message.trim() ||
-                        !selected.runtime?.active
-                      }
-                      type="submit"
-                      className="inline-flex items-center gap-2 px-3 text-[11px]"
-                    >
-                      <Send className="w-3" />
-                      {sending ? "Working…" : "Send"}
-                    </TactileButton>
-                  </div>
-                </form>
-              )}
-            </>
-          ) : (
-            <EmptyState
-              icon={<Bot />}
-              title="Choose a Hermes bot"
-              description="Select a bot to open its chat and browser workspace."
-            />
-          )}
-        </section>
-        <BrowserEnvironment bot={selected} capabilities={capabilities} />
-      </div>
-      {settings && selected && (
-        <Settings
-          bot={selected}
-          canManage={canManage}
-          capabilities={capabilities}
-          close={() => setSettings(false)}
-          lifecycle={lifecycle}
-          setModel={setModel}
-        />
-      )}{" "}
-      {addBot && (
-        <AddBot
-          project={project}
-          close={() => setAddBot(false)}
-          done={async () => {
-            setAddBot(false);
-            await load();
-          }}
-        />
-      )}
-      {adoptProfile && (
-        <AdoptProfile
-          project={project}
-          claims={desk?.claimableProfiles || []}
-          close={() => setAdoptProfile(false)}
-          done={async () => {
-            setAdoptProfile(false);
-            await load();
-          }}
-        />
-      )}
-    </div>
-  );
+    </main>
+    {settingsOpen && selected && (
+      <EmployeeSettings bot={selected} canManage={canManage} close={() => setSettingsOpen(false)} saveAvatar={saveAvatar} lifecycle={lifecycle} openModel={() => { setSettingsOpen(false); setModelShell(true); }}/>
+    )}
+    {modelShell && (
+      <ModelShell bot={selected} catalogAvailable={capabilities.model.catalog} close={() => setModelShell(false)}/>
+    )}
+    {addBot && (
+      <BotForm mode="add" project={project} claims={[]} close={() => setAddBot(false)} done={async () => { setAddBot(false); await load(); }}/>
+    )}
+    {adoptProfile && (
+      <BotForm mode="claim" project={project} claims={desk?.claimableProfiles || []} close={() => setAdoptProfile(false)} done={async () => { setAdoptProfile(false); await load(); }}/>
+    )}
+  </div>;
 }
 
-function BrowserEnvironment({
-  bot,
-  capabilities,
-}: {
-  bot?: RosterBot;
-  capabilities: Capabilities;
-}) {
-  return (
-    <aside className="flex min-h-72 flex-col bg-[color-mix(in_srgb,var(--gp-accent)_3%,var(--gp-surface))] p-4">
-      {bot ? (
-        <>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="eyebrow">Browser environment</p>
-              <h3 className="mt-2 text-sm font-semibold">
-                {bot.profile.displayName}&apos;s browser
-              </h3>
-            </div>
-            <StatusPill
-              tone={capabilities.browser.viewerLease ? "accent" : "neutral"}
-            >
-              {capabilities.browser.viewerLease
-                ? "Viewer capability reported"
-                : "Protected setup required"}
-            </StatusPill>
-          </div>
-          <div className="mt-5 flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--gp-line-strong)] bg-[var(--gp-surface)] p-6 text-center">
-            <Monitor className="h-6 w-6 text-[var(--gp-accent)]" />
-            <p className="mt-4 text-sm font-semibold">
-              Browser environment is preparing
-            </p>
-            <p className="mt-2 text-[11px] leading-5 text-[var(--gp-muted)]">
-              Each bot gets an isolated Hermes browser. RogerOS will render it
-              only through a short-lived protected viewer lease—never a shared
-              desktop or exposed VNC address.
-            </p>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <TactileButton
-              disabled
-              variant="secondary"
-              className="inline-flex items-center justify-center gap-2 px-2 text-[11px]"
-            >
-              <Eye className="h-3.5 w-3.5" />
-              Watch
-            </TactileButton>
-            <TactileButton
-              disabled
-              variant="secondary"
-              className="inline-flex items-center justify-center gap-2 px-2 text-[11px]"
-            >
-              <Radio className="h-3.5 w-3.5" />
-              Take over
-            </TactileButton>
-          </div>
-          <p className="mt-3 text-[10px] text-[var(--gp-faint)]">
-            Take over is disabled until the adapter proves exclusive human
-            control.
-          </p>
-        </>
-      ) : (
-        <EmptyState
-          icon={<Monitor />}
-          title="Browser environment"
-          description="Select a Hermes bot to inspect its workspace."
-        />
-      )}
-    </aside>
-  );
+function ContextPanel({ bot, capabilities, mobileView, close }: { bot?: RosterBot; capabilities: Capabilities; mobileView: string; close: () => void }) {
+  return <aside className={`${mobileView === "context" ? "flex" : "hidden"} min-h-0 flex-col border-l border-[var(--gp-line)] bg-[var(--gp-raised)] lg:flex`}><header className="flex min-h-[72px] items-center justify-between border-b border-[var(--gp-line)] px-4"><div><p className="text-xs font-semibold">Context</p><p className="mt-1 text-[10px] text-[var(--gp-muted)]">Follows {bot?.profile.displayName || "selected employee"}</p></div><button onClick={close} className="grid min-h-11 min-w-11 place-items-center rounded-xl" aria-label="Close context panel"><X className="h-4 w-4"/></button></header><div className="flex gap-1 border-b border-[var(--gp-line)] p-2"><span className="rounded-lg bg-[var(--gp-accent-soft)] px-3 py-2 text-[11px] font-semibold text-[var(--gp-accent)]">Browser</span><span className="px-3 py-2 text-[11px] text-[var(--gp-faint)]">Employee</span></div><div className="min-h-0 flex-1 overflow-y-auto p-4"><div className="flex items-center gap-3">{bot && <AnimalAvatar presetKey={avatarKey(bot)} name={bot.profile.displayName}/>}<div><p className="text-xs font-semibold">{bot?.profile.displayName}&apos;s browser</p><p className="mt-1 text-[10px] text-[var(--gp-muted)]">Assignment-scoped workspace</p></div></div><div className="mt-5 grid min-h-64 place-items-center rounded-2xl border border-dashed border-[var(--gp-line)] bg-[var(--gp-canvas)] p-6 text-center"><div><Monitor className="mx-auto h-7 w-7 text-[var(--gp-faint)]"/><h3 className="mt-3 text-sm font-semibold">Browser unavailable</h3><p className="mt-2 text-[11px] leading-5 text-[var(--gp-muted)]">{capabilities.browser.viewerLease ? "A viewer capability is reported, but T1 does not open a session without the complete assignment-scoped lease flow." : "The adapter has not proven an assignment-scoped viewer lease. No browser session or takeover control is exposed."}</p></div></div><div className="mt-4 rounded-xl border border-[var(--gp-line)] p-3"><div className="flex items-center gap-2 text-[11px] font-semibold"><Info className="h-3.5 w-3.5"/> Capability boundary</div><p className="mt-2 text-[10px] leading-4 text-[var(--gp-muted)]">Human takeover remains unavailable until exclusive input ownership, lease expiry, and revocation are verified.</p></div></div></aside>;
 }
-function Settings({
-  bot,
-  canManage,
-  capabilities,
-  close,
-  lifecycle,
-  setModel,
-}: {
-  bot: RosterBot;
-  canManage: boolean;
-  capabilities: Capabilities;
-  close: () => void;
-  lifecycle: (a: "suspend" | "resume" | "reconcile" | "retire") => void;
-  setModel: (model: { provider: string; modelId: string }) => Promise<void>;
-}) {
-  const ref = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
-  const routines = bot.runtime?.externalRuntimeMetadata?.routines || [];
-  const [modelSaving, setModelSaving] = useState(false);
-  const [modelError, setModelError] = useState("");
-  const currentModel =
-    bot.runtime?.desiredModelProvider && bot.runtime.desiredModelId
-      ? `${bot.runtime.desiredModelProvider}:${bot.runtime.desiredModelId}`
-      : bot.profile.modelProvider && bot.profile.modelId
-        ? `${bot.profile.modelProvider}:${bot.profile.modelId}`
-        : "";
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-title"
-      onKeyDown={(e) => e.key === "Escape" && close()}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 backdrop-blur-sm sm:items-center"
-    >
-      <section className="glass-panel max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl p-5">
-        <header className="flex justify-between">
-          <div>
-            <p className="eyebrow">Hermes bot profile</p>
-            <h2
-              id="settings-title"
-              className="mt-1 font-display text-xl font-extrabold"
-            >
-              {bot.profile.displayName}
-            </h2>
-          </div>
-          <button
-            ref={ref}
-            onClick={close}
-            aria-label="Close settings"
-            className="rogeros-tactile-button grid min-h-11 min-w-11 place-items-center rounded-xl border border-[var(--gp-line)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <p className="mt-3 text-sm text-[var(--gp-muted)]">
-          RogerOS governs this profile. Runtime configuration never grants Tool
-          permission or bypasses approval.
-        </p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <Card label="Profile" value={bot.profile.profileId} />
-          <Card
-            label="Model"
-            value={
-              bot.profile.modelId ||
-              bot.runtime?.desiredModelId ||
-              (capabilities.model.catalog
-                ? "Approved catalog available"
-                : "Adapter-managed")
-            }
-          />
-          <Card
-            label="Role"
-            value={
-              bot.employee?.roleOverride ||
-              bot.employee?.employee.role ||
-              "Not assigned"
-            }
-          />
-          <Card
-            label="Approved skills"
-            value={`${bot.employee?.skillAssignments.length || 0} assigned`}
-          />
-        </div>
-        <section className="mt-4 rounded-xl border border-[var(--gp-line)] p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <strong className="text-xs">Approved model</strong>
-              <p className="mt-1 text-[11px] text-[var(--gp-muted)]">
-                Only models advertised by this bot&apos;s signed Hermes binding
-                can be selected.
-              </p>
-            </div>
-            <select
-              aria-label="Approved model"
-              disabled={
-                !canManage ||
-                !bot.employee ||
-                !capabilities.model.catalog ||
-                modelSaving ||
-                !capabilities.model.approved.length
-              }
-              value={currentModel}
-              onChange={(event) => {
-                const selected = capabilities.model.approved.find(
-                  (item) =>
-                    `${item.provider}:${item.modelId}` === event.target.value,
-                );
-                if (!selected) return;
-                setModelError("");
-                setModelSaving(true);
-                void setModel(selected)
-                  .catch((cause) =>
-                    setModelError(
-                      cause instanceof Error
-                        ? cause.message
-                        : "Model could not be changed.",
-                    ),
-                  )
-                  .finally(() => setModelSaving(false));
-              }}
-              className="max-w-full rounded-lg border border-[var(--gp-line)] bg-[var(--gp-surface)] px-2 py-2 text-[11px]"
-            >
-              {!currentModel && <option value="">Choose approved model</option>}
-              {capabilities.model.approved.map((item) => (
-                <option
-                  key={`${item.provider}:${item.modelId}`}
-                  value={`${item.provider}:${item.modelId}`}
-                >
-                  {item.provider} / {item.modelId}
-                </option>
-              ))}
-            </select>
-          </div>
-          {modelError && (
-            <p role="alert" className="mt-3 text-xs text-[var(--gp-danger)]">
-              {modelError}
-            </p>
-          )}
-        </section>
-        <section className="mt-4 rounded-xl border border-[var(--gp-line)] p-4">
-          <div className="flex gap-2">
-            <Sparkles className="h-4 w-4 text-[var(--gp-accent)]" />
-            <strong className="text-xs">Skills, tools, and MCP</strong>
-          </div>
-          <p className="mt-2 text-[11px] text-[var(--gp-muted)]">
-            Skills are governed in the library. Tools and MCP are managed in
-            Tools; no capability or credential is granted automatically.
-          </p>
-        </section>
-        <section className="mt-3 rounded-xl border border-[var(--gp-line)] p-4">
-          <div className="flex gap-2">
-            <Clock3 className="h-4 w-4 text-[var(--gp-accent)]" />
-            <strong className="text-xs">Schedules and routines</strong>
-          </div>
-          <p className="mt-2 text-[11px] text-[var(--gp-muted)]">
-            {routines.length
-              ? `${routines.length} observed routine(s).`
-              : capabilities.routines.managed
-                ? "Managed routine capability reported; schedule controls are awaiting the adapter action endpoint."
-                : "No observed routines yet. Creation awaits the protected adapter’s bounded schedule contract."}
-          </p>
-        </section>
-        <section className="mt-3 rounded-xl border border-[var(--gp-line)] bg-[var(--gp-accent-soft)] p-4">
-          <div className="flex gap-2">
-            <WandSparkles className="h-4 w-4 text-[var(--gp-accent)]" />
-            <strong className="text-xs">Teach by observation</strong>
-          </div>
-          <p className="mt-2 text-[11px] text-[var(--gp-muted)]">
-            {capabilities.teach.observation
-              ? "The adapter reports bounded observation support. RogerOS will still require review before any learned skill is assigned."
-              : "Recording will be enabled only after the browser adapter can redact"}
-            {!capabilities.teach.observation &&
-              " credentials, scope a session to this bot, and produce a reviewable skill draft. Learning never installs automatically."}
-          </p>
-          <TactileButton
-            disabled
-            variant="secondary"
-            className="mt-3 px-3 text-[11px]"
-          >
-            Record a lesson
-          </TactileButton>
-        </section>
-        {canManage && bot.employee && (
-          <div className="mt-5 flex flex-wrap gap-2 border-t border-[var(--gp-line)] pt-4">
-            <TactileButton
-              variant="secondary"
-              onClick={() => lifecycle("reconcile")}
-              className="px-3 text-[11px]"
-            >
-              <RefreshCw className="mr-1 inline h-3.5 w-3.5" />
-              Reconcile
-            </TactileButton>
-            <TactileButton
-              variant="secondary"
-              onClick={() =>
-                lifecycle(
-                  bot.runtime?.assignmentState === "SUSPENDED"
-                    ? "resume"
-                    : "suspend",
-                )
-              }
-              className="px-3 text-[11px]"
-            >
-              {bot.runtime?.assignmentState === "SUSPENDED" ? (
-                <Play className="mr-1 inline h-3.5 w-3.5" />
-              ) : (
-                <Pause className="mr-1 inline h-3.5 w-3.5" />
-              )}
-              {bot.runtime?.assignmentState === "SUSPENDED"
-                ? "Resume"
-                : "Pause"}
-            </TactileButton>
-            <TactileButton
-              variant="secondary"
-              onClick={() => lifecycle("retire")}
-              className="px-3 text-[11px] text-[var(--gp-danger)]"
-            >
-              <Trash2 className="mr-1 inline h-3.5 w-3.5" />
-              Remove bot
-            </TactileButton>
-          </div>
-        )}
-      </section>
-    </div>
-  );
+
+function EmployeeSettings({ bot, canManage, close, saveAvatar, lifecycle, openModel }: { bot: RosterBot; canManage: boolean; close: () => void; saveAvatar: (key: TeamAvatarPresetKey) => Promise<void>; lifecycle: (action: "suspend" | "resume" | "reconcile" | "retire") => Promise<void>; openModel: () => void }) {
+  return <div role="dialog" aria-modal="true" aria-labelledby="employee-settings-title" className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 sm:items-center sm:p-4"><section className="glass-panel max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl p-5 sm:rounded-2xl"><header className="flex items-center gap-3"><AnimalAvatar presetKey={avatarKey(bot)} name={bot.profile.displayName} size="lg"/><div className="flex-1"><p className="eyebrow">Employee</p><h2 id="employee-settings-title" className="font-display text-xl font-extrabold">{bot.profile.displayName}</h2><p className="text-xs text-[var(--gp-muted)]">{roleFor(bot)}</p></div><button onClick={close} className="grid min-h-11 min-w-11 place-items-center rounded-xl" aria-label="Close employee settings"><X className="h-4 w-4"/></button></header><div className="mt-5 rounded-xl border border-[var(--gp-line)] p-3"><p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--gp-faint)]">Hermes profile</p><p className="mt-2 break-all font-mono text-xs">{bot.profile.profileId}</p>{bot.profile.profileId === "default" && <p className="mt-2 text-[10px] text-[var(--gp-muted)]">Protected default profile · presented as Chief of Staff</p>}</div><section className="mt-5"><h3 className="text-xs font-semibold">Animal avatar</h3><p className="mt-1 text-[10px] text-[var(--gp-muted)]">Saved only for this project assignment.</p><div className="mt-3 grid grid-cols-4 gap-2">{teamAvatarPresets.map((preset) => <button key={preset.key} disabled={!canManage} onClick={() => void saveAvatar(preset.key)} aria-label={`Use ${preset.name}`} aria-pressed={avatarKey(bot) === preset.key} className={`grid min-h-16 place-items-center rounded-xl border transition active:scale-[.975] disabled:opacity-50 ${avatarKey(bot) === preset.key ? "border-[var(--gp-accent)] bg-[var(--gp-accent-soft)]" : "border-[var(--gp-line)]"}`}><AnimalAvatar presetKey={preset.key} name={preset.name} size="sm"/></button>)}</div></section><button onClick={openModel} className="mt-5 flex min-h-14 w-full items-center justify-between rounded-xl border border-[var(--gp-line)] px-4 text-left transition active:scale-[.985]"><span><span className="block text-xs font-semibold">Model</span><span className="mt-1 block text-[10px] text-[var(--gp-muted)]">View the T1 command shell</span></span><ChevronRight className="h-4 w-4"/></button>{canManage && bot.employee && <div className="mt-5 flex flex-wrap gap-2 border-t border-[var(--gp-line)] pt-4"><TactileButton variant="secondary" onClick={() => void lifecycle("reconcile")} className="px-3 text-xs">Reconcile</TactileButton><TactileButton variant="secondary" onClick={() => void lifecycle(bot.runtime?.assignmentState === "SUSPENDED" ? "resume" : "suspend")} className="px-3 text-xs">{bot.runtime?.assignmentState === "SUSPENDED" ? "Resume" : "Pause"}</TactileButton><TactileButton variant="secondary" disabled={bot.profile.profileId === "default"} title={bot.profile.profileId === "default" ? "The default Hermes profile is protected." : undefined} onClick={() => void lifecycle("retire")} className="px-3 text-xs text-[var(--gp-danger)]">Remove bot</TactileButton></div>}</section></div>;
 }
-function AddBot({
-  project,
-  close,
-  done,
-}: {
-  project: Project;
-  close: () => void;
-  done: () => Promise<void>;
-}) {
-  const [name, setName] = useState(""),
-    [role, setRole] = useState(""),
-    [description, setDescription] = useState(""),
-    [saving, setSaving] = useState(false),
-    [error, setError] = useState("");
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const r = await fetch("/api/runtime/bots", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: project.id,
-          name,
-          role,
-          description,
-        }),
-      });
-      if (!r.ok)
-        throw Error(
-          (await r.json().catch(() => ({}))).error || "Bot could not be added.",
-        );
-      await done();
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Bot could not be added.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 backdrop-blur-sm sm:items-center"
-    >
-      <form
-        onSubmit={submit}
-        className="glass-panel w-full max-w-lg rounded-2xl p-5"
-      >
-        <header className="flex justify-between">
-          <div>
-            <p className="eyebrow">New Hermes employee</p>
-            <h2 className="mt-1 font-display text-xl font-extrabold">
-              Add a bot
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            className="rogeros-tactile-button grid min-h-11 min-w-11 place-items-center rounded-xl border border-[var(--gp-line)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <p className="mt-3 text-[11px] text-[var(--gp-muted)]">
-          RogerOS creates the employee and project-bound runtime assignment. The
-          profile is live only after Hermes reconciliation succeeds.
-        </p>
-        {error && (
-          <p role="alert" className="mt-3 text-xs text-[var(--gp-danger)]">
-            {error}
-          </p>
-        )}
-        <label className="mt-4 block text-xs font-semibold">
-          Name
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3 py-2.5"
-          />
-        </label>
-        <label className="mt-3 block text-xs font-semibold">
-          Role
-          <input
-            required
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3 py-2.5"
-          />
-        </label>
-        <label className="mt-3 block text-xs font-semibold">
-          Mission
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="mt-1.5 min-h-20 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] p-3"
-          />
-        </label>
-        <div className="mt-5 flex justify-end gap-2">
-          <TactileButton
-            type="button"
-            variant="secondary"
-            onClick={close}
-            className="px-3 text-xs"
-          >
-            Cancel
-          </TactileButton>
-          <TactileButton
-            disabled={saving || !name.trim() || !role.trim()}
-            type="submit"
-            className="px-3 text-xs"
-          >
-            {saving ? "Adding…" : "Add governed bot"}
-          </TactileButton>
-        </div>
-      </form>
-    </div>
-  );
-}
-function AdoptProfile({
-  project,
-  claims,
-  close,
-  done,
-}: {
-  project: Project;
-  claims: DeskClaim[];
-  close: () => void;
-  done: () => Promise<void>;
-}) {
-  const [claimId, setClaimId] = useState("");
-  const [name, setName] = useState("");
-  const [role, setRole] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const response = await fetch("/api/runtime/bots/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: project.id,
-          claimId,
-          name,
-          role,
-        }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || "Profile could not be adopted.");
-      }
-      await done();
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Profile could not be adopted.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="adopt-profile-title"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 backdrop-blur-sm sm:items-center"
-    >
-      <form
-        onSubmit={submit}
-        className="glass-panel w-full max-w-lg rounded-2xl p-5"
-      >
-        <header className="flex justify-between gap-4">
-          <div>
-            <p className="eyebrow">Existing Hermes profile</p>
-            <h2
-              id="adopt-profile-title"
-              className="mt-1 font-display text-xl font-extrabold"
-            >
-              Adopt a profile
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Close profile adoption"
-            className="rogeros-tactile-button grid min-h-11 min-w-11 place-items-center rounded-xl border border-[var(--gp-line)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <p className="mt-3 text-[11px] leading-5 text-[var(--gp-muted)]">
-          Choose a profile the protected adapter explicitly made claimable.
-          The one-time claim is consumed into a signed project binding; this
-          grants no tools, browser, MCP, schedule, or approval access.
-        </p>
-        {error && (
-          <p role="alert" className="mt-3 text-xs text-[var(--gp-danger)]">
-            {error}
-          </p>
-        )}
-        <label className="mt-4 block text-xs font-semibold">
-          Claimable profile
-          <select
-            required
-            value={claimId}
-            onChange={(event) => {
-              const selected = claims.find((claim) => claim.claimId === event.target.value);
-              setClaimId(event.target.value);
-              if (selected) { setName(selected.displayName); setRole(selected.role || ""); }
-            }}
-            className="mt-1.5 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3 py-2.5"
-          >
-            <option value="">Select an available profile</option>
-            {claims.map((claim) => <option key={claim.claimId} value={claim.claimId}>{claim.displayName}{claim.role ? ` · ${claim.role}` : ""}</option>)}
-          </select>
-          {!claims.length && <span className="mt-1 block text-[10px] font-normal text-[var(--gp-muted)]">No profiles are currently claimable for this protected adapter.</span>}
-        </label>
-        <label className="mt-3 block text-xs font-semibold">
-          Employee name
-          <input
-            required
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3 py-2.5"
-          />
-        </label>
-        <label className="mt-3 block text-xs font-semibold">
-          RogerOS role
-          <input
-            required
-            value={role}
-            onChange={(event) => setRole(event.target.value)}
-            placeholder="Operations lead"
-            className="mt-1.5 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3 py-2.5"
-          />
-        </label>
-        <div className="mt-5 flex justify-end gap-2">
-          <TactileButton
-            type="button"
-            variant="secondary"
-            onClick={close}
-            className="px-3 text-xs"
-          >
-            Cancel
-          </TactileButton>
-          <TactileButton
-            disabled={
-              saving || !claimId || !name.trim() || !role.trim()
-            }
-            type="submit"
-            className="px-3 text-xs"
-          >
-            {saving ? "Adopting…" : "Adopt governed profile"}
-          </TactileButton>
-        </div>
-      </form>
-    </div>
-  );
-}
-function Card({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] p-3">
-      <p className="text-[9px] font-semibold uppercase tracking-[.12em] text-[var(--gp-faint)]">
-        {label}
-      </p>
-      <p className="mt-2 break-all text-[11px]">{value}</p>
-    </div>
-  );
+
+function ModelShell({ bot, catalogAvailable, close }: { bot?: RosterBot; catalogAvailable: boolean; close: () => void }) { return <div role="dialog" aria-modal="true" aria-labelledby="model-shell-title" className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-4 sm:items-center"><section className="glass-panel w-full max-w-md rounded-2xl p-5"><header className="flex items-start justify-between"><div><p className="eyebrow">/model</p><h2 id="model-shell-title" className="mt-1 font-display text-xl font-extrabold">Model picker</h2></div><button onClick={close} className="grid min-h-11 min-w-11 place-items-center rounded-xl" aria-label="Close model picker"><X className="h-4 w-4"/></button></header><div className="mt-5 rounded-xl border border-[var(--gp-line)] bg-[var(--gp-canvas)] p-4"><p className="text-xs font-semibold">No model change is available in T1</p><p className="mt-2 text-[11px] leading-5 text-[var(--gp-muted)]">This command is intercepted by RogerOS and was not sent to {bot?.profile.displayName || "Hermes"}. {catalogAvailable ? "The adapter reports a catalog, but selection and reconciliation belong to Employee Studio in T3." : "A signed assignment-scoped model catalog is not currently available."}</p></div><TactileButton onClick={close} className="mt-5 w-full text-xs">Done</TactileButton></section></div>; }
+
+function BotForm({ mode, project, claims, close, done }: { mode: "add" | "claim"; project: Project; claims: DeskClaim[]; close: () => void; done: () => Promise<void> }) {
+  const [name, setName] = useState(""), [role, setRole] = useState(""), [description, setDescription] = useState(""), [claimId, setClaimId] = useState(""), [saving, setSaving] = useState(false), [error, setError] = useState("");
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (saving) return; setSaving(true); setError(""); try { const response = await fetch(mode === "add" ? "/api/runtime/bots" : "/api/runtime/bots/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: project.id, name, role, description, ...(mode === "claim" ? { claimId } : {}) }) }); if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Employee could not be added."); await done(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Employee could not be added."); } finally { setSaving(false); } };
+  return <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 sm:items-center"><form onSubmit={submit} className="glass-panel w-full max-w-lg rounded-2xl p-5"><header className="flex justify-between"><div><p className="eyebrow">Governed Team identity</p><h2 className="mt-1 font-display text-xl font-extrabold">{mode === "add" ? "Add a bot" : "Claim a profile"}</h2></div><button type="button" onClick={close} className="grid min-h-11 min-w-11 place-items-center rounded-xl" aria-label="Close"><X className="h-4 w-4"/></button></header>{error && <p role="alert" className="mt-3 text-xs text-[var(--gp-danger)]">{error}</p>}{mode === "claim" && <label className="mt-4 block text-xs font-semibold">Available profile<select required value={claimId} onChange={(event) => { const claim = claims.find((item) => item.claimId === event.target.value); setClaimId(event.target.value); if (claim) { setName(claim.displayName); setRole(claim.role || ""); setDescription(claim.description || ""); } }} className="mt-1.5 min-h-11 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3"><option value="">Select a protected claim</option>{claims.map((claim) => <option key={claim.claimId} value={claim.claimId}>{claim.displayName}</option>)}</select></label>}<label className="mt-4 block text-xs font-semibold">Name<input required value={name} onChange={(event) => setName(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3"/></label><label className="mt-3 block text-xs font-semibold">Role<input required value={role} onChange={(event) => setRole(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3"/></label><label className="mt-3 block text-xs font-semibold">Mission<textarea value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1.5 min-h-20 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] p-3"/></label><div className="mt-5 flex justify-end gap-2"><TactileButton type="button" variant="secondary" onClick={close}>Cancel</TactileButton><TactileButton type="submit" disabled={saving || !name.trim() || !role.trim() || (mode === "claim" && !claimId)}>{saving ? "Saving…" : mode === "add" ? "Add governed bot" : "Claim profile"}</TactileButton></div></form></div>;
 }

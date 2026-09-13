@@ -36,6 +36,7 @@ export async function GET(request: Request) {
             createdAt: true,
             authorUserId: true,
             authorSystemIdentity: true,
+            author: { select: { name: true } },
           },
         },
       },

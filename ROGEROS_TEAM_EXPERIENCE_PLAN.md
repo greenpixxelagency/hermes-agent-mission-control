@@ -93,6 +93,8 @@ All additions preserve composite project ownership, bounded retention, and recov
 
 ### T1 — Messenger foundation and preset identity
 
+> **Completed locally, 2026-09-14 (`codex/t1-team-experience`).** Team is now messenger-first with a responsive roster/conversation layout, polished human/employee bubbles, timestamps and delivery/working states, history loading and auto-scroll, accessible animal avatar presets persisted on `EmployeeProjectAssignment`, guarded Enter/Shift+Enter/IME submission, a local-only `/model` interception shell, and a closed-by-default capability-truthful context panel. The reviewed migration adds only `avatarPresetKey` and normalizes the project-owned role of a bound `default` profile to Chief of Staff without renaming the profile. Authenticated localhost acceptance observed the established six-profile roster at 6/6 Online, Hermes Default as Chief of Staff, avatar persistence after reload, desktop/mobile navigation, unavailable browser state, and one non-duplicated multiline keyboard turn returning `ROGEROS_T1_KEYBOARD_OK`. This is local evidence only; it does not authorize staging/production deployment or any T2–T4 capability.
+
 - Redesign Team into the conversational layout without replacing authorization or chat APIs.
 - Add polished bubbles, header, roster identity, responsive behavior, loading/error states, auto-scroll/history behavior, and accessible focus.
 - Implement keyboard behavior, duplicate-submit prevention, and /model interception shell.
@@ -102,6 +104,8 @@ All additions preserve composite project ownership, bounded retention, and recov
 - Do not implement uploads, voice transport, arbitrary file access, fake browser controls, or fake model changes.
 
 Acceptance: schema/migration review if needed, focused tests, TypeScript, scoped lint, production build, authenticated localhost browser verification for all six bots, keyboard behavior, avatar persistence, responsive layout, and 6/6 runtime health.
+
+**Exact next-phase handoff:** T2 must start from the accepted T1 commit and implement only project-owned managed assets, message attachments, safe avatar upload/replace/remove, document cards, governed expiring Hermes attachment references, and user-gesture MediaRecorder voice notes. It must preserve T1 preset avatars and messenger behavior and must not add T3 model/files/Skills/MCP mutations or T4 browser takeover/lesson observation. Before implementation, independently re-verify schema, storage choices, authorization, audit, runtime attachment support, and the accepted T1 tests; stop if durable secret-safe object storage or a project-bound Hermes attachment contract is unavailable.
 
 ### T2 — Managed attachments, avatar uploads, and voice notes
 
