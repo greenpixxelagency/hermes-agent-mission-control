@@ -5,6 +5,7 @@ import {
 } from "@/lib/hermes-bots";
 import { botErrorResponse } from "@/lib/hermes-bot-api";
 import { prisma } from "@/lib/prisma";
+import { hermesRuntimeAdapter } from "@/lib/hermes-runtime-adapter";
 import {
   projectScopeErrorResponse,
   requireProjectContextForBody,
@@ -37,6 +38,23 @@ export async function GET(request: Request) {
             authorUserId: true,
             authorSystemIdentity: true,
             author: { select: { name: true } },
+            attachments: {
+              orderBy: { sortOrder: "asc" },
+              select: {
+                state: true,
+                errorCode: true,
+                asset: {
+                  select: {
+                    id: true,
+                    kind: true,
+                    safeName: true,
+                    mimeType: true,
+                    byteLength: true,
+                    durationMs: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -65,6 +83,8 @@ export async function POST(request: Request) {
         id,
         message,
         body.mentionedEmployeeProjectAssignmentIds,
+        hermesRuntimeAdapter,
+        { attachmentAssetIds: body.attachmentAssetIds },
       ),
       { status: 201 },
     );

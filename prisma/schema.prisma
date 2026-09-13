@@ -46,6 +46,27 @@ enum ThreadStatus {
   ARCHIVED
 }
 
+enum ManagedAssetKind {
+  AVATAR
+  DOCUMENT
+  VOICE_NOTE
+  IMAGE
+}
+
+enum ManagedAssetState {
+  PENDING
+  ACTIVE
+  DELETION_PENDING
+  DELETED
+  FAILED
+}
+
+enum MessageAttachmentState {
+  READY
+  PROCESSING
+  FAILED
+}
+
 enum TaskStatus {
   BACKLOG
   TODO
@@ -318,6 +339,7 @@ model User {
   passwordResetTokens      PasswordResetToken[]
   driveOAuthStates         DriveOAuthState[]
   assignedEmployeeSkills   EmployeeSkillAssignment[] @relation("SkillAssignedBy")
+  managedAssets            ManagedAsset[]            @relation("ManagedAssetCreator")
 }
 
 model UserCredential {
@@ -413,6 +435,9 @@ model Project {
   driveOAuthStates             DriveOAuthState[]
   appInstallations             ProjectAppInstallation[]
   appMarketMutations           AppMarketMutation[]
+  managedAssets                ManagedAsset[]
+  messageAttachments           MessageAttachment[]
+  assetRedemptions             AssetRedemption[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -954,6 +979,7 @@ model ProjectMember {
   employmentActivities EmployeeEmploymentActivity[] @relation("EmployeeEmploymentActivityActor")
   appInstallations     ProjectAppInstallation[]
   appMarketMutations   AppMarketMutation[]
+  assetRedemptions     AssetRedemption[]
 
   @@unique([projectId, organizationMemberId])
   @@unique([id, projectId])
@@ -966,20 +992,21 @@ model ProjectMember {
 // A conversation is explicitly project-owned. The composite id/project key
 // lets child records enforce that they cannot point at another project's row.
 model Conversation {
-  id           String                    @id @default(cuid())
-  projectId    String
-  type         ConversationType
-  slug         String?
-  title        String?
-  createdById  String?
-  archivedAt   DateTime?
-  createdAt    DateTime                  @default(now())
-  updatedAt    DateTime                  @updatedAt
-  project      Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy    User?                     @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  participants ConversationParticipant[]
-  messages     Message[]
-  threads      Thread[]
+  id               String                    @id @default(cuid())
+  projectId        String
+  type             ConversationType
+  slug             String?
+  title            String?
+  createdById      String?
+  archivedAt       DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  project          Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy        User?                     @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  participants     ConversationParticipant[]
+  messages         Message[]
+  threads          Thread[]
+  assetRedemptions AssetRedemption[]
 
   @@unique([id, projectId])
   @@unique([projectId, slug])
@@ -1007,26 +1034,108 @@ model ConversationParticipant {
 }
 
 model Message {
-  id                   String       @id @default(cuid())
+  id                   String              @id @default(cuid())
   projectId            String
   conversationId       String
   threadId             String?
   authorUserId         String?
   authorSystemIdentity String?
-  body                 String       @db.Text
-  kind                 String       @default("MESSAGE")
+  body                 String              @db.Text
+  kind                 String              @default("MESSAGE")
   editedAt             DateTime?
   deletedAt            DateTime?
-  createdAt            DateTime     @default(now())
-  project              Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  conversation         Conversation @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
-  author               User?        @relation("MessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
-  thread               Thread?      @relation("ThreadReplies", fields: [threadId, projectId], references: [id, projectId], onDelete: Cascade)
-  rootForThread        Thread?      @relation("ThreadRootMessage")
+  createdAt            DateTime            @default(now())
+  project              Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  conversation         Conversation        @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
+  author               User?               @relation("MessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  thread               Thread?             @relation("ThreadReplies", fields: [threadId, projectId], references: [id, projectId], onDelete: Cascade)
+  rootForThread        Thread?             @relation("ThreadRootMessage")
+  attachments          MessageAttachment[]
+  assetRedemptions     AssetRedemption[]
 
+  @@unique([id, projectId])
   @@unique([id, projectId, conversationId])
   @@index([projectId, conversationId, createdAt])
   @@index([projectId, threadId, createdAt])
+}
+
+model ManagedAsset {
+  id              String                      @id @default(cuid())
+  projectId       String
+  kind            ManagedAssetKind
+  state           ManagedAssetState           @default(PENDING)
+  storageProvider String
+  storageKey      String                      @unique
+  safeName        String
+  mimeType        String
+  byteLength      Int
+  sha256          String
+  width           Int?
+  height          Int?
+  durationMs      Int?
+  createdById     String
+  retentionUntil  DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  project         Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy       User                        @relation("ManagedAssetCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  messageLinks    MessageAttachment[]
+  avatarFor       EmployeeProjectAssignment[] @relation("AssignmentAvatarAsset")
+  redemptions     AssetRedemption[]
+
+  @@unique([id, projectId])
+  @@index([projectId, kind, state, createdAt])
+  @@index([projectId, retentionUntil])
+}
+
+model MessageAttachment {
+  id                  String                 @id @default(cuid())
+  projectId           String
+  messageId           String
+  assetId             String
+  sortOrder           Int                    @default(0)
+  state               MessageAttachmentState @default(READY)
+  processingReceiptId String?
+  errorCode           String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  project             Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  message             Message                @relation(fields: [messageId, projectId], references: [id, projectId], onDelete: Cascade)
+  asset               ManagedAsset           @relation(fields: [assetId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([messageId, assetId])
+  @@unique([id, projectId])
+  @@index([projectId, messageId, sortOrder])
+  @@index([projectId, assetId])
+}
+
+model AssetRedemption {
+  id                  String                  @id @default(cuid())
+  projectId           String
+  assetId             String
+  runtimeId           String
+  runtimeAssignmentId String
+  profileId           String
+  conversationId      String
+  messageId           String
+  correlationId       String
+  authorizedActorId   String
+  tokenHash           String                  @unique
+  expiresAt           DateTime
+  redeemedAt          DateTime?
+  createdAt           DateTime                @default(now())
+  project             Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  asset               ManagedAsset            @relation(fields: [assetId, projectId], references: [id, projectId], onDelete: Cascade)
+  conversation        Conversation            @relation(fields: [conversationId, projectId], references: [id, projectId], onDelete: Cascade)
+  message             Message                 @relation(fields: [messageId, projectId, conversationId], references: [id, projectId, conversationId], onDelete: Cascade)
+  runtime             HermesRuntime           @relation(fields: [runtimeId], references: [id], onDelete: Restrict)
+  runtimeAssignment   HermesRuntimeAssignment @relation(fields: [runtimeAssignmentId, projectId, runtimeId, profileId], references: [id, projectId, runtimeId, profileKey], onDelete: Restrict)
+  authorizedActor     ProjectMember           @relation(fields: [authorizedActorId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([id, projectId])
+  @@index([projectId, assetId, expiresAt])
+  @@index([runtimeAssignmentId, correlationId])
 }
 
 model Thread {
@@ -1161,6 +1270,7 @@ model EmployeeProjectAssignment {
   status                   EmployeeStatus               @default(ACTIVE)
   roleOverride             String?
   avatarPresetKey          String?
+  avatarAssetId            String?
   joinedAt                 DateTime                     @default(now())
   pausedAt                 DateTime?
   createdAt                DateTime                     @default(now())
@@ -1177,6 +1287,7 @@ model EmployeeProjectAssignment {
   skillAssignments         EmployeeSkillAssignment[]
   marketHire               EmployeeMarketHire?
   employmentActivities     EmployeeEmploymentActivity[]
+  avatarAsset              ManagedAsset?                @relation("AssignmentAvatarAsset", fields: [avatarAssetId, projectId], references: [id, projectId], onDelete: Restrict)
 
   @@unique([employeeId, projectId])
   @@unique([id, projectId])
@@ -1268,16 +1379,17 @@ model EmployeeSkillAssignment {
 // M11: Hermes is an execution runtime only. Project-scoped assignments keep
 // RogerOS tenancy and task ownership authoritative.
 model HermesRuntime {
-  id          String                    @id @default(cuid())
-  key         String                    @unique
-  name        String
-  status      HermesRuntimeStatus       @default(ACTIVE)
-  endpoint    String?
-  profileKey  String?
-  createdAt   DateTime                  @default(now())
-  updatedAt   DateTime                  @updatedAt
-  assignments HermesRuntimeAssignment[]
-  executions  HermesExecution[]
+  id               String                    @id @default(cuid())
+  key              String                    @unique
+  name             String
+  status           HermesRuntimeStatus       @default(ACTIVE)
+  endpoint         String?
+  profileKey       String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  assignments      HermesRuntimeAssignment[]
+  executions       HermesExecution[]
+  assetRedemptions AssetRedemption[]
 }
 
 model HermesRuntimeAssignment {
@@ -1313,10 +1425,12 @@ model HermesRuntimeAssignment {
   runtime                     HermesRuntime                @relation(fields: [runtimeId], references: [id], onDelete: Restrict)
   employeeAssignment          EmployeeProjectAssignment?   @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
   executions                  HermesExecution[]
+  assetRedemptions            AssetRedemption[]
 
   @@unique([projectId, employeeProjectAssignmentId])
   @@unique([projectId, profileKey])
   @@unique([id, projectId])
+  @@unique([id, projectId, runtimeId, profileKey])
   @@index([projectId, active])
 }
 

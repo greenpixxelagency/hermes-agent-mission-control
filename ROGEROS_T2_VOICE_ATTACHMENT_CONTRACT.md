@@ -119,6 +119,8 @@ Initial limits are conservative and must be constants covered by tests. The adap
 - Document: PDF, plain text, Markdown, DOCX, JPEG, PNG, or WebP; at most 20 MiB per file.
 - At most 5 attachments and 25 MiB combined per message.
 
+The first Vercel deployment uses the existing server-upload route and applies a stricter effective limit of 3.9 MB per browser file and 4.0 MB for the complete multipart body. This is intentionally below Vercel Functions' 4.5 MB request ceiling. The 12 MiB voice and 20 MiB document values remain validation/adapter upper bounds, not a claim that the first deployed browser transport accepts them. A later private client-direct upload design may raise the effective limit only after its grant, quota reservation, completion validation, normalization, and orphan cleanup are reviewed and accepted.
+
 If the chosen decoding/transcription libraries cannot safely validate a listed format, remove that format from the effective allowlist rather than bypass validation. Archive containers such as DOCX require exact package validation and decompression bounds before any preview or Hermes ingestion. Document ingestion remains unavailable until separately supported by the proven adapter capability; document cards and authorized download may exist without claiming Hermes read the document.
 
 Downloads use a sanitized `Content-Disposition`, `X-Content-Type-Options: nosniff`, a validated content type, private/no-store caching unless an explicitly reviewed authenticated caching policy replaces it, and no inline rendering for unsafe or unsupported formats. Filenames cannot inject headers or paths.

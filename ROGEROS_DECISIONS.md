@@ -142,6 +142,14 @@
 
 **Consequences:** Staging success never implies permission to alter production. Never assume production migration history from local or staging status.
 
+## Initial managed-asset uploads stay below the Vercel Function ceiling
+
+**Decision:** The first deployed T2 browser transport uses authenticated RogerOS multipart routes with a 3.9 MB per-file and 4.0 MB complete-body limit. The 12 MiB voice and 20 MiB document validation maxima remain upper bounds for a future transport.
+
+**Reason:** Vercel Functions reject request bodies above 4.5 MB. Advertising the larger limits through the current server-upload path would create a broken and misleading product boundary.
+
+**Consequences:** Typical bounded Opus voice notes, avatars, and small documents remain supported. Larger files require a separately reviewed private client-direct upload design with short-lived project-bound grants, quota reservation, server-side type/integrity validation and normalization, completion proof, and orphan cleanup; a raw private Blob URL or client-selected object key is not sufficient.
+
 ## Phase 3 sequencing follows governed dependencies
 
 **Decision:** Future Phase 3 work is planned from the original blueprint, reconciled against verified repository evidence, and delivered one bounded milestone at a time. A planning document is not implementation approval.

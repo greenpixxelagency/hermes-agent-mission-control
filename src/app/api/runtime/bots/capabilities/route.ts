@@ -7,6 +7,7 @@ import {
   projectScopeErrorResponse,
   requireProjectContextForRequest,
 } from "@/lib/project-scope";
+import { voiceCapabilityForAssignment } from "@/lib/voice-note-contract";
 
 const bool = (value: unknown) => value === true;
 
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
     const observed = await hermesRuntimeAdapter.getBindingCapabilities(
       assignment.id,
     );
+    const voice = await voiceCapabilityForAssignment(assignment.id);
     // This is intentionally an allowlist projection. It contains no runtime
     // URL, credential, command, session data, or adapter implementation detail.
     return NextResponse.json(
@@ -47,6 +49,7 @@ export async function GET(request: Request) {
         runtime: {
           gatewayRestart: bool(observed.capabilities.gatewayRestartAvailable),
         },
+        voice,
       },
       { headers: { "Cache-Control": "no-store" } },
     );
@@ -65,6 +68,7 @@ export async function GET(request: Request) {
             mcp: { managed: false },
             routines: { managed: false },
             runtime: { gatewayRestart: false },
+            voice: { available: false },
           },
           { status: 503, headers: { "Cache-Control": "no-store" } },
         );

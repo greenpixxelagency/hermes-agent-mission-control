@@ -115,11 +115,14 @@ Acceptance: schema/migration review if needed, focused tests, TypeScript, scoped
 
 ### T2 — Managed attachments, avatar uploads, and voice notes
 
+> **Implementation checkpoint, 2026-09-14:** T2B is implemented and locally accepted on `codex/t2-voice-architecture`; T2A is implemented only in a separately isolated disabled acceptance service and has not been connected to Preview. Local evidence is 55/55 full regression tests, clean TypeScript/scoped lint/Prisma/build, composite database isolation, and authenticated desktop/mobile UI acceptance. Voice remains correctly default-disabled until the remaining private Preview storage, migration, TLS/fixed-origin binding, and end-to-end selected-profile acceptance are complete. This checkpoint does not authorize or claim production.
+
 - **T2A, separate Hermes/VPS workstream:** implement and verify the versioned assignment-bound voice-note/attachment redemption and transcription contract in `ROGEROS_T2_VOICE_ATTACHMENT_CONTRACT.md`. Reuse Hermes's supported transcription implementation behind the adapter. Do not expose its internal paths or client credentials. Return `PROVEN` isolation, expiry, replay, validation, redaction, and profile-routing evidence before repository transport integration.
 - **T2B, RogerOS repository workstream:** after T2A is proven and a durable private object store is approved, add the project-owned models, storage adapter, upload/download services, Team UI, audit, quotas, retention, and adapter client integration described below.
 - Add project-owned managed assets and message attachments.
 - Add safe avatar upload/replace/remove, document cards, governed Hermes attachment references, and MediaRecorder voice notes.
 - Apply validation, authorization, quotas, retention, audit, and an object-storage abstraction. Local development may use a gitignored provider; deployment requires an approved durable provider.
+- Keep the initial Vercel server-upload path at 3.9 MB per file/4.0 MB per multipart body. Raising it to the larger validation maxima requires a separately reviewed private direct-upload lifecycle.
 
 Voice-note flow: a user gesture starts `MediaRecorder`; RogerOS uploads and validates the bounded recording into private project-owned storage; the created Message and MessageAttachment establish project ownership; RogerOS issues a short-lived single-purpose reference; the adapter redeems and verifies it for the exact runtime assignment/profile/message correlation; Hermes transcribes it; and only the transcript is submitted through the existing Bot Chat path. The original voice note remains available through an authorized RogerOS playback/download response. Live voice chat and spoken agent replies are not included.
 

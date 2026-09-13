@@ -14,6 +14,8 @@ import {
 } from "@/lib/hermes-runtime-adapter";
 import type { ProjectContext } from "@/lib/project-context";
 import { prisma } from "@/lib/prisma";
+import { ASSET_LIMITS } from "@/lib/managed-assets";
+import { voiceCapabilityForAssignment } from "@/lib/voice-note-contract";
 
 const operateRoles = new Set<ProjectRole>(["OWNER", "ADMIN", "OPERATOR"]);
 const administerRoles = new Set<ProjectRole>(["OWNER", "ADMIN"]);
@@ -628,6 +630,167 @@ async function conversationFor(
   return conversation;
 }
 
+export async function prepareHermesVoiceRequest(
+  context: ProjectContext,
+  employeeProjectAssignmentId: string,
+  assetId: string,
+) {
+  if (!operateRoles.has(context.project.role))
+    throw new HermesBotError("FORBIDDEN");
+  const member = await actor(context);
+  const loaded = await loadAssignment(
+    context.project.id,
+    employeeProjectAssignmentId,
+  );
+  if (
+    !loaded.runtimeAssignment.active ||
+    loaded.runtimeAssignment.assignmentState !== "ACTIVE" ||
+    loaded.assignment.status !== "ACTIVE"
+  )
+    throw new HermesBotError("RUNTIME_SUSPENDED");
+  const profileId = expectedProfile(loaded);
+  const voiceCapability = await voiceCapabilityForAssignment(
+    loaded.runtimeAssignment.id,
+  );
+  if (!voiceCapability.available)
+    throw new HermesBotError("VOICE_TRANSCRIPTION_UNAVAILABLE");
+  const asset = await prisma.managedAsset.findFirst({
+    where: {
+      id: assetId,
+      projectId: context.project.id,
+      kind: "VOICE_NOTE",
+      state: "ACTIVE",
+    },
+  });
+  if (!asset) throw new HermesBotError("INVALID_ATTACHMENTS");
+  if (
+    !voiceCapability.acceptedMimeTypes.includes(asset.mimeType) ||
+    asset.byteLength > voiceCapability.maxBytes ||
+    !asset.durationMs ||
+    asset.durationMs > voiceCapability.maxDurationMs
+  )
+    throw new HermesBotError("VOICE_ATTACHMENT_UNSUPPORTED");
+  const conversation = await conversationFor(context, loaded);
+  const correlationId = randomUUID();
+  const message = await prisma.$transaction(async (tx) => {
+    const created = await tx.message.create({
+      data: {
+        projectId: context.project.id,
+        conversationId: conversation.id,
+        authorUserId: context.user.id,
+        body: "Voice note is being transcribed…",
+        kind: `BOT_VOICE_PROCESSING:${correlationId}`,
+      },
+    });
+    await tx.messageAttachment.create({
+      data: {
+        projectId: context.project.id,
+        messageId: created.id,
+        assetId: asset.id,
+        state: "PROCESSING",
+      },
+    });
+    return created;
+  });
+  return {
+    asset,
+    conversationId: conversation.id,
+    messageId: message.id,
+    correlationId,
+    authorizedActorId: member.id,
+    runtimeId: loaded.runtimeAssignment.runtimeId,
+    runtimeAssignmentId: loaded.runtimeAssignment.id,
+    profileId,
+  };
+}
+
+export async function failHermesVoiceRequest(
+  context: ProjectContext,
+  messageId: string,
+  assetId: string,
+  code: string,
+) {
+  const safeCode = /^[A-Z][A-Z0-9_]{0,63}$/.test(code)
+    ? code
+    : "VOICE_TRANSCRIPTION_FAILED";
+  await prisma.messageAttachment.updateMany({
+    where: { projectId: context.project.id, messageId, assetId },
+    data: { state: "FAILED", errorCode: safeCode },
+  });
+  await prisma.message.updateMany({
+    where: { id: messageId, projectId: context.project.id },
+    data: { body: "Voice note transcription failed. You can try again." },
+  });
+}
+
+export async function prepareHermesVoiceRetry(
+  context: ProjectContext,
+  employeeProjectAssignmentId: string,
+  messageId: string,
+) {
+  if (!operateRoles.has(context.project.role))
+    throw new HermesBotError("FORBIDDEN");
+  const member = await actor(context);
+  const loaded = await loadAssignment(
+    context.project.id,
+    employeeProjectAssignmentId,
+  );
+  if (
+    !loaded.runtimeAssignment.active ||
+    loaded.runtimeAssignment.assignmentState !== "ACTIVE" ||
+    loaded.assignment.status !== "ACTIVE"
+  )
+    throw new HermesBotError("RUNTIME_SUSPENDED");
+  const profileId = expectedProfile(loaded);
+  const message = await prisma.message.findFirst({
+    where: {
+      id: messageId,
+      projectId: context.project.id,
+      authorUserId: context.user.id,
+      conversation: { slug: `runtime-${loaded.runtimeAssignment.id}` },
+      kind: { startsWith: "BOT_VOICE_PROCESSING:" },
+    },
+    include: {
+      attachments: {
+        where: {
+          state: "FAILED",
+          asset: { kind: "VOICE_NOTE", state: "ACTIVE" },
+        },
+        include: { asset: true },
+        take: 1,
+      },
+    },
+  });
+  const asset = message?.attachments[0]?.asset;
+  const correlationId = message?.kind.split(":")[1] || "";
+  if (!message || !asset || !/^[0-9a-f-]{36}$/i.test(correlationId))
+    throw new HermesBotError("INVALID_REQUEST_MESSAGE");
+  await prisma.$transaction([
+    prisma.message.update({
+      where: { id: message.id },
+      data: { body: "Voice note is being transcribed…" },
+    }),
+    prisma.messageAttachment.updateMany({
+      where: {
+        projectId: context.project.id,
+        messageId: message.id,
+        assetId: asset.id,
+      },
+      data: { state: "PROCESSING", errorCode: null },
+    }),
+  ]);
+  return {
+    asset,
+    conversationId: message.conversationId,
+    messageId: message.id,
+    correlationId,
+    authorizedActorId: member.id,
+    runtimeId: loaded.runtimeAssignment.runtimeId,
+    runtimeAssignmentId: loaded.runtimeAssignment.id,
+    profileId,
+  };
+}
+
 async function resolveMentionedBots(
   context: ProjectContext,
   primaryAssignmentId: string,
@@ -691,6 +854,11 @@ export async function sendHermesBotMessage(
   message: string,
   mentionedAssignmentIds?: unknown,
   adapter: HermesRuntimeAdapter = hermesRuntimeAdapter,
+  options: {
+    attachmentAssetIds?: unknown;
+    correlationId?: string;
+    requestMessageId?: string;
+  } = {},
 ) {
   if (!operateRoles.has(context.project.role))
     throw new HermesBotError("FORBIDDEN");
@@ -710,17 +878,98 @@ export async function sendHermesBotMessage(
   const profileId = expectedProfile(loaded);
   if (profileId !== loaded.runtimeAssignment.profileKey)
     throw new HermesBotError("INVALID_RUNTIME_IDENTITY");
-  const correlationId = randomUUID();
+  const correlationId = options.correlationId || randomUUID();
+  if (!/^[0-9a-f-]{36}$/i.test(correlationId))
+    throw new HermesBotError("INVALID_CORRELATION_ID");
   const conversation = await conversationFor(context, loaded);
-  await prisma.message.create({
-    data: {
-      projectId: context.project.id,
-      conversationId: conversation.id,
-      authorUserId: context.user.id,
-      body: text,
-      kind: `BOT_CHAT_REQUEST:${correlationId}`,
-    },
-  });
+  let attachmentIds: string[] = [];
+  if (options.attachmentAssetIds !== undefined) {
+    if (
+      !Array.isArray(options.attachmentAssetIds) ||
+      options.attachmentAssetIds.length > ASSET_LIMITS.MESSAGE_COUNT ||
+      options.attachmentAssetIds.some(
+        (id) => typeof id !== "string" || id.length > 160,
+      )
+    )
+      throw new HermesBotError("INVALID_ATTACHMENTS");
+    attachmentIds = [...new Set(options.attachmentAssetIds as string[])];
+    const assets = await prisma.managedAsset.findMany({
+      where: {
+        id: { in: attachmentIds },
+        projectId: context.project.id,
+        state: "ACTIVE",
+      },
+      select: { id: true, byteLength: true },
+    });
+    if (
+      assets.length !== attachmentIds.length ||
+      assets.reduce((sum, asset) => sum + asset.byteLength, 0) >
+        ASSET_LIMITS.MESSAGE_BYTES
+    )
+      throw new HermesBotError("INVALID_ATTACHMENTS");
+  }
+  let requestMessageId = options.requestMessageId;
+  if (requestMessageId) {
+    const existing = await prisma.message.findFirst({
+      where: {
+        id: requestMessageId,
+        projectId: context.project.id,
+        conversationId: conversation.id,
+        authorUserId: context.user.id,
+      },
+      select: {
+        id: true,
+        attachments: {
+          where: { assetId: { in: attachmentIds } },
+          select: { assetId: true },
+        },
+      },
+    });
+    if (!existing || existing.attachments.length !== attachmentIds.length)
+      throw new HermesBotError("INVALID_REQUEST_MESSAGE");
+    await prisma.message.update({
+      where: { id: existing.id },
+      data: {
+        body: text,
+        kind: `BOT_CHAT_REQUEST:${correlationId}`,
+        attachments: {
+          updateMany: {
+            where: { assetId: { in: attachmentIds } },
+            data: { state: "READY", errorCode: null },
+          },
+        },
+      },
+    });
+  } else {
+    const invalidKind = await prisma.managedAsset.count({
+      where: {
+        id: { in: attachmentIds },
+        projectId: context.project.id,
+        kind: { notIn: ["DOCUMENT", "IMAGE"] },
+      },
+    });
+    if (invalidKind) throw new HermesBotError("INVALID_ATTACHMENTS");
+    const request = await prisma.message.create({
+      data: {
+        projectId: context.project.id,
+        conversationId: conversation.id,
+        authorUserId: context.user.id,
+        body: text,
+        kind: `BOT_CHAT_REQUEST:${correlationId}`,
+        attachments: attachmentIds.length
+          ? {
+              create: attachmentIds.map((assetId, sortOrder) => ({
+                projectId: context.project.id,
+                assetId,
+                sortOrder,
+              })),
+            }
+          : undefined,
+      },
+      select: { id: true },
+    });
+    requestMessageId = request.id;
+  }
   const mentionedBots = await resolveMentionedBots(
     context,
     employeeProjectAssignmentId,
@@ -737,9 +986,27 @@ export async function sendHermesBotMessage(
       correlationId,
       profileId,
       conversationId: conversation.id,
+      requestMessageId,
       mentionedProfileIds: mentionedBots.map((bot) => bot.profileId),
     },
   );
+  const priorResponse = await prisma.message.findFirst({
+    where: {
+      projectId: context.project.id,
+      conversationId: conversation.id,
+      kind: `BOT_CHAT_RESPONSE:${correlationId}`,
+    },
+    select: { id: true, body: true },
+  });
+  if (priorResponse)
+    return {
+      correlationId,
+      conversationId: conversation.id,
+      messageId: priorResponse.id,
+      requestMessageId,
+      result: priorResponse.body,
+      sessionId: null,
+    };
   try {
     const briefs = await Promise.all(
       mentionedBots.map(async (bot) => {
@@ -812,6 +1079,7 @@ export async function sendHermesBotMessage(
       correlationId,
       conversationId: conversation.id,
       messageId: saved.id,
+      requestMessageId,
       result: saved.body,
       sessionId: response.sessionId || null,
     };
