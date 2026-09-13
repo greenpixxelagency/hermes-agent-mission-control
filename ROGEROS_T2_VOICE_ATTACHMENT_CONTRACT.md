@@ -21,7 +21,9 @@ Read-only verification at `2026-09-13T19:47:27Z` found:
 - The assignment capability response has no attachment, MIME, size/count, digest, redemption, expiry, or receipt policy.
 - Hermes's official Voice Mode documentation describes native speech-to-text for CLI/desktop/messaging and an authenticated `/api/audio/transcribe` relay/fallback. It also describes client-direct credentials and an internal cached-path mode; those two mechanisms are not approved RogerOS web contracts. Source: <https://hermes-agent.nousresearch.com/docs/user-guide/features/voice-mode>.
 
-Verdict: native voice transcription is feasible; the RogerOS assignment-bound attachment contract is **ABSENT**.
+Initial verdict at the read-only architecture gate: native voice transcription was feasible; the RogerOS assignment-bound attachment contract was **ABSENT**.
+
+Local acceptance verdict, 2026-09-14: **PROVEN for the bounded localhost T2 milestone**. The isolated adapter/runtime passed 25/25 contract tests and remained loopback/internal-only. Real authenticated flows for the exact `aarav` and `default` runtime assignments each returned HTTP 201 after fixed-origin one-time redemption, selected-profile transcription, durable READY receipt persistence, and one normal Bot Chat response. Preview storage, migration, TLS bindings, deployment, production, and `main` are not covered by this verdict.
 
 ## Ownership and storage
 
