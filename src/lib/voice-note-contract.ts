@@ -78,7 +78,8 @@ export async function voiceCapabilityForAssignment(
       !response.ok ||
       result.runtimeAssignmentId !== runtimeAssignmentId ||
       voice?.available !== true ||
-      voice.contractVersion !== "rogeros-attachment-v1"
+      voice.contractVersion !== "rogeros-attachment-v1" ||
+      voice.purpose !== "VOICE_NOTE_TRANSCRIPTION"
     )
       return { available: false as const };
     const acceptedMimeTypes = Array.isArray(voice.acceptedMimeTypes)
@@ -87,22 +88,22 @@ export async function voiceCapabilityForAssignment(
         )
       : [];
     const maxBytes = Number(voice.maxBytes);
-    const maxDurationSeconds = Number(voice.maxDurationSeconds);
+    const maxDurationMs = Number(voice.maxDurationMs);
     if (
       !acceptedMimeTypes.length ||
       !Number.isInteger(maxBytes) ||
       maxBytes <= 0 ||
       maxBytes > 12_582_912 ||
-      !Number.isFinite(maxDurationSeconds) ||
-      maxDurationSeconds <= 0 ||
-      maxDurationSeconds > 120
+      !Number.isInteger(maxDurationMs) ||
+      maxDurationMs <= 0 ||
+      maxDurationMs > 120_000
     )
       return { available: false as const };
     return {
       available: true as const,
       acceptedMimeTypes,
       maxBytes,
-      maxDurationMs: Math.floor(maxDurationSeconds * 1000),
+      maxDurationMs,
     };
   } catch {
     return { available: false as const };

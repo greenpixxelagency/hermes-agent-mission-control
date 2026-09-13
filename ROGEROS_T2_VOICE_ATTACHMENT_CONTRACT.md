@@ -48,9 +48,10 @@ The signed assignment capability response adds a bounded object equivalent to:
   "voiceNoteTranscription": {
     "available": true,
     "contractVersion": "rogeros-attachment-v1",
+    "purpose": "VOICE_NOTE_TRANSCRIPTION",
     "acceptedMimeTypes": ["audio/webm", "audio/ogg", "audio/mp4"],
     "maxBytes": 12582912,
-    "maxDurationSeconds": 120
+    "maxDurationMs": 120000
   }
 }
 ```

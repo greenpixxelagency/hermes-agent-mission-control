@@ -141,9 +141,10 @@ test("voice capability accepts only the documented bounded shape", async () => {
         voiceNoteTranscription: {
           available: true,
           contractVersion: "rogeros-attachment-v1",
+          purpose: "VOICE_NOTE_TRANSCRIPTION",
           acceptedMimeTypes: ["audio/webm", "application/octet-stream"],
           maxBytes: 3_900_000,
-          maxDurationSeconds: 120,
+          maxDurationMs: 120_000,
         },
       });
     };
@@ -160,9 +161,10 @@ test("voice capability accepts only the documented bounded shape", async () => {
         voiceNoteTranscription: {
           available: true,
           contractVersion: "rogeros-attachment-v1",
+          purpose: "VOICE_NOTE_TRANSCRIPTION",
           acceptedMimeTypes: ["audio/webm"],
           maxBytes: 3_900_000,
-          maxDurationMs: 120_000,
+          maxDurationSeconds: 120,
         },
       });
     assert.deepEqual(await voiceCapabilityForAssignment("assignment-a"), {
