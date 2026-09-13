@@ -8,6 +8,14 @@
 
 **Consequences:** T1 may add preset avatars and messenger UX. Uploaded assets and attachments require T2 managed storage; model/files/Skills/MCP require T3 signed contracts; browser takeover and lesson observation require T4 isolation and single input ownership. UI presence never represents an unavailable capability as working.
 
+## Voice notes reuse Hermes transcription behind an assignment-bound adapter contract
+
+**Decision:** RogerOS T2 voice notes will use browser `MediaRecorder` for explicit user-gesture capture, RogerOS-owned private managed storage for the original audio, and Hermes's existing supported speech-to-text implementation only behind a new versioned adapter redemption contract. The contract is defined in `ROGEROS_T2_VOICE_ATTACHMENT_CONTRACT.md` and must be proven in a separate Hermes/VPS workstream before RogerOS transport integration.
+
+**Reason:** Hermes v0.21.0 proves transcription is feasible, but its current RogerOS Bot Chat adapter accepts text only. Hermes Desktop's client-direct provider credentials and the internal cached-filesystem-path fallback do not satisfy RogerOS multi-tenant ownership, secret handling, or audit requirements.
+
+**Consequences:** Only a short-lived single-purpose reference bound to the complete project/runtime-assignment/profile/message/asset/correlation identity may cross the adapter boundary. The adapter streams and verifies bytes, calls transcription for the selected profile, and returns a bounded sanitized receipt and transcript; only that transcript becomes Bot Chat input. The original audio remains a project-owned MessageAttachment. Live duplex voice, TTS replies, wake words, and messaging-platform voice modes remain outside T2. T2B and T3 stay blocked until the T2A contract is proven and durable private storage is approved.
+
 ## Main Hermes Bot Mode profiles map one-to-one to RogerOS bots
 
 **Decision:** The existing main Hermes installation is the execution source. One Hermes Bot Mode profile is one runtime identity and maps to one project-bound RogerOS bot. RogerOS Add Bot creates or ensures a profile in that main namespace; governed retirement removes the same identity only after the signed adapter operation succeeds, and the `default` profile is protected.

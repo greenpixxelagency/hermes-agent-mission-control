@@ -3,7 +3,7 @@
 ## Start every session
 
 1. Locate candidate checkouts/worktrees and identify the authoritative one from the owner’s instruction, branch, remotes, recent commits, and status. Do not use a stale checkout by convenience.
-2. Read `AGENTS.md`, `ROGEROS_AGENT_INSTRUCTIONS.md`, and the architecture/status/roadmap/decision/runbook documents.
+2. Read `AGENTS.md`, `ROGEROS_AGENT_INSTRUCTIONS.md`, and every architecture/status/roadmap/decision/runbook or phase-contract document named there. T2 work must include `ROGEROS_TEAM_EXPERIENCE_PLAN.md` and `ROGEROS_T2_VOICE_ATTACHMENT_CONTRACT.md`.
 3. Independently run `git status --short --branch`, inspect recent commits, migrations, relevant code, and tests.
 4. Confirm scope, protected systems, current milestone, and stop condition before editing.
 5. When auditing or planning, classify each claim as verified code/test/acceptance evidence, partial implementation, planned work, or legacy upstream behavior. Do not turn a shell label, a roadmap item, or a historical README into a completion claim.

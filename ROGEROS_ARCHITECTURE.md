@@ -55,6 +55,18 @@ Employee (reusable definition)
 - Runtime assignment never grants external Tool permission; governed Tool permissions remain separate.
 - M17 Employee Market uses curated, versioned, non-secret catalog data. A hire creates a project-owned employment assignment plus immutable template/version and safe configuration snapshot provenance; it does not turn a mutable global Employee row into a cross-project control channel. Selected Skill and Tool recommendations remain non-grant metadata until separately approved through existing governed flows. See `ROGEROS_PHASE_3_PLAN.md`.
 
+## Managed assets, attachments, and voice notes
+
+RogerOS owns uploaded presentation and conversation assets. A `ManagedAsset` is project-owned metadata for one privately stored object; a `MessageAttachment` joins a project-owned Message to a project-owned asset; an uploaded employee avatar is selected through `EmployeeProjectAssignment`. Composite project relations must prevent cross-project attachment or avatar links at the database layer as well as in services.
+
+Object bytes never belong in Prisma rows, browser-visible permanent URLs, employee records, prompts, or Git. A server-only storage adapter owns randomized object keys, bounded streaming writes and reads, deletion, and provider-specific credentials. Local development may use a gitignored provider; any deployed environment requires an approved durable private object store with lifecycle and deletion behavior verified before use.
+
+The browser records a voice note only after an explicit user gesture. RogerOS validates, stores, and displays the original audio as a first-class message attachment. Hermes v0.21.0 has native speech-to-text building blocks, including an audio transcription relay used by its own clients, so transcription is feasible; that native feature is not by itself RogerOS authorization or transport.
+
+Hermes may receive a voice note only through the versioned assignment-bound contract in `ROGEROS_T2_VOICE_ATTACHMENT_CONTRACT.md`. RogerOS issues a short-lived, single-purpose reference bound to opaque project, runtime, runtime-assignment, profile, conversation, message, asset, correlation, and actor identities plus MIME, byte length, digest, expiry, nonce, and purpose. The adapter authenticates the request, redeems from a fixed trusted RogerOS origin, streams within limits, verifies the digest and sniffed type, rejects replay or scope substitution, invokes the selected profile's supported transcription path, and returns a bounded sanitized receipt and transcript. Only the transcript enters the normal Bot Chat prompt; the original audio remains governed by RogerOS.
+
+Direct filesystem paths, arbitrary URLs, redirects, provider credentials, client-supplied storage locations, and permanent bearer URLs are forbidden. Hermes Desktop's client-direct credential flow and its internal cached-path fallback are not suitable RogerOS web contracts. Live duplex voice, TTS replies, Discord/Telegram voice behavior, and wake-word operation are separate future capabilities and are not part of T2 voice notes.
+
 ## Tasks and execution
 
 - `Task` is authoritative project work with status, priority, dependencies, activities, and assignments to project members or employees.

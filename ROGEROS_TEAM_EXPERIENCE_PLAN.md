@@ -17,6 +17,12 @@ The existing main-Hermes connection remains authoritative for execution. RogerOS
 - Message stores text today. There is no governed message-attachment or managed employee-avatar asset model.
 - The current Team UI is a control desk, not yet a polished messenger.
 
+### Verified T2 dependency, 2026-09-14
+
+- Hermes v0.21.0 already provides voice capture/transcription features for its CLI, desktop, Telegram, and Discord surfaces, including an authenticated audio-transcription relay used by its clients. This proves voice transcription is technically feasible and should be reused rather than rebuilt.
+- The connected RogerOS adapter remains text-only: `POST /bots/{profileId}/messages` accepts exactly `message` and `correlationId`. It has no attachment capability, redemption endpoint, supported-media policy, or sanitized attachment receipt.
+- T2 therefore begins with the separate Hermes adapter/runtime prerequisite in `ROGEROS_T2_VOICE_ATTACHMENT_CONTRACT.md`. Repository schema, storage, and UI work must not claim Hermes receipt until that prerequisite returns `PROVEN` evidence.
+
 ## Product experience
 
 ### Conversation layout
@@ -109,11 +115,19 @@ Acceptance: schema/migration review if needed, focused tests, TypeScript, scoped
 
 ### T2 — Managed attachments, avatar uploads, and voice notes
 
+- **T2A, separate Hermes/VPS workstream:** implement and verify the versioned assignment-bound voice-note/attachment redemption and transcription contract in `ROGEROS_T2_VOICE_ATTACHMENT_CONTRACT.md`. Reuse Hermes's supported transcription implementation behind the adapter. Do not expose its internal paths or client credentials. Return `PROVEN` isolation, expiry, replay, validation, redaction, and profile-routing evidence before repository transport integration.
+- **T2B, RogerOS repository workstream:** after T2A is proven and a durable private object store is approved, add the project-owned models, storage adapter, upload/download services, Team UI, audit, quotas, retention, and adapter client integration described below.
 - Add project-owned managed assets and message attachments.
 - Add safe avatar upload/replace/remove, document cards, governed Hermes attachment references, and MediaRecorder voice notes.
 - Apply validation, authorization, quotas, retention, audit, and an object-storage abstraction. Local development may use a gitignored provider; deployment requires an approved durable provider.
 
+Voice-note flow: a user gesture starts `MediaRecorder`; RogerOS uploads and validates the bounded recording into private project-owned storage; the created Message and MessageAttachment establish project ownership; RogerOS issues a short-lived single-purpose reference; the adapter redeems and verifies it for the exact runtime assignment/profile/message correlation; Hermes transcribes it; and only the transcript is submitted through the existing Bot Chat path. The original voice note remains available through an authorized RogerOS playback/download response. Live voice chat and spoken agent replies are not included.
+
 Acceptance: cross-project denial, malformed/polyglot rejection, limits, authorization tests, storage rollback, safe download headers, microphone denial/retry, real Hermes receipt for supported attachments, and no path or credential leakage.
+
+**Exact T2A handoff:** start from the accepted T1/T2 architecture documents, independently verify the current main-Hermes and adapter versions, then implement only the contract in `ROGEROS_T2_VOICE_ATTACHMENT_CONTRACT.md` in the dedicated Hermes/VPS workstream. Do not change RogerOS schema/UI, model/files/Skills/MCP, browser control, lessons, production, or unrelated services. Stop unless the fixed-origin redemption, complete identity binding, single-use expiry/replay enforcement, bounded streaming validation, selected-profile transcription, safe receipt, tests, health, and rollback evidence can all be proven.
+
+**Exact T2B handoff after T2A returns `PROVEN`:** start from accepted T1 commit `d9d52340ec337b218b3e4680636751cea1edf182` plus the accepted T2 architecture commit. Re-verify the contract evidence and durable storage provider, review the additive migration before applying it to a verified local target, and implement only ManagedAsset, MessageAttachment, uploaded avatars, document cards, and voice notes. Preserve all T1 interaction/runtime behavior and do not begin T3 or T4.
 
 ### T3 — Employee Studio, models, files, Skills, and MCP
 
