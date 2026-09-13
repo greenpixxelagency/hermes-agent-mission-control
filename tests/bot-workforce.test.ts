@@ -7,17 +7,22 @@ import {
   compileHermesSoul,
   normalizeHermesRuntimeObservation,
   reconcileHermesBotAssignment,
+  retireHermesBotAssignment,
   runtimeSlug,
   sendHermesBotMessage,
   setHermesBotSuspension,
 } from "../src/lib/hermes-bots";
 import type {
   HermesBot,
-  HermesBotIdentitySpec,
+  HermesBotSpec,
   HermesRuntimeAdapter,
 } from "../src/lib/hermes-runtime-adapter";
 import {
   normalizeHermesBotMessageResult,
+  normalizeHermesBotRuntimeStatusResponse,
+  bindingIntegrityHeaders,
+  canonicalRetirementBody,
+  controlSignatureCanonical,
   parseClaimableProfiles,
   parseProjectBotInventory,
   safeAdapterErrorHint,
@@ -40,6 +45,7 @@ function adapterHarness() {
   let bot: HermesBot | null = null;
   let state: "ACTIVE" | "SUSPENDED" = "ACTIVE";
   let ensureCount = 0;
+  let retireCount = 0;
   const profiles: string[] = [];
   const bindings: Array<{
     projectId: string;
@@ -114,11 +120,16 @@ function adapterHarness() {
       botChatAvailable: true,
       routinesAvailable: true,
     }),
-    ensureBot: async (spec: HermesBotIdentitySpec) => {
+    ensureBot: async (spec: HermesBotSpec) => {
       ensureCount += 1;
       profiles.push(spec.profileId);
       bot = { profileId: spec.profileId, displayName: spec.profileId, state };
-      return bot;
+      return {
+        profileId: spec.profileId,
+        created: ensureCount === 1,
+        assignmentState: state,
+        ready: true,
+      };
     },
     updateBotIdentity: async (profileId, metadata) => ({
       ...(bot ?? { profileId, state }),
@@ -151,6 +162,10 @@ function adapterHarness() {
       state = "ACTIVE";
       return { profileId, state };
     },
+    retireBotBinding: async (input) => {
+      retireCount += 1;
+      return { ...input, state: "RETIRED", profileRemoved: true };
+    },
     sendBotMessage: async (profileId, _message, correlationId) => ({
       profileId,
       correlationId,
@@ -159,7 +174,7 @@ function adapterHarness() {
       completedAt: timestamp,
     }),
   };
-  return { adapter, ensureCount: () => ensureCount, profiles, bindings };
+  return { adapter, ensureCount: () => ensureCount, retireCount: () => retireCount, profiles, bindings };
 }
 
 test("M14B normalizes truthful runtime observations from status and health", () => {
@@ -257,10 +272,55 @@ test("project bot inventory is bounded and rejects malformed or duplicate adapte
   );
 });
 
+test("gateway state controls the truthful per-profile online observation", () => {
+  assert.equal(
+    normalizeHermesBotRuntimeStatusResponse({
+      status: { profileId: "aarav", state: "ACTIVE", runtime: "Gateway: stopped" },
+    }).healthy,
+    false,
+  );
+  assert.equal(
+    normalizeHermesBotRuntimeStatusResponse({
+      profileId: "aarav",
+      state: "ACTIVE",
+      runtime: "Gateway: running",
+    }).healthy,
+    true,
+  );
+});
+
 test("claim discovery exposes only bounded opaque claims, never profile IDs", () => {
   assert.deepEqual(parseClaimableProfiles({ claims: [{ claimId: "a".repeat(16), displayName: "Available research lead", role: "Research", description: null }] }), [{ claimId: "a".repeat(16), displayName: "Available research lead", role: "Research", description: null }]);
   assert.throws(() => parseClaimableProfiles({ claims: [{ claimId: "short", displayName: "Bad" }] }));
   assert.throws(() => parseClaimableProfiles({ claims: Array.from({ length: 26 }, () => ({ claimId: "b".repeat(16), displayName: "Bad" })) }));
+});
+
+test("claim consumption signs its own canonical path", () => {
+  const prior = process.env.ROGEROS_HERMES_STAGING_ADAPTER_TOKEN;
+  process.env.ROGEROS_HERMES_STAGING_ADAPTER_TOKEN = "test-only-integrity-secret";
+  try {
+    const body = JSON.stringify({ claimId: "a".repeat(16) });
+    const binding = bindingIntegrityHeaders(body);
+    const claim = bindingIntegrityHeaders(body, "/claims/consume");
+    assert.notEqual(binding["X-RogerOS-Signature"], claim["X-RogerOS-Signature"]);
+    assert.equal(claim["X-RogerOS-Signature"].startsWith("RogerOS-HMAC-SHA256 "), true);
+    assert.match(controlSignatureCanonical("/claims/consume", "2026-09-08T00:00:00.000Z", "test-nonce", body), /^rogeros-control-v1\nPOST\n\/claims\/consume\n/);
+  } finally {
+    if (prior === undefined) delete process.env.ROGEROS_HERMES_STAGING_ADAPTER_TOKEN;
+    else process.env.ROGEROS_HERMES_STAGING_ADAPTER_TOKEN = prior;
+  }
+});
+
+test("retirement uses the exact immutable binding envelope", () => {
+  assert.equal(
+    canonicalRetirementBody({
+      projectId: "project-123",
+      runtimeId: "runtime-123",
+      runtimeAssignmentId: "assignment-123",
+      profileId: "aarav",
+    }),
+    '{"profileId":"aarav","projectId":"project-123","runtimeAssignmentId":"assignment-123","runtimeId":"runtime-123"}',
+  );
 });
 
 test("M14B provisions deterministic project-scoped bots and enforces runtime authorization", async (t) => {
@@ -689,5 +749,22 @@ test("M14B provisions deterministic project-scoped bots and enforces runtime aut
   assert.equal(
     JSON.stringify(audits).match(/authorization|bearer|password|token/i),
     null,
+  );
+
+  await prisma.hermesRuntimeAssignment.update({
+    where: { id: vhalamRuntime.id },
+    data: { profileKey: importedProfile },
+  });
+  const retired = await retireHermesBotAssignment(
+    context(0),
+    vhalamEmployee.id,
+    harness.adapter,
+  );
+  assert.equal(retired.assignmentState, "RETIRED");
+  assert.equal(retired.active, false);
+  assert.equal(harness.retireCount(), 1);
+  assert.equal(
+    (await prisma.employeeProjectAssignment.findUniqueOrThrow({ where: { id: vhalamEmployee.id } })).status,
+    "ARCHIVED",
   );
 });

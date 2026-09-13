@@ -4,7 +4,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { prisma } from '@/lib/prisma'
-import { isAllowedEmail, normalizeEmail, verifyPassword } from '@/lib/native-auth'
+import { isAllowedEmail, isLocalDevelopment, normalizeEmail, verifyPassword } from '@/lib/native-auth'
 
 type LocalGoogleOAuth = { clientId: string; clientSecret: string }
 
@@ -46,7 +46,43 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === 'credentials') return isAllowedEmail(user.email ?? '')
       // Comma-separated allowlist from env, e.g. ALLOWED_EMAILS="you@example.com,teammate@example.com"
       const verified = account?.provider !== 'google' || (profile as { email_verified?: boolean } | null)?.email_verified === true
-      return verified && isAllowedEmail(normalizeEmail(user.email ?? ''))
+      const email = normalizeEmail(user.email ?? '')
+      if (!verified || !email || !isAllowedEmail(email)) return false
+
+      // Google supplies a provider-specific account ID. Project memberships belong
+      // to RogerOS users, so resolve the Google identity to that local user before
+      // its ID is stored in the session token.
+      if (account?.provider === 'google') {
+        const localUser = await prisma.user.upsert({
+          where: { email },
+          create: { email, name: user.name ?? null, image: user.image ?? null },
+          update: { name: user.name ?? null, image: user.image ?? null },
+        })
+        user.id = localUser.id
+
+        // An isolated localhost database has a single seeded workspace. Let the
+        // signed-in local developer enter it without weakening hosted tenancy.
+        if (isLocalDevelopment()) {
+          const organization = await prisma.organization.findUnique({ where: { slug: 'local-development' } })
+          const project = organization
+            ? await prisma.project.findUnique({ where: { organizationId_slug: { organizationId: organization.id, slug: 'local' } } })
+            : null
+          if (organization && project) {
+            const member = await prisma.organizationMember.upsert({
+              where: { userId_organizationId: { userId: localUser.id, organizationId: organization.id } },
+              create: { userId: localUser.id, organizationId: organization.id, role: 'OWNER' },
+              update: { role: 'OWNER' },
+            })
+            await prisma.projectMember.upsert({
+              where: { projectId_organizationMemberId: { projectId: project.id, organizationMemberId: member.id } },
+              create: { projectId: project.id, organizationId: organization.id, organizationMemberId: member.id, role: 'OWNER' },
+              update: { role: 'OWNER' },
+            })
+          }
+        }
+      }
+
+      return true
     },
     async jwt({ token, user }) {
       if (user) {

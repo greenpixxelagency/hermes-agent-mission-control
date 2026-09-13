@@ -5,7 +5,7 @@ import { OrganizationRole, PrismaClient, ProjectRole } from "@prisma/client";
 import { botProfileId } from "../src/lib/hermes-bots";
 import type {
   HermesBot,
-  HermesBotIdentitySpec,
+  HermesBotSpec,
   HermesBotSkill,
   HermesRuntimeAdapter,
 } from "../src/lib/hermes-runtime-adapter";
@@ -89,13 +89,18 @@ function adapterHarness() {
       botChatAvailable: true,
       routinesAvailable: true,
     }),
-    ensureBot: async (spec: HermesBotIdentitySpec) => {
+    ensureBot: async (spec: HermesBotSpec) => {
       bot = {
         profileId: spec.profileId,
         displayName: spec.profileId,
         state: "ACTIVE",
       };
-      return bot;
+      return {
+        profileId: spec.profileId,
+        created: false,
+        assignmentState: "ACTIVE",
+        ready: true,
+      };
     },
     updateBotIdentity: async (profileId, metadata) => ({
       profileId,
@@ -135,6 +140,11 @@ function adapterHarness() {
       state: "SUSPENDED",
     }),
     resumeBotAssignment: async (profileId) => ({ profileId, state: "ACTIVE" }),
+    retireBotBinding: async (input) => ({
+      ...input,
+      state: "RETIRED",
+      profileRemoved: true,
+    }),
     sendBotMessage: async (profileId, _message, correlationId) => ({
       profileId,
       correlationId,

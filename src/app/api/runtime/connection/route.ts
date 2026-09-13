@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import { configureHermesConnection, disconnectHermesConnection, hermesConnectionStatus, HermesConnectionError } from '@/lib/hermes-connection'
+import { configureHermesConnection, disconnectHermesConnection, hermesConnectionStatus, provisionHermesConnection, HermesConnectionError } from '@/lib/hermes-connection'
 import { requireProjectContextForRequest } from '@/lib/project-scope'
 import { projectScopeErrorResponse, requireProjectContextForBody } from '@/lib/project-scope'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json() as Record<string, unknown>
+    if (body.provision === true) {
+      const result = await provisionHermesConnection(await requireProjectContextForBody(body))
+      return NextResponse.json({ connection: result }, { status: 201 })
+    }
     const agentId = typeof body.agentId === 'string' ? body.agentId.trim() : ''
     const connectionSecret = typeof body.connectionSecret === 'string' ? body.connectionSecret.trim() : ''
     const result = await configureHermesConnection(await requireProjectContextForBody(body), { agentId, connectionSecret })

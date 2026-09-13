@@ -76,7 +76,14 @@ type Message = {
 type RosterBot = { profile: Profile; employee?: Employee; runtime?: Runtime };
 type Project = { id: string; name: string; slug: string; role: string };
 type DeskClaim = { claimId: string; displayName: string; role: string | null; description: string | null };
-type Desk = { state: "SETUP_REQUIRED" | "ADAPTER_UNAVAILABLE" | "READY_EMPTY" | "ACTIVE_ROSTER" | "NEEDS_ATTENTION"; failureCode: string | null; claimableProfiles: DeskClaim[]; allowedActions: { add: boolean; adopt: boolean; retry: boolean }; retained: Array<{ employeeAssignmentId: string; displayName: string; role: string; description: string | null; taskCount: number; assignmentState: string; provisioningState: string; reconciliationState: string; runtimeStatus: string | null; active: boolean }> };
+type Desk = { state: "SETUP_REQUIRED" | "ADAPTER_UNAVAILABLE" | "READY_EMPTY" | "ACTIVE_ROSTER" | "NEEDS_ATTENTION"; failureCode: string | null; claimFailureCode?: string | null; claimableProfiles: DeskClaim[]; inventory: Profile[]; allowedActions: { add: boolean; adopt: boolean; retry: boolean }; retained: Array<{ employeeAssignmentId: string; profileKey: string; displayName: string; role: string; description: string | null; taskCount: number; assignmentState: string; provisioningState: string; reconciliationState: string; runtimeStatus: string | null; active: boolean }> };
+const deskStateCopy: Record<Desk["state"], { label: string; detail: string }> = {
+  SETUP_REQUIRED: { label: "Setup required", detail: "No isolated Hermes adapter is configured. Counts show retained RogerOS assignments only; configure a local adapter or use the approved staging workspace." },
+  ADAPTER_UNAVAILABLE: { label: "Adapter unavailable", detail: "Live inventory could not be refreshed. Retained assignments remain visible; restore the protected adapter and retry." },
+  READY_EMPTY: { label: "Ready · empty roster", detail: "The protected adapter is healthy and no profile is bound to this project. Add a governed bot or claim an explicitly available profile." },
+  ACTIVE_ROSTER: { label: "Active roster", detail: "The protected adapter is healthy. Roster evidence comes from signed project bindings and retained RogerOS assignments." },
+  NEEDS_ATTENTION: { label: "Needs attention", detail: "At least one retained assignment needs reconciliation. Review its status and retry after resolving the stated dependency." },
+};
 type Capabilities = {
   browser: { viewerLease: boolean; takeover: boolean };
   teach: { observation: boolean };
@@ -185,6 +192,7 @@ export function TeamWorkspace({ project }: { project: Project }) {
   );
   const [error, setError] = useState("");
   const [desk, setDesk] = useState<Desk | null>(null);
+  const [rosterQuery, setRosterQuery] = useState("");
   const input = useRef<HTMLTextAreaElement>(null);
   const canManage = managers.has(project.role);
   const canOperate = operators.has(project.role);
@@ -193,11 +201,11 @@ export function TeamWorkspace({ project }: { project: Project }) {
     if (!response.ok) throw Error("Your project Team desk could not be loaded.");
     const next = await response.json() as Desk;
     setDesk(next);
-    setProfiles([]);
+    setProfiles(next.inventory || []);
     setEmployees(next.retained.map((row) => ({
       id: row.employeeAssignmentId, roleOverride: row.role,
       employee: { name: row.displayName, role: row.role, description: row.description }, skillAssignments: [],
-      runtimeAssignments: [{ active: row.active, profileKey: row.employeeAssignmentId, assignmentState: row.assignmentState, provisioningState: row.provisioningState, reconciliationState: row.reconciliationState, runtimeStatus: row.runtimeStatus, desiredModelId: null, desiredModelProvider: null, externalRuntimeMetadata: null }],
+      runtimeAssignments: [{ active: row.active, profileKey: row.profileKey, assignmentState: row.assignmentState, provisioningState: row.provisioningState, reconciliationState: row.reconciliationState, runtimeStatus: row.runtimeStatus, desiredModelId: null, desiredModelProvider: null, externalRuntimeMetadata: null }],
       _count: { taskAssignments: row.taskCount },
     })));
     if (next.state === "SETUP_REQUIRED") setError("Setup required: no isolated Hermes adapter is configured for this workspace. Roster counts are retained RogerOS assignments, not live runtime inventory.");
@@ -239,6 +247,7 @@ export function TeamWorkspace({ project }: { project: Project }) {
   }, [employees, profiles]);
   const selected =
     roster.find((bot) => bot.profile.profileId === selectedId) || roster[0];
+  const filteredRoster = roster.filter((bot) => `${bot.profile.displayName} ${bot.employee?.roleOverride || bot.employee?.employee.role || ""}`.toLocaleLowerCase().includes(rosterQuery.trim().toLocaleLowerCase()));
   const selectedEmployeeId = selected?.employee?.id;
   const mentionableBots = useMemo(
     () =>
@@ -363,15 +372,25 @@ export function TeamWorkspace({ project }: { project: Project }) {
     action: "suspend" | "resume" | "reconcile" | "retire",
   ) => {
     if (!selected?.employee) return;
+    if (
+      action === "retire" &&
+      !window.confirm(
+        `Remove ${selected.profile.displayName}? This permanently removes its non-default Hermes profile and retires the matching RogerOS employee. Existing tasks, messages, executions, and audit history are preserved.`,
+      )
+    )
+      return;
     const endpoint =
       action === "retire"
-        ? `/api/workforce/${selected.employee.id}/employment`
+        ? "/api/runtime/bots/retire"
         : action === "reconcile"
           ? "/api/runtime/bots/reconcile"
           : "/api/runtime/bots/state";
     const body =
       action === "retire"
-        ? { projectId: project.id, action }
+        ? {
+            projectId: project.id,
+            employeeProjectAssignmentId: selected.employee.id,
+          }
         : action === "reconcile"
           ? {
               projectId: project.id,
@@ -478,6 +497,14 @@ export function TeamWorkspace({ project }: { project: Project }) {
           hint="Assigned through RogerOS"
         />
       </div>
+      {desk && (
+        <div role="status" aria-live="polite" className="mt-4 rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-4 py-3 text-xs">
+          <strong>{deskStateCopy[desk.state].label}</strong>
+          <span className="ml-2 text-[var(--gp-muted)]">{deskStateCopy[desk.state].detail}</span>
+          {desk.failureCode && <span className="ml-2 font-mono text-[10px] text-[var(--gp-faint)]">{desk.failureCode}</span>}
+          {desk.claimFailureCode && <span className="ml-2 text-[10px] text-[var(--gp-faint)]">Existing-profile claims are temporarily unavailable; the signed roster remains connected.</span>}
+        </div>
+      )}
       {error && (
         <div
           role="alert"
@@ -492,18 +519,29 @@ export function TeamWorkspace({ project }: { project: Project }) {
             <p className="eyebrow">Active roster</p>
             <Users className="w-4 text-[var(--gp-faint)]" />
           </div>
+          <label className="mb-3 block">
+            <span className="sr-only">Search Team roster</span>
+            <input value={rosterQuery} onChange={(event) => setRosterQuery(event.target.value)} placeholder="Search bots and roles" className="min-h-11 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-surface)] px-3 text-xs outline-none focus:border-[var(--gp-accent)]" />
+          </label>
           {loading ? (
             <div className="space-y-2">
               <div className="sk h-16" />
               <div className="sk h-16" />
             </div>
-          ) : roster.length ? (
-            roster.map((bot) => (
+          ) : roster.length && filteredRoster.length ? (
+            filteredRoster.map((bot, index) => (
               <button
                 key={bot.profile.profileId}
                 onClick={() => {
                   setSelectedId(bot.profile.profileId);
                   setSettings(false);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+                  event.preventDefault();
+                  const next = (index + (event.key === "ArrowDown" ? 1 : -1) + filteredRoster.length) % filteredRoster.length;
+                  setSelectedId(filteredRoster[next].profile.profileId);
+                  (event.currentTarget.parentElement?.querySelectorAll("button")[next] as HTMLButtonElement | undefined)?.focus();
                 }}
                 className={`mb-1.5 w-full rounded-xl border p-3 text-left transition active:scale-[.975] ${selected?.profile.profileId === bot.profile.profileId ? "border-[var(--gp-accent)] bg-[var(--gp-accent-soft)]" : "border-transparent hover:border-[var(--gp-line)] hover:bg-[var(--gp-accent-soft)]"}`}
               >
@@ -529,13 +567,15 @@ export function TeamWorkspace({ project }: { project: Project }) {
                 </span>
               </button>
             ))
+          ) : roster.length ? (
+            <EmptyState icon={<Bot />} title="No roster matches" description="Try a different bot name or role." />
           ) : (
             <EmptyState
               icon={<Bot />}
               title="No bots yet"
-              description="Add a governed bot to create an employee and Hermes runtime assignment."
+              description={desk ? deskStateCopy[desk.state].detail : "Loading the server-authorized Team desk."}
               action={
-                canManage ? (
+                canManage && desk?.allowedActions.add ? (
                   <TactileButton
                     onClick={() => setAddBot(true)}
                     className="px-3 text-xs"

@@ -64,6 +64,15 @@ export async function POST(request: Request) {
         { error: "HERMES_RUNTIME_UNAVAILABLE" },
         { status: 409 },
       );
+    try {
+      const health = await hermesRuntimeAdapter.health();
+      if (!health.hermesReachable) throw new Error("unreachable");
+    } catch {
+      return NextResponse.json(
+        { error: "HERMES_ADAPTER_UNAVAILABLE", retryable: true },
+        { status: 503 },
+      );
+    }
     const requestedName = typeof body.name === "string" ? body.name.trim() : "";
     const requestedProfileKey = requestedName
       ? botProfileId(context.project.slug, requestedName)
@@ -78,10 +87,9 @@ export async function POST(request: Request) {
         select: { id: true },
       }))
     ) {
-      return NextResponse.json(
-        { error: "BOT_PROFILE_ALREADY_EXISTS" },
-        { status: 409 },
-      );
+      return NextResponse.json({
+        receipt: { operation: "ADD_BOT", status: "ALREADY_REQUESTED", retryable: false },
+      });
     }
     const created = await createCustomEmployee(context, body);
     const profileKey = botProfileId(
@@ -98,16 +106,13 @@ export async function POST(request: Request) {
       },
     });
     try {
-      const assignment = await reconcileHermesBotAssignment(
+      await reconcileHermesBotAssignment(
         context,
         created.assignment.id,
         hermesRuntimeAdapter,
       );
       return NextResponse.json(
-        {
-          employeeAssignment: created.assignment,
-          runtimeAssignment: assignment,
-        },
+        { receipt: { operation: "ADD_BOT", status: "BOUND_AND_RECONCILED", retryable: false, provenance: "SIGNED_PROJECT_BINDING" } },
         { status: 201 },
       );
     } catch {
@@ -115,10 +120,7 @@ export async function POST(request: Request) {
       // so the owner can retry after the typed adapter is healthy. We never
       // pretend that creating an employee provisioned a live Hermes profile.
       return NextResponse.json(
-        {
-          employeeAssignment: created.assignment,
-          provisioning: "PENDING_RECONCILIATION",
-        },
+        { receipt: { operation: "ADD_BOT", status: "ASSIGNMENT_RETAINED", retryable: true, provenance: "ROGEROS_ASSIGNMENT" } },
         { status: 202 },
       );
     }

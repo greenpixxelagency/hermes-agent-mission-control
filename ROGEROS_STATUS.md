@@ -2,7 +2,9 @@
 
 > **ROGEROS_STATUS.md is a handoff aid, not the source of truth. Always verify git status, recent commits, migrations, tests, and relevant code before working.**
 
-Last updated: 2026-09-08
+Last updated: 2026-09-14
+
+> **Main Hermes local acceptance (2026-09-14):** RogerOS at `http://localhost:3001` is connected through the signed adapter to the existing Hostinger Hermes installation, not a newly created runtime. The six existing Bot Mode profiles (`default`, `aarav`, `ira`, `kabir`, `meher`, and `vihaan`) reconcile one-to-one to six RogerOS bots and all six report `Online` in the Team desk. The shared Hermes container now leaves `API_SERVER_PORT` unset globally so each profile's own configuration supplies its unique internal gateway port (`8642` through `8647`). Add Bot targets the main Hermes profile namespace; governed retirement consumes the adapter's signed receipt and protects `default`. Local acceptance does not claim production deployment, browser takeover, or any capability still advertised false by the adapter.
 
 > **Team desk remediation (repository work in progress, 2026-09-08):** The detached remediation checkout adds a single server-authorized Team desk projection that distinguishes adapter setup required, unavailable, empty, active, and attention states while preserving retained RogerOS assignments. It removes raw-profile-ID adoption from the Team UI in favor of bounded opaque claim selection. This is not deployed or staging-accepted: the isolated staging adapter must first implement the sanitized `/claims` and `/claims/consume` signed contract, and local/staging environment evidence is still required before this note may be promoted to a completion claim.
 

@@ -1,5 +1,13 @@
 # RogerOS decision log
 
+## Main Hermes Bot Mode profiles map one-to-one to RogerOS bots
+
+**Decision:** The existing main Hermes installation is the execution source. One Hermes Bot Mode profile is one runtime identity and maps to one project-bound RogerOS bot. RogerOS Add Bot creates or ensures a profile in that main namespace; governed retirement removes the same identity only after the signed adapter operation succeeds, and the `default` profile is protected.
+
+**Reason:** A second staging profile namespace produced a misleading one-bot roster and could not represent the user's six established profiles or their native teammate communication.
+
+**Consequences:** Multiple profiles may share the main Hermes container but require distinct profile-local API ports. RogerOS retains control-plane authority, signed bindings, project boundaries, and audit behavior; display names and ports never establish ownership.
+
 ## SaaS-first generic tenancy
 
 **Decision:** Organizations, Projects, memberships, and project-owned records are generic product concepts. Buddhaji and Vhalam are dogfood only.

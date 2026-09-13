@@ -366,7 +366,7 @@ export async function reconcileHermesBotAssignment(
       { profileId: desired.profileId },
     );
     if (drifted) {
-      const ensured = await adapter.ensureBot({ profileId: desired.profileId });
+      const ensured = await adapter.ensureBot(desired);
       validateProfile(ensured.profileId, desired.profileId);
       await audit(
         context,
@@ -903,6 +903,90 @@ export async function setHermesBotSuspension(
     );
   }
   return loadAssignment(context.project.id, employeeProjectAssignmentId);
+}
+
+export async function retireHermesBotAssignment(
+  context: ProjectContext,
+  employeeProjectAssignmentId: string,
+  adapter: HermesRuntimeAdapter = hermesRuntimeAdapter,
+) {
+  if (!administerRoles.has(context.project.role))
+    throw new HermesBotError("FORBIDDEN");
+  const member = await actor(context);
+  const loaded = await loadAssignment(
+    context.project.id,
+    employeeProjectAssignmentId,
+  );
+  const current = loaded.runtimeAssignment;
+  const profileId = expectedProfile(loaded);
+  if (current.assignmentState === "RETIRED") return current;
+  if (profileId === "default")
+    throw new HermesBotError("DEFAULT_PROFILE_PROTECTED");
+  try {
+    const receipt = await adapter.retireBotBinding({
+      projectId: context.project.id,
+      runtimeId: current.runtimeId,
+      runtimeAssignmentId: current.id,
+      profileId,
+    });
+    if (
+      receipt.projectId !== context.project.id ||
+      receipt.runtimeId !== current.runtimeId ||
+      receipt.runtimeAssignmentId !== current.id ||
+      receipt.profileId !== profileId ||
+      receipt.state !== "RETIRED"
+    )
+      throw new HermesBotError("ADAPTER_MALFORMED_RETIREMENT_RESPONSE");
+    const retiredAt = new Date();
+    const [runtimeAssignment] = await prisma.$transaction([
+      prisma.hermesRuntimeAssignment.update({
+        where: { id: current.id },
+        data: {
+          active: false,
+          assignmentState: "RETIRED",
+          runtimeStatus: "RETIRED",
+          reconciliationState: "IN_SYNC",
+          retiredAt,
+          suspendedAt: null,
+          lastReconcileError: null,
+        },
+      }),
+      prisma.employeeProjectAssignment.update({
+        where: { id: loaded.assignment.id },
+        data: { status: "ARCHIVED", pausedAt: null },
+      }),
+      prisma.employeeEmploymentActivity.create({
+        data: {
+          projectId: context.project.id,
+          employeeProjectAssignmentId: loaded.assignment.id,
+          actorProjectMemberId: member.id,
+          eventType: "runtime.bot.retired",
+          detail: `${loaded.assignment.employee.name} Hermes bot retired`,
+          metadata: { profileId, profileRemoved: receipt.profileRemoved },
+        },
+      }),
+    ]);
+    await audit(
+      context,
+      member.id,
+      "runtime.bot.retired",
+      current.id,
+      "Hermes Bot profile and RogerOS assignment retired",
+      { profileId, profileRemoved: receipt.profileRemoved },
+    );
+    return runtimeAssignment;
+  } catch (error) {
+    const failure = adapterFailure(error);
+    await audit(
+      context,
+      member.id,
+      "runtime.bot.retire.failed",
+      current.id,
+      "Hermes Bot retirement failed safely",
+      { profileId },
+    );
+    throw failure;
+  }
 }
 
 export async function getHermesBotAssignment(

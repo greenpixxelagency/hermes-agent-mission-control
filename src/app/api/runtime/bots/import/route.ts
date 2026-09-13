@@ -31,6 +31,12 @@ export async function POST(request: Request) {
         { error: "HERMES_RUNTIME_UNAVAILABLE" },
         { status: 409 },
       );
+    try {
+      const health = await hermesRuntimeAdapter.health();
+      if (!health.hermesReachable) throw new Error("unreachable");
+    } catch {
+      return NextResponse.json({ error: "HERMES_ADAPTER_UNAVAILABLE", retryable: true }, { status: 503 });
+    }
 
     const created = await createCustomEmployee(context, {
       name: typeof body.name === "string" ? body.name : "Claimed Hermes profile",
@@ -70,33 +76,26 @@ export async function POST(request: Request) {
       targetType: "HermesRuntimeAssignment",
       targetId: runtimeAssignment.id,
       summary: "Hermes profile adoption requested for RogerOS workforce",
-      metadata: { claimConsumed: true, capabilityGrants: "NONE" },
+      metadata: { claimRequested: true, capabilityGrants: "NONE" },
     });
     try {
       const binding = await hermesRuntimeAdapter.claimProfileBinding({ claimId, projectId: context.project.id, runtimeId: runtime.id, runtimeAssignmentId });
       await prisma.hermesRuntimeAssignment.update({ where: { id: runtimeAssignment.id }, data: { profileKey: binding.profileId } });
-      const assignment = await reconcileHermesBotAssignment(
+      await recordAuditEvent({ projectId: context.project.id, eventType: "runtime.bot.claim.consumed", actor: { type: AuditActorType.HUMAN, projectMemberId: actor.id }, targetType: "HermesRuntimeAssignment", targetId: runtimeAssignment.id, summary: "Claimable Hermes profile bound to RogerOS assignment", metadata: { capabilityGrants: "NONE" } });
+      await reconcileHermesBotAssignment(
         context,
         created.assignment.id,
         hermesRuntimeAdapter,
       );
-      return NextResponse.json(
-        {
-          employeeAssignment: created.assignment,
-          runtimeAssignment: assignment,
-        },
-        { status: 201 },
-      );
+      return NextResponse.json({ receipt: { operation: "CLAIM_PROFILE", status: "BOUND_AND_RECONCILED", retryable: false, provenance: "SIGNED_PROJECT_BINDING" } }, { status: 201 });
     } catch (error) {
       const code = error instanceof Error && /^HERMES_ADAPTER_(?:NOT_CONFIGURED|\d{3}_[A-Z0-9_]{1,200})$/.test(error.message) ? error.message : "ADOPTION_REQUIRES_RETRY";
       await prisma.hermesRuntimeAssignment.update({ where: { id: runtimeAssignment.id }, data: { provisioningState: "FAILED", reconciliationState: "FAILED", lastReconcileError: code } });
+      const adapterStatus = /^HERMES_ADAPTER_(\d{3})_/.exec(code)?.[1];
+      const definitiveStatus = adapterStatus !== undefined && ["400", "404", "409", "410", "422"].includes(adapterStatus) ? Number(adapterStatus) : null;
       return NextResponse.json(
-        {
-          employeeAssignment: created.assignment,
-          provisioning: "PENDING_RECONCILIATION",
-          error: code,
-        },
-        { status: 202 },
+        { error: code, receipt: { operation: "CLAIM_PROFILE", status: definitiveStatus ? "CLAIM_REJECTED" : "ASSIGNMENT_RETAINED", retryable: !definitiveStatus, provenance: "ROGEROS_ASSIGNMENT" } },
+        { status: definitiveStatus ?? 202 },
       );
     }
   } catch (error) {

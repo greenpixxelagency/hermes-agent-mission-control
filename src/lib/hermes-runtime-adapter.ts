@@ -75,6 +75,14 @@ export type HermesBinding = {
   modelProvider?: string | null;
   modelId?: string | null;
 };
+export type HermesRetirementReceipt = {
+  projectId: string;
+  runtimeId: string;
+  runtimeAssignmentId: string;
+  profileId: string;
+  state: "RETIRED";
+  profileRemoved: boolean;
+};
 // This opaque, short-lived claim capability is the only discoverable handle
 // for an unbound profile. A profile ID is never returned by claim discovery.
 export type HermesClaimableProfile = {
@@ -93,7 +101,12 @@ export type HermesBotSpec = {
   runtime: { provider: string; modelId: string };
   approvedSkills: string[];
 };
-export type HermesBotIdentitySpec = Pick<HermesBotSpec, "profileId">;
+export type HermesBotEnsureResult = {
+  profileId: string;
+  created: boolean;
+  assignmentState: HermesBotState;
+  ready: boolean;
+};
 export type HermesBotMessageResult = {
   correlationId: string;
   profileId: string;
@@ -154,7 +167,7 @@ export type HermesRuntimeAdapter = HermesExecutionRuntimeAdapter & {
   getBotCapabilityFingerprint: (
     profileId: string,
   ) => Promise<HermesBotCapability>;
-  ensureBot: (spec: HermesBotIdentitySpec) => Promise<HermesBot>;
+  ensureBot: (spec: HermesBotSpec) => Promise<HermesBotEnsureResult>;
   updateBotIdentity: (
     profileId: string,
     metadata: { displayName: string; description: string },
@@ -181,6 +194,12 @@ export type HermesRuntimeAdapter = HermesExecutionRuntimeAdapter & {
   resumeBotAssignment: (
     profileId: string,
   ) => Promise<{ profileId: string; state: "ACTIVE" }>;
+  retireBotBinding: (input: {
+    projectId: string;
+    runtimeId: string;
+    runtimeAssignmentId: string;
+    profileId: string;
+  }) => Promise<HermesRetirementReceipt>;
   sendBotMessage: (
     profileId: string,
     message: string,
@@ -190,6 +209,13 @@ export type HermesRuntimeAdapter = HermesExecutionRuntimeAdapter & {
 
 const url = () => process.env.HERMES_STAGING_ADAPTER_URL?.replace(/\/$/, "");
 const token = () => process.env.ROGEROS_HERMES_STAGING_ADAPTER_TOKEN;
+// The adapter's project namespace is the stable RogerOS integration identity.
+// Local development projects may use a different database ID, so callers can
+// supply the explicitly configured staging namespace without exposing it to
+// browser clients.
+const adapterProjectId = (projectId: string) =>
+  process.env.ROGEROS_HERMES_ADAPTER_PROJECT_ID?.trim() ||
+  (process.env.NODE_ENV === "development" ? "rogeros-vhalam" : projectId);
 export const hermesAdapterConfigured = () => Boolean(url() && token());
 function config() {
   const base = url();
@@ -324,6 +350,18 @@ function canonicalBindingBody(input: BindingRegistrationInput) {
     runtimeId: input.runtimeId,
   });
 }
+export function canonicalRetirementBody(input: BindingRegistrationInput) {
+  // Retirement is authorized by the immutable opaque binding, not by a
+  // browser-selected profile label. Keep this serialization aligned with the
+  // adapter's signed control contract.
+  canonicalBindingBody(input);
+  return JSON.stringify({
+    profileId: input.profileId,
+    projectId: input.projectId,
+    runtimeAssignmentId: input.runtimeAssignmentId,
+    runtimeId: input.runtimeId,
+  });
+}
 function canonicalClaimBody(input: ClaimBindingInput) {
   for (const value of [input.projectId, input.runtimeId, input.runtimeAssignmentId]) {
     if (!opaqueBindingId.test(value)) throw new Error("HERMES_ADAPTER_400_CLAIM");
@@ -332,25 +370,27 @@ function canonicalClaimBody(input: ClaimBindingInput) {
   return JSON.stringify({ claimId: input.claimId, projectId: input.projectId, runtimeAssignmentId: input.runtimeAssignmentId, runtimeId: input.runtimeId });
 }
 
-function bindingIntegrityHeaders(body: string) {
+export function bindingIntegrityHeaders(body: string, path = "/bindings/register") {
   const secret = token();
   if (!secret) throw new Error("HERMES_ADAPTER_NOT_CONFIGURED");
   const timestamp = new Date().toISOString();
   const nonce = randomBytes(32).toString("base64url");
-  const bodyHash = createHash("sha256").update(body).digest("hex");
-  const canonical = [
-    "rogeros-control-v1",
-    "POST",
-    "/bindings/register",
-    timestamp,
-    nonce,
-    bodyHash,
-  ].join("\n");
+  const canonical = controlSignatureCanonical(path, timestamp, nonce, body);
   return {
     "X-RogerOS-Timestamp": timestamp,
     "X-RogerOS-Nonce": nonce,
     "X-RogerOS-Signature": `RogerOS-HMAC-SHA256 ${createHmac("sha256", secret).update(canonical).digest("base64url")}`,
   };
+}
+export function controlSignatureCanonical(path: string, timestamp: string, nonce: string, body: string) {
+  return [
+    "rogeros-control-v1",
+    "POST",
+    path,
+    timestamp,
+    nonce,
+    createHash("sha256").update(body).digest("hex"),
+  ].join("\n");
 }
 const botPath = (profileId: string, suffix = "") =>
   `/bots/${encodeURIComponent(profileId)}${suffix}`;
@@ -500,6 +540,27 @@ export function normalizeHermesBotMessageResult(
   };
 }
 
+export function normalizeHermesBotRuntimeStatusResponse(
+  value: unknown,
+): HermesBotRuntimeStatus {
+  const status = unwrap<HermesBotRuntimeStatus>(value, "status");
+  if (!status || typeof status !== "object")
+    throw new Error("HERMES_ADAPTER_502_STATUS");
+  const gateway =
+    typeof status.runtime === "string"
+      ? /Gateway:\s*(running|stopped)/i.exec(status.runtime)?.[1]?.toLowerCase()
+      : undefined;
+  return {
+    ...status,
+    healthy:
+      gateway === "running"
+        ? true
+        : gateway === "stopped"
+          ? false
+          : status.healthy,
+  };
+}
+
 export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   health: () => request("/health", { headers: {} }),
   ensureProfile: (input) =>
@@ -514,12 +575,12 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   listBots: () => request("/bots"),
   listProjectBots: async (projectId) =>
     parseProjectBotInventory(
-      await request<unknown>(`/projects/${encodeURIComponent(projectId)}/bots`),
+      await request<unknown>(`/projects/${encodeURIComponent(adapterProjectId(projectId))}/bots`),
     ),
   listClaimableProfiles: async () => parseClaimableProfiles(await request<unknown>("/claims")),
   claimProfileBinding: async (input) => {
     const body = canonicalClaimBody(input);
-    const response = await request<unknown>("/claims/consume", { method: "POST", body, headers: bindingIntegrityHeaders(body) });
+    const response = await request<unknown>("/claims/consume", { method: "POST", body, headers: bindingIntegrityHeaders(body, "/claims/consume") });
     const binding = unwrap<HermesBinding>(response, "binding");
     if (!binding || binding.projectId !== input.projectId || binding.runtimeId !== input.runtimeId || binding.runtimeAssignmentId !== input.runtimeAssignmentId || !safeBindingProfileId.test(binding.profileId)) throw new Error("HERMES_ADAPTER_502_CLAIM");
     return binding;
@@ -587,9 +648,8 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
   getBot: async (profileId) =>
     unwrap<HermesBot>(await request<unknown>(botPath(profileId)), "bot"),
   getBotRuntimeStatus: async (profileId) =>
-    unwrap<HermesBotRuntimeStatus>(
+    normalizeHermesBotRuntimeStatusResponse(
       await request<unknown>(botPath(profileId, "/status")),
-      "status",
     ),
   listBotSkills: async (profileId) =>
     unwrapSkillList(await request<unknown>(botPath(profileId, "/skills"))),
@@ -605,9 +665,25 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
       await request<unknown>(botPath(profileId, "/capability-fingerprint")),
       "capability",
     ),
-  // M14B adopts the deterministic profile already provisioned and verified by M14A.
-  // A read through the typed Bot endpoint proves its existence without risking a duplicate.
-  ensureBot: (spec) => request(botPath(spec.profileId)),
+  // The protected adapter owns profile creation. RogerOS supplies only the
+  // validated deterministic identity; it cannot choose a command or path.
+  ensureBot: (spec) => {
+    const modelExplicit =
+      spec.runtime.provider !== "adapter-managed" &&
+      spec.runtime.modelId !== "existing-safe-default";
+    return request<HermesBotEnsureResult>("/bots/ensure", {
+      method: "POST",
+      body: JSON.stringify({
+        profileId: spec.profileId,
+        displayName: spec.displayName,
+        description: spec.description,
+        soul: spec.soul.content,
+        ...(modelExplicit
+          ? { provider: spec.runtime.provider, model: spec.runtime.modelId }
+          : {}),
+      }),
+    });
+  },
   updateBotIdentity: (profileId, metadata) =>
     request(botPath(profileId, "/identity"), {
       method: "PUT",
@@ -642,6 +718,27 @@ export const hermesRuntimeAdapter: HermesRuntimeAdapter = {
     request(botPath(profileId, "/suspend"), { method: "POST" }),
   resumeBotAssignment: (profileId) =>
     request(botPath(profileId, "/resume"), { method: "POST" }),
+  retireBotBinding: async (input) => {
+    const path = `/bindings/${encodeURIComponent(input.runtimeAssignmentId)}/retire`;
+    const body = canonicalRetirementBody(input);
+    const response = await request<unknown>(path, {
+      method: "POST",
+      body,
+      headers: bindingIntegrityHeaders(body, path),
+    });
+    const receipt = unwrap<HermesRetirementReceipt>(response, "receipt");
+    if (
+      !receipt ||
+      receipt.projectId !== input.projectId ||
+      receipt.runtimeId !== input.runtimeId ||
+      receipt.runtimeAssignmentId !== input.runtimeAssignmentId ||
+      receipt.profileId !== input.profileId ||
+      receipt.state !== "RETIRED" ||
+      typeof receipt.profileRemoved !== "boolean"
+    )
+      throw new Error("HERMES_ADAPTER_502_RETIREMENT");
+    return receipt;
+  },
   sendBotMessage: async (profileId, message, correlationId) =>
     normalizeHermesBotMessageResult(
       await request<RawHermesBotMessageResult>(

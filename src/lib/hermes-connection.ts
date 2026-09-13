@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -90,6 +90,13 @@ export async function configureHermesConnection(context: ProjectContext, input: 
     return { connectionId: connection.id, capabilities: verified.capabilities ?? [] }
   })
   return result
+}
+
+/** Provision a fresh staging identity without ever sending the secret through the client. */
+export async function provisionHermesConnection(context: ProjectContext) {
+  const agentId = randomUUID()
+  const connectionSecret = randomBytes(32).toString('base64url')
+  return configureHermesConnection(context, { agentId, connectionSecret })
 }
 
 /** Removes RogerOS access immediately. Hermes registration is left inert server-side. */

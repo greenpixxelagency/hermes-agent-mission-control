@@ -6,6 +6,8 @@ RogerOS is a SaaS/micro-SaaS product for external customers. Organizations and P
 
 Hermes is the primary AI execution runtime. RogerOS is the authoritative control plane and owns tenancy, employees, project assignments, tasks, Project Brain, permissions, policies, approvals, audit history, tool governance, and authoritative business state. Hermes and other providers execute approved work through adapters; they are not authoritative business storage. Prompts, model instructions, and runtime configuration are never security boundaries.
 
+The main Hermes installation may run multiple Bot Mode profiles inside one container. Each profile is the runtime identity behind one RogerOS bot and must own a distinct internal API gateway port. The compose environment must not globally override `API_SERVER_PORT`; profile-local configuration is authoritative (`8642` through `8647` for the accepted six-profile installation). RogerOS addresses profiles through signed opaque bindings rather than by network port or display name.
+
 The current RogerOS application lives under `/p/[projectSlug]` and uses a shared project shell. Some untouched upstream Hermy HQ routes remain beside it during the staged product transition.
 
 ## Single-project-first experience
