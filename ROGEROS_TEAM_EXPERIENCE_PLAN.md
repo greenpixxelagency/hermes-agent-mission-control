@@ -139,6 +139,8 @@ Acceptance: cross-project denial, malformed/polyglot rejection, limits, authoriz
 
 Acceptance: role enforcement, profile isolation, path-traversal denial, secret redaction, stale-write conflict handling, invalid-config rollback, dynamic provider states, audit evidence, and real main-Hermes reconciliation.
 
+Repository-local status: implemented from T2 closeout with deterministic signed-contract coverage and truthful default-deny states. The additive migration is generated/reviewed but not applied because this checkout has no configured local PostgreSQL target. Real main-Hermes reconciliation and two-profile live acceptance remain gated on the separate handoff in `ROGEROS_T3_EMPLOYEE_STUDIO_CONTRACT.md`; they must not be inferred from mocks.
+
 ### T4 — Isolated browser control and Record Lesson
 
 - Deliver profile-bound browser viewing, expiring user-bound leases, and atomic Take/Return Control ownership.

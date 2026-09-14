@@ -128,3 +128,11 @@ The adapter redeems a voice asset only through `POST /assets/{assetId}/redeem` o
 - M22 exposes a GET-only `/api/search` endpoint and shell palette for the current server-authorized project. The client may supply a project selector, but all reads use the project returned by `requireProjectContextForRequest`; an inaccessible project is indistinguishable from a missing one.
 - The intentional allowlist is Task display metadata, `EmployeeProjectAssignment` display metadata, and native Project Brain record titles/statuses (`ProjectConstitution`, `KnowledgeItem`, `Decision`, and `ProjectMemory`). Approval/workflow records, Drive/external material, legacy Hermy HQ records, prompts, descriptions/content, execution outputs, provider payloads, JSON metadata, credentials, and connection secrets are excluded.
 - Searches match only those safe display fields, return at most 24 redacted metadata results, and make no provider call or state change. Palette selection can only navigate to the existing Tasks, Workforce, or Project Brain workflows; it cannot dispatch, approve, mutate, or change runtime/governance/billing/production state.
+
+## T3 Employee Studio
+
+- Existing employee/runtime assignments, Skill catalog/assignments, Tool permissions, ProjectConnection credentials, and audit remain authoritative. T3 adds no parallel employee, capability, credential, or execution system.
+- `RuntimeConfigurationMutation` is the project-owned idempotency ledger. Adapter application precedes a database CAS commit; failed commits trigger an assignment-bound compensating call and durable `ROLLED_BACK` or `ATTENTION` state.
+- `StudioProfileFile` and immutable versions store bounded recovery content. Adapter I/O uses fixed logical keys and digest/version CAS; raw paths and file contents are excluded from audit/mutation metadata.
+- `GovernedMcpAssignment` references an installed healthy project connection and protected credential row. Per-tool rows default disabled and still require existing employee Tool permission.
+- All observations/mutations use the signed, expiring, nonce-protected, assignment-bound `employee-studio-v1` contract. Absence is a truthful setup-required/unavailable state, never a legacy fallback.

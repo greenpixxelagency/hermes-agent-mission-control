@@ -94,6 +94,8 @@ export async function readTeamDesk(
         provisioningState: runtime.provisioningState,
         reconciliationState: runtime.reconciliationState,
         runtimeStatus: runtime.runtimeStatus,
+        desiredModelProvider: runtime.desiredModelProvider,
+        desiredModelId: runtime.desiredModelId,
         active: runtime.active,
         provenance: "ROGEROS_ASSIGNMENT" as const,
         lastReconciledAt: runtime.lastReconciledAt?.toISOString() ?? null,

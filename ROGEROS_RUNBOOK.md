@@ -40,6 +40,14 @@
 - When tunneling to a Windows localhost server, bind Next explicitly to `127.0.0.1`; a server listening only on `::1` cannot receive a reverse forward targeted at `127.0.0.1`. Verify both the local listener address and an adapter-side safe HTTP probe before spending a one-time redemption token.
 - T2A must derive its temporary file suffix only from the validated MIME allowlist (`.webm`, `.ogg`, or `.m4a`) and pass that suffix explicitly to both media-probe and transcription subprocesses. A generic `.audio` suffix is rejected by Hermes's supported STT path.
 
+## Local T3 Employee Studio verification
+
+- Start from the recorded T2 closeout on a new `codex/t3-*` branch. Review the additive migration before applying it to a verified disposable/local PostgreSQL target.
+- Keep `ROGEROS_EMPLOYEE_STUDIO_ENABLED` absent/false until the separate adapter handoff is `PROVEN`. Missing URL, bearer token, request HMAC secret, or distinct catalog HMAC secret must stay setup-required.
+- Run `npm run test:employee-studio`, Prisma validate/generate, TypeScript, focused lint, nearby governance/runtime/Skill/connection suites, build, and `git diff --check`.
+- Live acceptance must use a sanitized separate VPS handoff and cover two same-project profiles, cross-project/profile denial, replay, stale model/file/MCP CAS, rollback, secret/path redaction, and audit. Restore default-deny after the bounded test unless separately approved.
+- Do not apply staging/production migrations, configure Vercel, or operate Hermes/VPS from the repository task.
+
 ## Implementation and testing
 
 - Inspect the existing feature and reuse its service, authorization, component, adapter, and audit patterns.

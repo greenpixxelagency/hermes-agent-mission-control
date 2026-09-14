@@ -149,6 +149,14 @@ Last updated: 2026-09-14
 - M17 migration/test closeout commits follow it on `origin/phase-3`.
 - Production and `main` remain untouched.
 
+## T3 repository-local Employee Studio foundation — 2026-09-14
+
+- `codex/t3-employee-studio` starts exactly at T2 closeout `d15d2bef70a02f0848f22b3dffcc2d67a68172ed`.
+- Implemented integrated settings/model UI with explicit states, signed dynamic catalog states, logical-key file edit/diff/version restore, governed Skills, and default-deny MCP tools.
+- Added an additive migration for project/runtime mutation receipts, observed model/CAS state, durable profile versions, and governed MCP secret references/tool state.
+- Added strict assignment binding, nonce/timestamp request signing, independent HMAC secret, strict response/catalog verification, durable idempotency, CAS, and compensating rollback paths.
+- This checkout has no local PostgreSQL configuration, so no database migration or DB-backed acceptance is claimed. No VPS, Hermes, Vercel, Preview, production, or `main` operation occurred. The adapter stays default-deny pending a separate `PROVEN` handoff.
+
 ## Warnings for a future approved milestone
 
 - Identify the authoritative worktree before editing; the Documents checkout may be stale.

@@ -123,6 +123,8 @@ type Desk = {
     provisioningState: string;
     reconciliationState: string;
     runtimeStatus: string | null;
+    desiredModelProvider: string | null;
+    desiredModelId: string | null;
     active: boolean;
   }>;
 };
@@ -136,6 +138,36 @@ type Capabilities = {
     maxDurationMs?: number;
   };
 };
+type StudioData = {
+  state: "READY" | "SETUP_REQUIRED" | "UNAVAILABLE" | "ATTENTION";
+  failureCode: string | null;
+  expectedRevision: number;
+  model: { capability: boolean; catalog: { revision: string; models: Array<{ provider: string; modelId: string; displayName: string; state: string }> } | null; observed: { provider: string; modelId: string; fingerprint: string } | null };
+  profileFiles: { capability: boolean; observed: Array<{ logicalKey: string; version: number; digest: string; state: string }> };
+  skills: { capability: boolean; lifecycle: boolean; observed: Array<{ key: string; version: string; installed: boolean; enabled: boolean }>; catalog: Array<{ id: string; name: string; description: string; version: string; runtimeKey: string }>; assignments: Array<{ skill: { id: string }; state: string }> };
+  mcp: { capability: boolean; observed: Array<{ serverKey: string; name: string; healthy: boolean; tools: Array<{ key: string; name: string }> }>; eligibleConnections: Array<{ id: string; name: string }>; assignments: Array<{ serverKey: string; state: string; revision: number; tools: Array<{ toolKey: string; enabled: boolean }> }> };
+};
+type RawStudioData = {
+  overview: { reconciliationState: string; studioConfigRevision: number; observedModelProvider: string | null; observedModelId: string | null };
+  capabilities: Record<"model" | "profileFiles" | "skills" | "skillLifecycle" | "mcp", { available: boolean; reason: "READY" | "SETUP_REQUIRED" | "UNAVAILABLE" }>;
+  modelCatalog: { revision: string; current: { provider: string; modelId: string; fingerprint: string } | null; models: Array<{ provider: string; modelId: string; displayName: string; setupState: string }> } | null;
+  profileFiles: Array<{ logicalKey: string; version: number; digest: string }>;
+  skills: Array<{ state: string; skill: { id: string; name: string; description: string; version: string }; observed: { key: string; version: string; installed: boolean; enabled: boolean } | null }>;
+  skillCatalog: Array<{ id: string; name: string; description: string; version: string; runtimeKey: string }>;
+  observedSkills: Array<{ key: string; version: string; installed: boolean; enabled: boolean }>;
+  mcp: { catalog: Array<{ serverKey: string; displayName: string; setupState: string; toolKeys: string[] }>; eligibleConnections: Array<{ id: string; name: string }>; assignments: Array<{ serverKey: string; state: string; revision: number; tools: Array<{ toolKey: string; enabled: boolean }> }> };
+};
+function normalizeStudio(value: RawStudioData): StudioData {
+  const capabilityValues = Object.values(value.capabilities);
+  const state = value.overview.reconciliationState === "FAILED" ? "ATTENTION" : capabilityValues.some((item) => item.available) ? "READY" : capabilityValues.every((item) => item.reason === "SETUP_REQUIRED") ? "SETUP_REQUIRED" : "UNAVAILABLE";
+  return {
+    state, failureCode: state === "READY" ? null : capabilityValues.find((item) => !item.available)?.reason || null, expectedRevision: value.overview.studioConfigRevision,
+    model: { capability: value.capabilities.model.available, catalog: value.modelCatalog ? { revision: value.modelCatalog.revision, models: value.modelCatalog.models.map((model) => ({ ...model, state: model.setupState })) } : null, observed: value.modelCatalog?.current || (value.overview.observedModelProvider && value.overview.observedModelId ? { provider: value.overview.observedModelProvider, modelId: value.overview.observedModelId, fingerprint: "server-cas" } : null) },
+    profileFiles: { capability: value.capabilities.profileFiles.available, observed: value.profileFiles.map((file) => ({ ...file, state: "READY" })) },
+    skills: { capability: value.capabilities.skills.available, lifecycle: value.capabilities.skillLifecycle.available, observed: value.observedSkills, catalog: value.skillCatalog, assignments: value.skills.map((item) => ({ skill: { id: item.skill.id }, state: item.state })) },
+    mcp: { capability: value.capabilities.mcp.available, observed: value.mcp.catalog.map((server) => ({ serverKey: server.serverKey, name: server.displayName, healthy: server.setupState === "READY", tools: server.toolKeys.map((key) => ({ key, name: key })) })), eligibleConnections: value.mcp.eligibleConnections, assignments: value.mcp.assignments },
+  };
+}
 
 const managers = new Set(["OWNER", "ADMIN"]);
 const operators = new Set(["OWNER", "ADMIN", "OPERATOR"]);
@@ -361,8 +393,8 @@ export function TeamWorkspace({ project }: { project: Project }) {
             provisioningState: row.provisioningState,
             reconciliationState: row.reconciliationState,
             runtimeStatus: row.runtimeStatus,
-            desiredModelId: null,
-            desiredModelProvider: null,
+            desiredModelId: row.desiredModelId,
+            desiredModelProvider: row.desiredModelProvider,
           },
         ],
         _count: { taskAssignments: row.taskCount },
@@ -1474,7 +1506,8 @@ export function TeamWorkspace({ project }: { project: Project }) {
       {modelShell && (
         <ModelShell
           bot={selected}
-          catalogAvailable={capabilities.model.catalog}
+          projectId={project.id}
+          canManage={canManage}
           close={() => setModelShell(false)}
         />
       )}
@@ -1609,6 +1642,18 @@ function EmployeeSettings({
   ) => Promise<void>;
   openModel: () => void;
 }) {
+  const [studio, setStudio] = useState<StudioData | null>(null);
+  const [studioError, setStudioError] = useState("");
+  const refreshStudio = useCallback(async () => {
+    if (!bot.employee?.id) return;
+    try {
+      const response = await fetch(`/api/runtime/bots/studio?projectId=${encodeURIComponent(projectId)}&employeeProjectAssignmentId=${encodeURIComponent(bot.employee.id)}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("Employee Studio could not be loaded.");
+      setStudio(normalizeStudio(await response.json() as RawStudioData)); setStudioError("");
+    } catch (cause) { setStudioError(cause instanceof Error ? cause.message : "Employee Studio could not be loaded."); }
+  }, [bot.employee?.id, projectId]);
+  useEffect(() => { void refreshStudio(); }, [refreshStudio]);
+  const studioTone = studio?.state === "READY" ? "good" : studio?.state === "ATTENTION" ? "bad" : studio?.state === "SETUP_REQUIRED" ? "warn" : "neutral";
   return (
     <div
       role="dialog"
@@ -1643,6 +1688,14 @@ function EmployeeSettings({
             <X className="h-4 w-4" />
           </button>
         </header>
+        <nav aria-label="Employee Studio sections" className="mt-5 flex gap-2 overflow-x-auto pb-1">
+          {["Overview", "Model", "Profile files", "Skills", "MCP"].map((label) => <a key={label} href={`#studio-${label.toLowerCase().replace(" ", "-")}`} className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-[var(--gp-line)] px-3 text-xs font-semibold transition active:scale-[.975] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gp-accent)]">{label}</a>)}
+        </nav>
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--gp-line)] bg-[var(--gp-canvas)] p-3" aria-live="polite">
+          <StatusPill tone={studioTone}>{studio?.state || "UNAVAILABLE"}</StatusPill>
+          <p className="text-[10px] text-[var(--gp-muted)]">{studioError || (studio?.failureCode ? studio.failureCode.replaceAll("_", " ") : "Signed assignment-scoped observation")}</p>
+        </div>
+        <div id="studio-overview" className="scroll-mt-4" />
         <div className="mt-5 rounded-xl border border-[var(--gp-line)] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--gp-faint)]">
             Hermes profile
@@ -1711,17 +1764,31 @@ function EmployeeSettings({
           </div>
         </section>
         <button
+          id="studio-model"
           onClick={openModel}
           className="mt-5 flex min-h-14 w-full items-center justify-between rounded-xl border border-[var(--gp-line)] px-4 text-left transition active:scale-[.985]"
         >
           <span>
             <span className="block text-xs font-semibold">Model</span>
             <span className="mt-1 block text-[10px] text-[var(--gp-muted)]">
-              View the T1 command shell
+              {studio?.model.capability ? `${studio.model.catalog?.models.length || 0} signed catalog choices` : "Setup required or unavailable"}
             </span>
           </span>
           <ChevronRight className="h-4 w-4" />
         </button>
+        <section id="studio-profile-files" className="mt-5 scroll-mt-4 rounded-2xl border border-[var(--gp-line)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-xs font-semibold">Profile files</h3><p className="mt-1 text-[10px] text-[var(--gp-muted)]">Fixed logical keys only. No runtime paths are exposed.</p></div><StatusPill tone={studio?.profileFiles.capability ? "good" : "neutral"}>{studio?.profileFiles.capability ? "READY" : "UNAVAILABLE"}</StatusPill></div>
+          {studio?.profileFiles.capability && studio.profileFiles.observed.length ? <div className="mt-3 space-y-2">{studio.profileFiles.observed.map((file) => <ProfileFileControl key={file.logicalKey} file={file} projectId={projectId} employeeProjectAssignmentId={bot.employee!.id} canManage={canManage} />)}</div> : <p className="mt-3 text-[11px] leading-5 text-[var(--gp-muted)]">The adapter has not advertised the signed profile-file capability. Editing and restore remain denied.</p>}
+        </section>
+        <section id="studio-skills" className="mt-5 scroll-mt-4 rounded-2xl border border-[var(--gp-line)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-xs font-semibold">Skills</h3><p className="mt-1 text-[10px] text-[var(--gp-muted)]">Trusted RogerOS catalog plus signed runtime observation.</p></div><StatusPill tone={studio?.skills.capability ? "good" : "neutral"}>{studio?.skills.capability ? "READY" : "UNAVAILABLE"}</StatusPill></div>
+          <div className="mt-3 space-y-2">{studio?.skills.catalog.map((skill) => { const assigned = studio.skills.assignments.some((item) => item.skill.id === skill.id && item.state === "ACTIVE"); const observed = studio.skills.observed.find((item) => item.key === skill.runtimeKey); return <div key={skill.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--gp-line)] p-3"><div className="min-w-0"><p className="text-xs font-semibold">{skill.name}</p><p className="mt-1 text-[10px] text-[var(--gp-muted)]">v{skill.version} · {observed?.installed ? "Observed installed" : "Not observed"}</p></div><button disabled={!canManage || !studio.skills.lifecycle} onClick={() => void mutateStudioSkill(projectId, bot.employee!.id, skill.id, skill.version, assigned ? "DISABLE" : "ENABLE").then(refreshStudio).catch((cause) => setStudioError(cause instanceof Error ? cause.message : "Skill update failed."))} className="min-h-11 rounded-xl border border-[var(--gp-line)] px-3 text-xs font-semibold transition active:scale-[.975] disabled:opacity-45">{assigned ? "Disable" : "Enable"}</button></div>; })}</div>
+          {!studio?.skills.catalog.length && <p className="mt-3 text-[11px] text-[var(--gp-muted)]">No trusted enabled Skills are available.</p>}
+        </section>
+        <section id="studio-mcp" className="mt-5 scroll-mt-4 rounded-2xl border border-[var(--gp-line)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-xs font-semibold">MCP</h3><p className="mt-1 text-[10px] text-[var(--gp-muted)]">Installed healthy project connections only. Every tool starts denied.</p></div><StatusPill tone={studio?.mcp.capability ? "good" : "neutral"}>{studio?.mcp.capability ? "READY" : "UNAVAILABLE"}</StatusPill></div>
+          {!studio?.mcp.capability ? <p className="mt-3 text-[11px] leading-5 text-[var(--gp-muted)]">Managed MCP is default-deny because the selected adapter assignment has not advertised this capability.</p> : !studio.mcp.eligibleConnections.length ? <p className="mt-3 text-[11px] leading-5 text-[var(--gp-muted)]">SETUP REQUIRED · Install and connect a healthy project-owned app before enabling a server.</p> : <div className="mt-3 space-y-2">{studio.mcp.observed.map((server) => <McpControl key={server.serverKey} server={server} connections={studio.mcp.eligibleConnections} assignment={studio.mcp.assignments.find((item) => item.serverKey === server.serverKey)} projectId={projectId} employeeProjectAssignmentId={bot.employee!.id} canManage={canManage} onSaved={refreshStudio} />)}</div>}
+        </section>
         {canManage && bot.employee && (
           <div className="mt-5 flex flex-wrap gap-2 border-t border-[var(--gp-line)] pt-4">
             <TactileButton
@@ -1766,15 +1833,45 @@ function EmployeeSettings({
   );
 }
 
-function ModelShell({
-  bot,
-  catalogAvailable,
-  close,
-}: {
-  bot?: RosterBot;
-  catalogAvailable: boolean;
-  close: () => void;
-}) {
+async function mutateStudioSkill(projectId: string, employeeProjectAssignmentId: string, skillId: string, expectedVersion: string, action: "ENABLE" | "DISABLE") {
+  const response = await fetch("/api/runtime/bots/skills", { method: "PUT", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ projectId, employeeProjectAssignmentId, skillId, expectedVersion, enabled: action === "ENABLE" }) });
+  if (!response.ok) { const value = await response.json().catch(() => ({})) as { error?: string }; throw new Error(value.error || "Skill update failed."); }
+}
+
+function McpControl({ server, connections, assignment, projectId, employeeProjectAssignmentId, canManage, onSaved }: { server: { serverKey: string; name: string; healthy: boolean; tools: Array<{ key: string; name: string }> }; connections: Array<{ id: string; name: string }>; assignment?: { state: string; revision: number; tools: Array<{ toolKey: string; enabled: boolean }> }; projectId: string; employeeProjectAssignmentId: string; canManage: boolean; onSaved: () => Promise<void> }) {
+  const [connectionId, setConnectionId] = useState(connections[0]?.id || "");
+  const [selected, setSelected] = useState(() => new Set(assignment?.tools.filter((tool) => tool.enabled).map((tool) => tool.toolKey) || []));
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const enabled = assignment?.state === "ENABLED";
+  const save = async (nextEnabled: boolean) => { setBusy(true); setError(""); try { const response = await fetch("/api/runtime/bots/mcp", { method: "PUT", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ projectId, employeeProjectAssignmentId, serverKey: server.serverKey, projectConnectionId: connectionId, enabled: nextEnabled, toolKeys: nextEnabled ? [...selected] : [], expectedRevision: assignment?.revision || 0 }) }); const value = await response.json() as { error?: string }; if (!response.ok) throw new Error(value.error || "MCP update failed."); await onSaved(); } catch (cause) { setError(cause instanceof Error ? cause.message : "MCP update failed."); } finally { setBusy(false); } };
+  return <div className="rounded-xl border border-[var(--gp-line)] p-3"><div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold">{server.name}</p><StatusPill tone={enabled ? "good" : server.healthy ? "neutral" : "warn"}>{enabled ? "ENABLED" : server.healthy ? "DEFAULT DENY" : "ATTENTION"}</StatusPill></div><label className="mt-3 block text-[10px] font-semibold text-[var(--gp-muted)]">Project connection<select value={connectionId} onChange={(event) => setConnectionId(event.target.value)} disabled={!canManage || busy} className="mt-1 min-h-11 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-canvas)] px-3 text-xs"><option value="">Select a connection</option>{connections.map((connection) => <option key={connection.id} value={connection.id}>{connection.name}</option>)}</select></label><div className="mt-3 grid gap-2 sm:grid-cols-2">{server.tools.map((tool) => <label key={tool.key} className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--gp-line)] px-3 text-xs"><input type="checkbox" checked={selected.has(tool.key)} disabled={!canManage || busy} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(tool.key); else next.delete(tool.key); return next; })} />{tool.name}</label>)}</div><div className="mt-3 flex gap-2"><button onClick={() => void save(!enabled)} disabled={!canManage || busy || !connectionId || (!enabled && selected.size === 0)} className="min-h-11 rounded-xl bg-[var(--gp-accent)] px-4 text-xs font-semibold text-white disabled:opacity-45">{busy ? "Saving" : enabled ? "Disable server" : "Enable selected tools"}</button></div>{error && <p className="mt-2 text-[10px] text-[var(--gp-danger)]" role="alert">{error}</p>}</div>;
+}
+
+function lineDiff(before: string, after: string) {
+  const left = before.split("\n"), right = after.split("\n"), rows: string[] = [];
+  for (let index = 0; index < Math.max(left.length, right.length) && rows.length < 80; index += 1) {
+    if (left[index] === right[index]) continue;
+    if (left[index] !== undefined) rows.push(`- ${left[index]}`);
+    if (right[index] !== undefined) rows.push(`+ ${right[index]}`);
+  }
+  return rows;
+}
+
+function ProfileFileControl({ file, projectId, employeeProjectAssignmentId, canManage }: { file: { logicalKey: string; version: number; digest: string; state: string }; projectId: string; employeeProjectAssignmentId: string; canManage: boolean }) {
+  const [open, setOpen] = useState(false), [content, setContent] = useState(""), [baseline, setBaseline] = useState(""), [version, setVersion] = useState(file.version), [digest, setDigest] = useState(file.digest), [versions, setVersions] = useState<number[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const diff = useMemo(() => lineDiff(baseline, content), [baseline, content]);
+  const loadFile = async () => { setBusy(true); setError(""); try { const response = await fetch(`/api/runtime/bots/profile-files?projectId=${encodeURIComponent(projectId)}&employeeProjectAssignmentId=${encodeURIComponent(employeeProjectAssignmentId)}&logicalKey=${encodeURIComponent(file.logicalKey)}`, { cache: "no-store" }); const value = await response.json() as { file?: { content: string; version: number; digest: string }; versions?: Array<{ version: number }>; error?: string }; if (!response.ok || !value.file) throw new Error(value.error || "File unavailable."); setContent(value.file.content); setBaseline(value.file.content); setVersion(value.file.version); setDigest(value.file.digest); setVersions(value.versions?.map((item) => item.version) || []); setOpen(true); } catch (cause) { setError(cause instanceof Error ? cause.message : "File unavailable."); } finally { setBusy(false); } };
+  const save = async (restoreVersion?: number) => { setBusy(true); setError(""); try { const response = await fetch("/api/runtime/bots/profile-files", { method: "PUT", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ projectId, employeeProjectAssignmentId, logicalKey: file.logicalKey, expectedDigest: digest, ...(restoreVersion === undefined ? { content } : { restoreVersion }) }) }); const value = await response.json() as { error?: string }; if (!response.ok) throw new Error(value.error || "File update failed."); await loadFile(); } catch (cause) { setError(cause instanceof Error ? cause.message : "File update failed."); } finally { setBusy(false); } };
+  return <div className="rounded-xl border border-[var(--gp-line)] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-mono text-xs font-bold">{file.logicalKey}</p><p className="mt-1 text-[10px] text-[var(--gp-muted)]">Version {version} · digest {digest.slice(0, 12)}</p></div><button onClick={() => void (open ? Promise.resolve(setOpen(false)) : loadFile())} disabled={busy} className="min-h-11 rounded-xl border border-[var(--gp-line)] px-3 text-xs font-semibold transition active:scale-[.975] disabled:opacity-45">{open ? "Close" : busy ? "Loading" : "Open"}</button></div>{open && <div className="mt-3"><textarea value={content} onChange={(event) => setContent(event.target.value)} readOnly={!canManage} rows={10} spellCheck={false} className="w-full resize-y rounded-xl border border-[var(--gp-line)] bg-[var(--gp-canvas)] p-3 font-mono text-xs leading-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gp-accent)]" aria-label={`${file.logicalKey} contents`} />{diff.length > 0 && <pre className="mt-2 max-h-48 overflow-auto rounded-xl bg-[var(--gp-panel)] p-3 text-[10px] leading-4 text-[var(--gp-muted)]" aria-label="Unsaved line diff">{diff.join("\n")}</pre>}<div className="mt-2 flex flex-wrap items-center gap-2"><button onClick={() => void save()} disabled={!canManage || busy || content === baseline} className="min-h-11 rounded-xl bg-[var(--gp-accent)] px-4 text-xs font-semibold text-white transition active:scale-[.975] disabled:opacity-45">Save with CAS</button><button onClick={() => setContent(baseline)} disabled={content === baseline} className="min-h-11 rounded-xl border border-[var(--gp-line)] px-3 text-xs disabled:opacity-45">Discard diff</button><select aria-label="Restore file version" defaultValue="" disabled={!canManage || busy || versions.length < 2} onChange={(event) => { if (event.target.value) void save(Number(event.target.value)); }} className="min-h-11 rounded-xl border border-[var(--gp-line)] bg-[var(--gp-canvas)] px-3 text-xs disabled:opacity-45"><option value="">Restore version…</option>{versions.filter((item) => item !== version).map((item) => <option key={item} value={item}>Version {item}</option>)}</select><span className="text-[10px] text-[var(--gp-muted)]">{diff.length ? `${diff.length} changed lines shown` : "No local changes"}</span></div></div>}{error && <p className="mt-2 text-[10px] text-[var(--gp-danger)]" role="alert">{error}</p>}</div>;
+}
+
+function ModelShell({ bot, projectId, canManage, close }: { bot?: RosterBot; projectId: string; canManage: boolean; close: () => void }) {
+  const [studio, setStudio] = useState<StudioData | null>(null), [query, setQuery] = useState(""), [saving, setSaving] = useState(false), [error, setError] = useState("");
+  const employeeId = bot?.employee?.id;
+  const loadStudio = useCallback(async () => { if (!employeeId) return; try { const response = await fetch(`/api/runtime/bots/studio?projectId=${encodeURIComponent(projectId)}&employeeProjectAssignmentId=${encodeURIComponent(employeeId)}`, { cache: "no-store" }); if (!response.ok) throw new Error("Model catalog unavailable."); setStudio(normalizeStudio(await response.json() as RawStudioData)); } catch (cause) { setError(cause instanceof Error ? cause.message : "Model catalog unavailable."); } }, [employeeId, projectId]);
+  useEffect(() => { void loadStudio(); }, [loadStudio]);
+  const models = (studio?.model.catalog?.models || []).filter((model) => `${model.displayName} ${model.provider} ${model.modelId}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const choose = async (model: { provider: string; modelId: string }) => { if (!employeeId || !studio?.model.catalog || !studio.model.observed) return; setSaving(true); setError(""); try { const response = await fetch("/api/runtime/bots/model", { method: "PUT", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ projectId, employeeProjectAssignmentId: employeeId, provider: model.provider, modelId: model.modelId, catalogRevision: studio.model.catalog.revision, expectedRevision: studio.expectedRevision }) }); const value = await response.json() as { error?: string }; if (!response.ok) throw new Error(value.error || "Model change failed."); await loadStudio(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Model change failed."); } finally { setSaving(false); } };
   return (
     <div
       role="dialog"
@@ -1801,21 +1898,10 @@ function ModelShell({
             <X className="h-4 w-4" />
           </button>
         </header>
-        <div className="mt-5 rounded-xl border border-[var(--gp-line)] bg-[var(--gp-canvas)] p-4">
-          <p className="text-xs font-semibold">
-            No model change is available in T1
-          </p>
-          <p className="mt-2 text-[11px] leading-5 text-[var(--gp-muted)]">
-            This command is intercepted by RogerOS and was not sent to{" "}
-            {bot?.profile.displayName || "Hermes"}.{" "}
-            {catalogAvailable
-              ? "The adapter reports a catalog, but selection and reconciliation belong to Employee Studio in T3."
-              : "A signed assignment-scoped model catalog is not currently available."}
-          </p>
-        </div>
-        <TactileButton onClick={close} className="mt-5 w-full text-xs">
-          Done
-        </TactileButton>
+        <div className="mt-4 flex items-center gap-2"><StatusPill tone={studio?.state === "READY" && studio.model.capability ? "good" : studio?.state === "ATTENTION" ? "bad" : "neutral"}>{studio?.state || "UNAVAILABLE"}</StatusPill><p className="text-[10px] text-[var(--gp-muted)]">This command stays in RogerOS and targets only {bot?.profile.displayName || "the selected employee"}.</p></div>
+        {studio?.model.capability && studio.model.catalog ? <><label className="mt-4 block text-[10px] font-semibold uppercase tracking-wider text-[var(--gp-faint)]">Search signed catalog<input value={query} onChange={(event) => setQuery(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--gp-line)] bg-[var(--gp-canvas)] px-3 text-xs normal-case tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gp-accent)]" /></label><div className="mt-3 max-h-[48dvh] space-y-2 overflow-y-auto">{models.map((model) => { const active = studio.model.observed?.provider === model.provider && studio.model.observed?.modelId === model.modelId; return <button key={`${model.provider}:${model.modelId}`} disabled={!canManage || saving || active || model.state !== "READY"} onClick={() => void choose(model)} className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-[var(--gp-line)] p-3 text-left transition active:scale-[.985] disabled:opacity-55"><span><span className="block text-xs font-semibold">{model.displayName}</span><span className="mt-1 block font-mono text-[10px] text-[var(--gp-muted)]">{model.provider} · {model.modelId}</span></span><StatusPill tone={active ? "good" : model.state === "READY" ? "neutral" : "warn"}>{active ? "ACTIVE" : model.state}</StatusPill></button>; })}</div></> : <div className="mt-5 rounded-xl border border-[var(--gp-line)] bg-[var(--gp-canvas)] p-4"><p className="text-xs font-semibold">Model configuration unavailable</p><p className="mt-2 text-[11px] leading-5 text-[var(--gp-muted)]">A valid, unexpired, signed assignment catalog is required. No fallback provider or model is assumed.</p></div>}
+        {error && <p className="mt-3 text-[11px] text-[var(--gp-danger)]" role="alert">{error}</p>}
+        <TactileButton onClick={close} className="mt-5 w-full text-xs">Done</TactileButton>
       </section>
     </div>
   );

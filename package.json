@@ -33,6 +33,7 @@
     "test:employee-market": "node --env-file=.env.staging --import tsx --test tests/employee-market.test.ts",
     "test:app-market": "node --import tsx --test tests/app-market.test.ts",
     "test:connections": "node --import tsx --test tests/connections-foundation.test.ts",
+    "test:employee-studio": "node --import tsx --test tests/employee-studio-contract.test.ts",
     "test:drive": "node --import tsx --test tests/drive-foundation.test.ts",
     "db:seed:connections-staging": "tsx prisma/seed-connections-staging.ts",
     "db:push": "prisma db push",

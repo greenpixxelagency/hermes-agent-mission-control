@@ -206,6 +206,14 @@
 
 Vercel Deployment Protection requires a project-scoped automation bypass credential for the isolated adapter callback. The credential is stored only in the protected staging adapter environment, sent only to the fixed Preview callback URL, rotated as a secret, and never treated as a production or tenancy authorization boundary.
 
+## Employee Studio uses signed observation, durable intent, CAS, and compensation
+
+**Decision:** T3 uses one assignment-bound `employee-studio-v1` adapter and a RogerOS-owned mutation ledger. Catalogs are signed/expiring; writes use observed revision/fingerprint or digest/version CAS; a valid receipt must match scope and result before commit.
+
+**Reason:** A successful runtime call followed by a stale/failed database write otherwise creates silent drift, while unsigned catalogs, raw paths, or browser-provided MCP configuration bypass project governance.
+
+**Consequences:** Owner/Admin authority, trusted Skill/version policy, installed/healthy connections, employee Tool permissions, protected credential references, and audit stay server-side. Post-runtime commit failure invokes rollback and becomes `ROLLED_BACK` or `ATTENTION`. Missing capability is default-deny. Audit excludes secrets, content, paths, endpoints, signatures, and provider payloads.
+
 ## Workforce scorecards are computed evidence, not cost estimation
 
 **Decision:** M20 computes bounded project workforce outcome evidence from existing Task, HermesExecution, and ToolExecution records without adding a cost ledger or provider payload storage.
