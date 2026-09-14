@@ -165,3 +165,7 @@ Acceptance: six-profile isolation, lease expiry/revocation, one input owner, rec
 ## Stop conditions
 
 Stop the affected phase instead of weakening controls when any of these is missing: authoritative checkout, project ownership, signed adapter capability, secret-safe storage, recoverable migration/rollback, real runtime evidence for a claimed feature, or owner confirmation for a new destructive or production action.
+
+## T3 local implementation checkpoint — 2026-09-14
+
+The repository foundation now includes signed `/v1` client parsers, additive project-owned persistence, hardened model/file mutation flows, and a GP Employee Studio surface. Stage 2 adapter evidence proves model/profile primitives only; Skill assignment reuses RogerOS, while adapter Skill lifecycle and MCP remain unavailable. Live localhost mutation acceptance awaits a bounded secret handoff and enable window.

@@ -250,6 +250,25 @@ enum ConnectionCredentialStatus {
   REVOKED
 }
 
+enum StudioMutationStatus {
+  PENDING
+  SUCCEEDED
+  ROLLED_BACK
+  FAILED
+  ATTENTION
+}
+
+enum StudioProfileFileState {
+  READY
+  ATTENTION
+}
+
+enum GovernedMcpAssignmentState {
+  ENABLED
+  DISABLED
+  ATTENTION
+}
+
 enum DriveScopeType {
   FOLDER
   FILE
@@ -392,15 +411,15 @@ model OrganizationMember {
 }
 
 model Project {
-  id                           String                       @id @default(cuid())
+  id                           String                         @id @default(cuid())
   organizationId               String
   name                         String
   description                  String?
   slug                         String
-  status                       ProjectStatus                @default(ACTIVE)
-  createdAt                    DateTime                     @default(now())
-  updatedAt                    DateTime                     @updatedAt
-  organization                 Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  status                       ProjectStatus                  @default(ACTIVE)
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime                       @updatedAt
+  organization                 Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   members                      ProjectMember[]
   agentRequests                AgentRequest[]
   agentEvents                  AgentEvent[]
@@ -438,6 +457,10 @@ model Project {
   managedAssets                ManagedAsset[]
   messageAttachments           MessageAttachment[]
   assetRedemptions             AssetRedemption[]
+  studioMutations              RuntimeConfigurationMutation[]
+  studioProfileFiles           StudioProfileFile[]
+  studioProfileFileVersions    StudioProfileFileVersion[]
+  governedMcpAssignments       GovernedMcpAssignment[]
 
   @@unique([organizationId, slug])
   @@unique([id, organizationId])
@@ -572,22 +595,23 @@ model ProjectTool {
 // M12: a project-owned connection references a server-side credential handle
 // only. It never persists the credential value or exposes it to a client.
 model ProjectConnection {
-  id            String                   @id @default(cuid())
-  projectId     String
-  projectToolId String
-  name          String
-  status        ConnectionStatus         @default(DISCONNECTED)
-  enabled       Boolean                  @default(true)
-  credentialRef String?
-  metadata      Json                     @default("{}")
-  createdAt     DateTime                 @default(now())
-  updatedAt     DateTime                 @updatedAt
-  project       Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectTool   ProjectTool              @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Restrict)
-  executions    ToolExecution[]
-  credential    ConnectionCredential?
-  scopes        ProjectConnectionScope[]
-  driveSources  DriveSource[]
+  id                     String                   @id @default(cuid())
+  projectId              String
+  projectToolId          String
+  name                   String
+  status                 ConnectionStatus         @default(DISCONNECTED)
+  enabled                Boolean                  @default(true)
+  credentialRef          String?
+  metadata               Json                     @default("{}")
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  project                Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectTool            ProjectTool              @relation(fields: [projectToolId, projectId], references: [id, projectId], onDelete: Restrict)
+  executions             ToolExecution[]
+  credential             ConnectionCredential?
+  scopes                 ProjectConnectionScope[]
+  driveSources           DriveSource[]
+  governedMcpAssignments GovernedMcpAssignment[]
 
   @@unique([projectId, projectToolId])
   @@unique([id, projectId])
@@ -597,23 +621,25 @@ model ProjectConnection {
 // Credential payloads contain an authenticated-encryption envelope only.
 // The encryption key is environment-only and never stored in PostgreSQL.
 model ConnectionCredential {
-  id                 String                     @id @default(cuid())
-  projectId          String
-  connectionId       String                     @unique
-  provider           String
-  encryptedPayload   String                     @db.Text
-  keyVersion         String                     @default("v1")
-  expiresAt          DateTime?
-  status             ConnectionCredentialStatus @default(ACTIVE)
-  accountEmail       String?
-  accountDisplayName String?
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
-  project            Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  connection         ProjectConnection          @relation(fields: [connectionId, projectId], references: [id, projectId], onDelete: Restrict)
+  id                     String                     @id @default(cuid())
+  projectId              String
+  connectionId           String                     @unique
+  provider               String
+  encryptedPayload       String                     @db.Text
+  keyVersion             String                     @default("v1")
+  expiresAt              DateTime?
+  status                 ConnectionCredentialStatus @default(ACTIVE)
+  accountEmail           String?
+  accountDisplayName     String?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  project                Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection             ProjectConnection          @relation(fields: [connectionId, projectId], references: [id, projectId], onDelete: Restrict)
+  governedMcpAssignments GovernedMcpAssignment[]
 
   @@unique([id, projectId])
   @@unique([connectionId, projectId])
+  @@unique([id, projectId, connectionId])
   @@index([projectId, status])
 }
 
@@ -961,25 +987,27 @@ model ProjectMemory {
 }
 
 model ProjectMember {
-  id                   String                       @id @default(cuid())
+  id                   String                         @id @default(cuid())
   projectId            String
   organizationMemberId String
   organizationId       String
-  role                 ProjectRole                  @default(VIEWER)
-  createdAt            DateTime                     @default(now())
-  updatedAt            DateTime                     @updatedAt
-  project              Project                      @relation(fields: [projectId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  organizationMember   OrganizationMember           @relation(fields: [organizationMemberId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  role                 ProjectRole                    @default(VIEWER)
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+  project              Project                        @relation(fields: [projectId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  organizationMember   OrganizationMember             @relation(fields: [organizationMemberId, organizationId], references: [id, organizationId], onDelete: Cascade)
   taskAssignments      TaskAssignment[]
-  requestedApprovals   ApprovalRequest[]            @relation("ApprovalRequester")
-  decidedApprovals     ApprovalRequest[]            @relation("ApprovalDecider")
-  reviewedExecutions   HermesExecution[]            @relation("HermesExecutionReviewer")
+  requestedApprovals   ApprovalRequest[]              @relation("ApprovalRequester")
+  decidedApprovals     ApprovalRequest[]              @relation("ApprovalDecider")
+  reviewedExecutions   HermesExecution[]              @relation("HermesExecutionReviewer")
   auditEvents          AuditEvent[]
-  marketHires          EmployeeMarketHire[]         @relation("EmployeeMarketHireCreator")
-  employmentActivities EmployeeEmploymentActivity[] @relation("EmployeeEmploymentActivityActor")
+  marketHires          EmployeeMarketHire[]           @relation("EmployeeMarketHireCreator")
+  employmentActivities EmployeeEmploymentActivity[]   @relation("EmployeeEmploymentActivityActor")
   appInstallations     ProjectAppInstallation[]
   appMarketMutations   AppMarketMutation[]
   assetRedemptions     AssetRedemption[]
+  studioMutations      RuntimeConfigurationMutation[] @relation("StudioMutationActor")
+  studioFileVersions   StudioProfileFileVersion[]     @relation("StudioProfileFileVersionActor")
 
   @@unique([projectId, organizationMemberId])
   @@unique([id, projectId])
@@ -1393,45 +1421,161 @@ model HermesRuntime {
 }
 
 model HermesRuntimeAssignment {
-  id                          String                       @id @default(cuid())
+  id                          String                         @id @default(cuid())
   projectId                   String
   runtimeId                   String
   employeeProjectAssignmentId String?
   profileKey                  String
-  active                      Boolean                      @default(true)
-  runtimeKind                 HermesRuntimeKind            @default(HERMES_PROFILE)
-  assignmentState             HermesRuntimeAssignmentState @default(ACTIVE)
-  provisioningState           HermesProvisioningState      @default(UNPROVISIONED)
-  reconciliationState         HermesReconciliationState    @default(DRIFTED)
+  active                      Boolean                        @default(true)
+  runtimeKind                 HermesRuntimeKind              @default(HERMES_PROFILE)
+  assignmentState             HermesRuntimeAssignmentState   @default(ACTIVE)
+  provisioningState           HermesProvisioningState        @default(UNPROVISIONED)
+  reconciliationState         HermesReconciliationState      @default(DRIFTED)
   desiredDisplayName          String?
-  desiredDescription          String?                      @db.Text
-  desiredSoulRevision         Int                          @default(1)
+  desiredDescription          String?                        @db.Text
+  desiredSoulRevision         Int                            @default(1)
   desiredSoulHash             String?
   desiredModelProvider        String?
   desiredModelId              String?
-  desiredSkillRevision        Int                          @default(0)
-  desiredRoutineRevision      Int                          @default(0)
+  studioConfigRevision        Int                            @default(0)
+  observedModelProvider       String?
+  observedModelId             String?
+  observedConfigFingerprint   String?
+  modelCatalogRevision        String?
+  modelCatalogExpiresAt       DateTime?
+  desiredSkillRevision        Int                            @default(0)
+  desiredRoutineRevision      Int                            @default(0)
   lastObservedHermesVersion   String?
   capabilityFingerprint       String?
   lastReconciledAt            DateTime?
-  lastReconcileError          String?                      @db.Text
+  lastReconcileError          String?                        @db.Text
   runtimeStatus               String?
   suspendedAt                 DateTime?
   retiredAt                   DateTime?
   externalRuntimeMetadata     Json?
-  createdAt                   DateTime                     @default(now())
-  updatedAt                   DateTime                     @updatedAt
-  project                     Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  runtime                     HermesRuntime                @relation(fields: [runtimeId], references: [id], onDelete: Restrict)
-  employeeAssignment          EmployeeProjectAssignment?   @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  createdAt                   DateTime                       @default(now())
+  updatedAt                   DateTime                       @updatedAt
+  project                     Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runtime                     HermesRuntime                  @relation(fields: [runtimeId], references: [id], onDelete: Restrict)
+  employeeAssignment          EmployeeProjectAssignment?     @relation(fields: [employeeProjectAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
   executions                  HermesExecution[]
   assetRedemptions            AssetRedemption[]
+  studioMutations             RuntimeConfigurationMutation[]
+  studioProfileFiles          StudioProfileFile[]
+  governedMcpAssignments      GovernedMcpAssignment[]
 
   @@unique([projectId, employeeProjectAssignmentId])
   @@unique([projectId, profileKey])
   @@unique([id, projectId])
   @@unique([id, projectId, runtimeId, profileKey])
   @@index([projectId, active])
+}
+
+model RuntimeConfigurationMutation {
+  id                   String                  @id @default(cuid())
+  projectId            String
+  runtimeAssignmentId  String
+  actorProjectMemberId String
+  idempotencyKey       String
+  operation            String
+  requestFingerprint   String
+  status               StudioMutationStatus    @default(PENDING)
+  requestMetadata      Json                    @default("{}")
+  resultMetadata       Json                    @default("{}")
+  adapterReceiptId     String?
+  errorCode            String?
+  completedAt          DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  project              Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runtimeAssignment    HermesRuntimeAssignment @relation(fields: [runtimeAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  actor                ProjectMember           @relation("StudioMutationActor", fields: [actorProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([projectId, idempotencyKey])
+  @@unique([id, projectId])
+  @@index([projectId, runtimeAssignmentId, createdAt])
+  @@index([projectId, status, createdAt])
+}
+
+model StudioProfileFile {
+  id                    String                     @id @default(cuid())
+  projectId             String
+  runtimeAssignmentId   String
+  logicalKey            String
+  state                 StudioProfileFileState     @default(READY)
+  currentVersion        Int
+  currentSourceRevision Int
+  currentDigest         String
+  observedAt            DateTime
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  project               Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runtimeAssignment     HermesRuntimeAssignment    @relation(fields: [runtimeAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  versions              StudioProfileFileVersion[]
+
+  @@unique([projectId, runtimeAssignmentId, logicalKey])
+  @@unique([id, projectId])
+  @@index([projectId, runtimeAssignmentId, state])
+}
+
+model StudioProfileFileVersion {
+  id                       String            @id @default(cuid())
+  projectId                String
+  profileFileId            String
+  version                  Int
+  sourceRevision           Int
+  digest                   String
+  byteLength               Int
+  content                  String            @db.Text
+  adapterReceiptId         String?
+  createdByProjectMemberId String?
+  createdAt                DateTime          @default(now())
+  project                  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  profileFile              StudioProfileFile @relation(fields: [profileFileId, projectId], references: [id, projectId], onDelete: Cascade)
+  createdBy                ProjectMember?    @relation("StudioProfileFileVersionActor", fields: [createdByProjectMemberId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@unique([profileFileId, version])
+  @@unique([id, projectId])
+  @@index([projectId, profileFileId, createdAt])
+}
+
+model GovernedMcpAssignment {
+  id                  String                      @id @default(cuid())
+  projectId           String
+  runtimeAssignmentId String
+  projectConnectionId String
+  secretReferenceId   String
+  serverKey           String
+  state               GovernedMcpAssignmentState  @default(DISABLED)
+  revision            Int                         @default(1)
+  observedFingerprint String?
+  lastObservedAt      DateTime?
+  lastErrorCode       String?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  project             Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runtimeAssignment   HermesRuntimeAssignment     @relation(fields: [runtimeAssignmentId, projectId], references: [id, projectId], onDelete: Restrict)
+  projectConnection   ProjectConnection           @relation(fields: [projectConnectionId, projectId], references: [id, projectId], onDelete: Restrict)
+  secretReference     ConnectionCredential        @relation(fields: [secretReferenceId, projectId, projectConnectionId], references: [id, projectId, connectionId], onDelete: Restrict)
+  tools               GovernedMcpToolAssignment[]
+
+  @@unique([projectId, runtimeAssignmentId, serverKey])
+  @@unique([id, projectId])
+  @@index([projectId, runtimeAssignmentId, state])
+}
+
+model GovernedMcpToolAssignment {
+  id              String                @id @default(cuid())
+  projectId       String
+  mcpAssignmentId String
+  toolKey         String
+  enabled         Boolean               @default(false)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  mcpAssignment   GovernedMcpAssignment @relation(fields: [mcpAssignmentId, projectId], references: [id, projectId], onDelete: Cascade)
+
+  @@unique([mcpAssignmentId, toolKey])
+  @@index([projectId, mcpAssignmentId, enabled])
 }
 
 model HermesExecution {

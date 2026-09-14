@@ -30,6 +30,7 @@
     "test:assets": "node --import tsx --test tests/team-assets.test.ts",
     "test:assets:db": "node --import tsx --test tests/team-asset-isolation.test.ts",
     "test:skills": "node --import tsx --test tests/skills.test.ts",
+    "test:employee-studio": "node --import tsx --test tests/employee-studio.test.ts",
     "test:employee-market": "node --env-file=.env.staging --import tsx --test tests/employee-market.test.ts",
     "test:app-market": "node --import tsx --test tests/app-market.test.ts",
     "test:connections": "node --import tsx --test tests/connections-foundation.test.ts",

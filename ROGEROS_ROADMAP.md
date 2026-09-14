@@ -38,3 +38,7 @@ See `ROGEROS_PHASE_3_PLAN.md` for completed-vs-blueprint reconciliation and depe
 - A customer-ready AI Business Operating System that hides runtime complexity while making work, employees, knowledge, permissions, decisions, approvals, and activity understandable.
 - Broader governed capabilities and integrations may be considered only through the existing tenancy, policy, permission, approval, audit, and adapter boundaries.
 - Production readiness, onboarding, billing, lifecycle operations, and customer self-service are vision areas, not claims of current implementation.
+
+## T3 local checkpoint
+
+- Employee Studio is implemented locally with Overview, shared Model picker, fixed-key Profile files, existing trusted Skills, and truthful MCP states. The isolated Stage 2 adapter proved 24/24 model/profile contract and integration checks while boot-disabled on loopback; adapter Skill lifecycle and MCP remain unavailable. Live local mutation acceptance, deployment, shared migration, production, and `main` remain separate gates.

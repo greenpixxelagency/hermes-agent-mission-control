@@ -76,3 +76,10 @@
 ## Human intervention
 
 Stop only when completion requires unavailable credentials, owner login/2FA/CAPTCHA, billing/consent, destructive production authority, or a genuine product/architecture decision. State the exact minimum action and preserve all safe completed work.
+
+## Local T3 Employee Studio acceptance
+
+- Keep the adapter loopback-only and boot-disabled outside a bounded acceptance window. Configure only the five server-side variables named in `ROGEROS_T3_EMPLOYEE_STUDIO_CONTRACT.md`; never expose values.
+- Verify exact `/v1/capabilities` identity first. Model catalog/read/set and profile read/update/restore are the only Stage 2 live mutation surfaces. Skill lifecycle and MCP must render unavailable.
+- Exercise role and binding denial, stale CAS, replay/conflict, catalog expiry/signature rejection, fixed-key traversal and secret denial, successful reconciliation, rollback, and safe audit metadata; restore default-deny afterward.
+- VPS proof does not authorize enabling the local client, migrating a shared database, deploying Preview, or touching production.

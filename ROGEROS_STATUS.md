@@ -157,3 +157,11 @@ Last updated: 2026-09-14
 - Do not touch production, `main`, production Hermes/bridge, or production data without explicit authorization.
 - For any Hermes or VPS operation, first provide the owner a self-contained prompt for the dedicated Hermes VPS Codex task, then continue from its returned handoff. Do not silently combine repository and VPS mutations.
 - Read-only VPS inspection found the unrelated production `hermyhq-bridge.service` already in an auto-restart failure loop. It was not touched. Do not fold investigation or repair of that service into M16 without a separate owner-approved VPS prompt.
+
+## T3 local Employee Studio status — 2026-09-14
+
+- Implemented Overview, shared Model picker, fixed-key Profile edit/diff/version restore, existing trusted Skill lifecycle, and truthful MCP unavailable/setup states using GP interaction patterns.
+- Added strict `employee-studio-v1` `/v1` parsers and canonical envelope signing. The client is default-deny behind five server-only variables; no secret value was introduced.
+- Added an additive project-owned mutation ledger, runtime model observation/revision, immutable profile versions/source revisions, and governed MCP references constrained to existing project connections and credentials.
+- Isolated adapter evidence is PROVEN: 24/24 tests, loopback-only boot-disabled service, model/profile support, and explicit Skill lifecycle/MCP unavailability. No live local adapter test, shared migration, Preview deployment, production change, or `main` change is claimed.
+- Local verification passes: T3 9/9, Team desk 2/2, managed assets 7/7, Prisma format/validate/generate, TypeScript, focused lint, diff whitespace, and the production build. Database-backed nearby suites could not start because this isolated worktree has no `DATABASE_URL`; they did not report product assertion failures.

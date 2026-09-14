@@ -1,0 +1,9 @@
+# RogerOS T3 Employee Studio contract
+
+`employee-studio-v1` is the assignment-scoped control-plane contract between RogerOS and the isolated Hermes adapter. The local client is default-deny unless all five server-only variables are present and `ROGEROS_EMPLOYEE_STUDIO_ENABLED=true`: `ROGEROS_EMPLOYEE_STUDIO_ADAPTER_URL`, `ROGEROS_EMPLOYEE_STUDIO_ADAPTER_TOKEN`, `ROGEROS_EMPLOYEE_STUDIO_HMAC_SECRET`, and the distinct `ROGEROS_EMPLOYEE_STUDIO_CATALOG_HMAC_SECRET`. Values never belong in source, browser data, logs, or audit metadata.
+
+Every call is a fixed `POST /v1/...` route with bearer authentication and an HMAC-SHA256 hex signature inside the JSON envelope. The unsigned envelope contains only contract version, exact project/runtime/assignment/profile/actor identity, epoch-millisecond timestamp, nonce, idempotency key, expected revision/fingerprint, operation, and bounded payload. Recursive object keys are sorted before signing; arrays retain order. Responses repeat exact assignment identity and pass strict key, type, count, digest, and state parsing.
+
+Catalogs carry a distinct top-level HMAC and expiry. The editable profile keys are exactly `identity`, `preferences`, `instructions`, and `memory`; callers cannot provide paths. Model and file writes use adapter revision/fingerprint CAS plus a project-owned RogerOS idempotency ledger and compensating rollback. File content is versioned but never copied into audit or mutation JSON.
+
+Stage 2 proves model and profile-file primitives for the accepted bindings. Skill inventory is observational; assignment continues through the existing trusted RogerOS Skill lifecycle. Adapter Skill lifecycle and MCP are `UNAVAILABLE`, and the UI must not expose them as successful or enabled. Live acceptance requires a bounded credential handoff and explicit enable window; it is not implied by this repository commit.

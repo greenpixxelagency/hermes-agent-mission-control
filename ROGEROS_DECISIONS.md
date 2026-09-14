@@ -221,3 +221,11 @@ Vercel Deployment Protection requires a project-scoped automation bypass credent
 **Reason:** Outcome aggregates can flag a need for human investigation, but cannot safely determine the correct Skill, policy, SOUL, permission, runtime, or business change.
 
 **Consequences:** Coach output states the observed aggregate and a review question with explicit safeguards. It makes no provider/AI call, exposes no execution content or credentials, and creates no permission, Skill, policy, Soul, runtime, task, approval, billing, production, or Hermes/VPS mutation. A human must initiate any subsequent change through the existing project-scoped authorization and audit flow.
+
+## Employee Studio mutations are signed, revisioned, and default-deny
+
+**Decision:** T3 uses `employee-studio-v1`, exact assignment identity, distinct envelope/catalog HMAC keys, project-owned idempotency receipts, compare-and-set revisions, and compensating rollback. Profile files are fixed logical keys; governed MCP may carry only an existing credential row reference and explicitly permitted tool keys.
+
+**Reason:** A settings surface can otherwise become an unscoped runtime, filesystem, or credential control channel. Desired state alone is not proof of runtime reconciliation.
+
+**Consequences:** Setup, unavailable, and attention are first-class UI states. No fallback catalog, arbitrary path/URL, plaintext secret, fake success, or implicit tool grant is allowed. Existing trusted Skill assignment is reused; adapter Skill lifecycle and MCP remain disabled while Stage 2 reports them unavailable.

@@ -128,3 +128,10 @@ The adapter redeems a voice asset only through `POST /assets/{assetId}/redeem` o
 - M22 exposes a GET-only `/api/search` endpoint and shell palette for the current server-authorized project. The client may supply a project selector, but all reads use the project returned by `requireProjectContextForRequest`; an inaccessible project is indistinguishable from a missing one.
 - The intentional allowlist is Task display metadata, `EmployeeProjectAssignment` display metadata, and native Project Brain record titles/statuses (`ProjectConstitution`, `KnowledgeItem`, `Decision`, and `ProjectMemory`). Approval/workflow records, Drive/external material, legacy Hermy HQ records, prompts, descriptions/content, execution outputs, provider payloads, JSON metadata, credentials, and connection secrets are excluded.
 - Searches match only those safe display fields, return at most 24 redacted metadata results, and make no provider call or state change. Palette selection can only navigate to the existing Tasks, Workforce, or Project Brain workflows; it cannot dispatch, approve, mutate, or change runtime/governance/billing/production state.
+
+## T3 Employee Studio
+
+- Employee Studio is project- and runtime-assignment-scoped over existing Employee, runtime, Skill, Tool, connection, permission, and audit authority; it is not a second control system.
+- `RuntimeConfigurationMutation` provides project-owned idempotency and reconciliation evidence. Model changes combine local and signed-adapter CAS, with compensating rollback on post-apply failure.
+- Profile files use four fixed logical keys. Immutable versions retain bounded content and adapter source revisions; audit and mutation metadata retain only keys, digests, sizes, revisions, and receipt IDs.
+- Governed MCP can reference only an installed healthy project connection, its credential row ID, and explicitly `FULL_EXECUTE`-permitted tools. Stage 2 reports MCP unavailable, so live controls remain disabled.
