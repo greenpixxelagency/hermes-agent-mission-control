@@ -17,11 +17,12 @@
 
 ## Local development
 
-- Run the local RogerOS app with `npm run dev:local`; it binds to `http://localhost:3001` so port 3000 remains available for another project.
-- Local configuration belongs in the gitignored `.env.local`; never copy staging or production credentials into it.
-- The local profile uses an isolated workspace PostgreSQL cluster at `127.0.0.1:55432`, stored under the gitignored `.local-postgres` directory.
-- Run `npm run db:local:push` to synchronize the local schema. The historical migration chain cannot replay cleanly on an empty local database because an older connections migration references `ProjectTool` before its later catalog migration; this local-only workaround does not modify migration files or staging history.
-- Run `npm run db:local:seed` after the schema push to restore curated non-secret Skills, Employee Market, and App Market catalog rows. When `LOCAL_OWNER_EMAIL` is set, it also creates a generic local Owner membership for the `local` workspace; create that account's password through the login page.
+- Run the local RogerOS app with `npm run dev:local`; it binds to `http://localhost:3001` so port 3000 remains available for another project. The command starts the isolated database when needed, validates the required local OAuth/database settings, synchronizes the schema and idempotent seed data, and then starts Next.js with webpack.
+- Local configuration and PostgreSQL data live in the persistent per-user state directory `%LOCALAPPDATA%\RogerOS\hermes-agent-mission-control` by default, rather than inside an individual Codex worktree. Override the location only with `ROGEROS_LOCAL_STATE_DIR`. The state is local-only and must never be committed, copied to chat, or populated with staging/production credentials.
+- One-time migration from an older worktree uses `scripts/setup-local.ps1 -OAuthEnvPath <local OAuth env> -DatabaseEnvPath <local database env> -PostgresDataPath <stopped local PostgreSQL data directory> -AssetDataPath <optional local managed-asset directory>`. The setup refuses to overwrite existing persistent state or copy a running database.
+- The local profile uses PostgreSQL at `127.0.0.1:55432`. Startup verifies this exact local boundary before any schema operation.
+- The historical migration chain cannot replay cleanly on an empty local database because an older connections migration references `ProjectTool` before its later catalog migration. `npm run dev:local` therefore uses the documented local-only `prisma db push` workaround; it does not modify migration files or staging history.
+- Startup also runs the idempotent local seed to restore curated non-secret Skills, Employee Market, App Market catalog rows, and the configured generic local Owner membership.
 
 ## Migration safety
 
