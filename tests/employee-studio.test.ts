@@ -11,7 +11,10 @@ import {
   parseStudioCatalog,
   parseStudioProfileFile,
   parseStudioReceipt,
+  parseStudioDefaultDeny,
   signStudioEnvelope,
+  studioModelSetPayload,
+  studioNonce,
   type StudioBinding,
 } from "../src/lib/employee-studio-adapter";
 import { validateEmployeeStudioProfileContent } from "../src/lib/employee-studio";
@@ -86,6 +89,21 @@ test("mutation receipts reject reconciliation identity and shape drift", () => {
   assert.equal(parseStudioReceipt(updated, binding, "mutation-12345678").observed.modelId, "provider/model");
   assert.throws(() => parseStudioReceipt({ ...updated, receipt: { ...updated.receipt, confirmed: false } }, binding, "mutation-12345678"), /MALFORMED/);
   assert.throws(() => parseStudioReceipt({ ...updated, profileId: "other" }, binding, "mutation-12345678"), /BINDING_MISMATCH/);
+});
+
+test("model mutation validates the requested model as the post-change observation", () => {
+  assert.deepEqual(studioModelSetPayload("candidate"), { modelId: "candidate", observedModelId: "candidate" });
+  assert.throws(() => studioModelSetPayload("../unsafe model"), /INVALID_MODEL/);
+});
+
+test("adapter nonces always satisfy the Stage-2 envelope grammar", () => {
+  for (let index = 0; index < 256; index += 1) assert.match(studioNonce(), /^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$/);
+});
+
+test("Stage 2 Skill lifecycle and MCP denial receipts are exact", () => {
+  assert.equal(parseStudioDefaultDeny({ ...common, receipt: { kind: "SKILL_LIFECYCLE", state: "UNAVAILABLE", changed: false, reason: "STAGE_2_DEFAULT_DENY" } }, binding, "skillLifecycle").available, false);
+  assert.equal(parseStudioDefaultDeny({ ...common, capability: { name: "mcp", state: "UNAVAILABLE", allowed: false, reason: "STAGE_2_DEFAULT_DENY" } }, binding, "mcp").available, false);
+  assert.throws(() => parseStudioDefaultDeny({ ...common, capability: { name: "mcp", state: "READY", allowed: true, reason: "ok" } }, binding, "mcp"), /MALFORMED/);
 });
 
 test("envelope HMAC recursively canonicalizes object keys", () => {

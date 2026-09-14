@@ -16,8 +16,8 @@ export type StudioMcpServer = { serverKey: string; displayName: string; setupSta
 export type EmployeeStudioAdapter = {
   capabilities(binding: StudioBinding): Promise<StudioCapabilities>;
   modelCatalog(binding: StudioBinding): Promise<StudioModelCatalog>;
-  changeModel(input: { binding: StudioBinding; mutationId: string; catalogRevision: string; expectedRevision: number; expectedFingerprint: string | null; provider: string; modelId: string; observedModelId: string }): Promise<StudioMutationReceipt>;
-  rollbackModel(input: { binding: StudioBinding; mutationId: string; receiptId: string; expectedRevision: number; provider: string; modelId: string; observedModelId: string }): Promise<StudioMutationReceipt>;
+  changeModel(input: { binding: StudioBinding; mutationId: string; catalogRevision: string; expectedRevision: number; expectedFingerprint: string | null; provider: string; modelId: string }): Promise<StudioMutationReceipt>;
+  rollbackModel(input: { binding: StudioBinding; mutationId: string; receiptId: string; expectedRevision: number; provider: string; modelId: string }): Promise<StudioMutationReceipt>;
   listProfileFiles(binding: StudioBinding): Promise<StudioProfileFileDescriptor[]>;
   readProfileFile(binding: StudioBinding, logicalKey: string): Promise<StudioProfileFile>;
   writeProfileFile(input: { binding: StudioBinding; mutationId: string; logicalKey: string; expectedVersion: number; expectedDigest: string; content: string }): Promise<StudioMutationReceipt>;
@@ -41,6 +41,7 @@ function assertCommon(value: Record<string, unknown>, binding: StudioBinding) { 
 function responseKeys(...extra: string[]) { return [...commonKeys, ...extra]; }
 function digestOf(value: string) { return createHash("sha256").update(value).digest("hex"); }
 function providerFor(value: string) { return value.includes("/") ? value.split("/", 1)[0] : "hermes"; }
+export function studioModelSetPayload(modelId: string) { if (!safeModel.test(modelId)) throw new Error("EMPLOYEE_STUDIO_INVALID_MODEL"); return { modelId, observedModelId: modelId }; }
 export function isAllowedProfileFileKey(value: string): value is (typeof STUDIO_PROFILE_KEYS)[number] { return (STUDIO_PROFILE_KEYS as readonly string[]).includes(value); }
 export function validateStudioBinding(binding: StudioBinding) { if ([binding.projectId, binding.runtimeId, binding.runtimeAssignmentId, binding.profileId, binding.actorId].some((value) => !safeId.test(value))) throw new Error("EMPLOYEE_STUDIO_INVALID_BINDING"); return binding; }
 
@@ -73,16 +74,32 @@ export function parseStudioReceipt(value: unknown, binding: StudioBinding, mutat
 }
 function parseSkills(value: unknown, binding: StudioBinding): StudioSkill[] { const row = object(value, "EMPLOYEE_STUDIO_MALFORMED_SKILLS"); exact(row, responseKeys("inventory"), "EMPLOYEE_STUDIO_MALFORMED_SKILLS"); assertCommon(row, binding); const inventory = object(row.inventory, "EMPLOYEE_STUDIO_MALFORMED_SKILLS"); exact(inventory, ["skills", "revision"], "EMPLOYEE_STUDIO_MALFORMED_SKILLS"); integer(inventory.revision, "EMPLOYEE_STUDIO_MALFORMED_SKILLS"); if (!Array.isArray(inventory.skills) || inventory.skills.length > 100) throw new Error("EMPLOYEE_STUDIO_MALFORMED_SKILLS"); return inventory.skills.map((item) => { const skill = object(item, "EMPLOYEE_STUDIO_MALFORMED_SKILLS"); exact(skill, ["id", "state", "version"], "EMPLOYEE_STUDIO_MALFORMED_SKILLS"); const key = string(skill.id, 120, "EMPLOYEE_STUDIO_MALFORMED_SKILLS", safeId), state = string(skill.state, 24, "EMPLOYEE_STUDIO_MALFORMED_SKILLS", /^(AVAILABLE|ENABLED|DISABLED|UNAVAILABLE)$/); return { key, name: key, version: string(skill.version, 80, "EMPLOYEE_STUDIO_MALFORMED_SKILLS"), installed: state !== "UNAVAILABLE", enabled: state === "ENABLED", readable: state !== "UNAVAILABLE", digest: null, content: null }; }); }
 
+export function parseStudioDefaultDeny(value: unknown, binding: StudioBinding, kind: "skillLifecycle" | "mcp") {
+  const row = object(value, "EMPLOYEE_STUDIO_MALFORMED_DEFAULT_DENY");
+  const field = kind === "skillLifecycle" ? "receipt" : "capability";
+  exact(row, responseKeys(field), "EMPLOYEE_STUDIO_MALFORMED_DEFAULT_DENY"); assertCommon(row, binding);
+  const denial = object(row[field], "EMPLOYEE_STUDIO_MALFORMED_DEFAULT_DENY");
+  if (kind === "skillLifecycle") {
+    exact(denial, ["kind", "state", "changed", "reason"], "EMPLOYEE_STUDIO_MALFORMED_DEFAULT_DENY");
+    if (denial.kind !== "SKILL_LIFECYCLE" || denial.state !== "UNAVAILABLE" || denial.changed !== false || denial.reason !== "STAGE_2_DEFAULT_DENY") throw new Error("EMPLOYEE_STUDIO_MALFORMED_DEFAULT_DENY");
+  } else {
+    exact(denial, ["name", "state", "allowed", "reason"], "EMPLOYEE_STUDIO_MALFORMED_DEFAULT_DENY");
+    if (denial.name !== "mcp" || denial.state !== "UNAVAILABLE" || denial.allowed !== false || denial.reason !== "STAGE_2_DEFAULT_DENY") throw new Error("EMPLOYEE_STUDIO_MALFORMED_DEFAULT_DENY");
+  }
+  return { available: false as const, reason: "STAGE_2_DEFAULT_DENY" as const };
+}
+
 function canonical(value: unknown): unknown { if (Array.isArray(value)) return value.map(canonical); if (value && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => [key, canonical(item)])); if (typeof value === "number" && !Number.isFinite(value)) throw new Error("EMPLOYEE_STUDIO_INVALID_ENVELOPE"); return value; }
 export function signStudioEnvelope(envelope: Record<string, unknown>, secret: string) { return createHmac("sha256", secret).update(JSON.stringify(canonical(envelope))).digest("hex"); }
 const baseUrl = () => process.env.ROGEROS_EMPLOYEE_STUDIO_ADAPTER_URL?.replace(/\/$/, ""); const token = () => process.env.ROGEROS_EMPLOYEE_STUDIO_ADAPTER_TOKEN; const envelopeSecret = () => process.env.ROGEROS_EMPLOYEE_STUDIO_HMAC_SECRET; const catalogSecret = () => process.env.ROGEROS_EMPLOYEE_STUDIO_CATALOG_HMAC_SECRET;
 export function employeeStudioAdapterConfigured() { return process.env.ROGEROS_EMPLOYEE_STUDIO_ENABLED === "true" && Boolean(baseUrl() && token() && envelopeSecret() && catalogSecret()); }
-async function request(path: string, operation: string, binding: StudioBinding, payload: Record<string, unknown>, options: { idempotencyKey?: string; expectedRevision?: number | null; expectedFingerprint?: string | null } = {}) { validateStudioBinding(binding); const base = baseUrl(), auth = token(), secret = envelopeSecret(); if (!employeeStudioAdapterConfigured() || !base || !auth || !secret) throw new Error("EMPLOYEE_STUDIO_NOT_CONFIGURED"); const unsigned = { contractVersion: EMPLOYEE_STUDIO_CONTRACT, projectId: binding.projectId, runtimeId: binding.runtimeId, runtimeAssignmentId: binding.runtimeAssignmentId, profileId: binding.profileId, actorId: binding.actorId, timestamp: Date.now(), nonce: randomBytes(32).toString("base64url"), idempotencyKey: options.idempotencyKey || randomUUID(), expectedRevision: options.expectedRevision ?? null, expectedFingerprint: options.expectedFingerprint ?? null, operation, payload }; const response = await fetch(`${base}${path}`, { method: "POST", cache: "no-store", redirect: "error", headers: { Authorization: `Bearer ${auth}`, "Content-Type": "application/json" }, body: JSON.stringify({ ...unsigned, signature: signStudioEnvelope(unsigned, secret) }) }); if (!response.ok) { const body = await response.json().catch(() => null) as { error?: unknown } | null; const code = typeof body?.error === "string" && /^[A-Z0-9_]{1,120}$/.test(body.error) ? body.error : `HTTP_${response.status}`; throw new Error(`EMPLOYEE_STUDIO_${code}`); } return response.json() as Promise<unknown>; }
+export function studioNonce() { return `n${randomBytes(32).toString("base64url")}`; }
+async function request(path: string, operation: string, binding: StudioBinding, payload: Record<string, unknown>, options: { idempotencyKey?: string; expectedRevision?: number | null; expectedFingerprint?: string | null } = {}) { validateStudioBinding(binding); const base = baseUrl(), auth = token(), secret = envelopeSecret(); if (!employeeStudioAdapterConfigured() || !base || !auth || !secret) throw new Error("EMPLOYEE_STUDIO_NOT_CONFIGURED"); const unsigned = { contractVersion: EMPLOYEE_STUDIO_CONTRACT, projectId: binding.projectId, runtimeId: binding.runtimeId, runtimeAssignmentId: binding.runtimeAssignmentId, profileId: binding.profileId, actorId: binding.actorId, timestamp: Date.now(), nonce: studioNonce(), idempotencyKey: options.idempotencyKey || randomUUID(), expectedRevision: options.expectedRevision ?? null, expectedFingerprint: options.expectedFingerprint ?? null, operation, payload }; const response = await fetch(`${base}${path}`, { method: "POST", cache: "no-store", redirect: "error", headers: { Authorization: `Bearer ${auth}`, "Content-Type": "application/json" }, body: JSON.stringify({ ...unsigned, signature: signStudioEnvelope(unsigned, secret) }) }); if (!response.ok) { const body = await response.json().catch(() => null) as { error?: unknown } | null; const code = typeof body?.error === "string" && /^[A-Z0-9_]{1,120}$/.test(body.error) ? body.error : `HTTP_${response.status}`; throw new Error(`EMPLOYEE_STUDIO_${code}`); } return response.json() as Promise<unknown>; }
 export const employeeStudioAdapter: EmployeeStudioAdapter = {
   capabilities: async (binding) => parseStudioCapabilities(await request("/v1/capabilities", "CAPABILITIES", binding, {}), binding),
   modelCatalog: async (binding) => { const [catalogValue, modelValue] = await Promise.all([request("/v1/models/catalog", "MODEL_CATALOG", binding, {}), request("/v1/models/read", "MODEL_READ", binding, {})]); const catalog = parseStudioCatalog(catalogValue, binding, catalogSecret() || ""), current = parseModelRead(modelValue, binding); if (catalog.expired) throw new Error("EMPLOYEE_STUDIO_STALE_MODEL_CATALOG"); const expiry = catalog.expiresAt < 10_000_000_000 ? catalog.expiresAt * 1000 : catalog.expiresAt; return { contractVersion: EMPLOYEE_STUDIO_CONTRACT, binding, revision: String(catalog.revision), expiresAt: new Date(expiry).toISOString(), current: { provider: providerFor(current.id), modelId: current.id, revision: current.revision }, models: catalog.models.map((model) => ({ provider: providerFor(model.id), modelId: model.id, displayName: model.id, setupState: model.state })) }; },
-  changeModel: async (input) => parseStudioReceipt(await request("/v1/models/set", "MODEL_SET", input.binding, { modelId: input.modelId, observedModelId: input.observedModelId }, { idempotencyKey: input.mutationId, expectedRevision: input.expectedRevision, expectedFingerprint: input.expectedFingerprint }), input.binding, input.mutationId),
-  rollbackModel: async (input) => ({ ...parseStudioReceipt(await request("/v1/models/set", "MODEL_SET", input.binding, { modelId: input.modelId, observedModelId: input.observedModelId }, { idempotencyKey: `${input.mutationId}:rollback`, expectedRevision: input.expectedRevision }), input.binding, input.mutationId), status: "ROLLED_BACK" as const }),
+  changeModel: async (input) => parseStudioReceipt(await request("/v1/models/set", "MODEL_SET", input.binding, studioModelSetPayload(input.modelId), { idempotencyKey: input.mutationId, expectedRevision: input.expectedRevision, expectedFingerprint: input.expectedFingerprint }), input.binding, input.mutationId),
+  rollbackModel: async (input) => ({ ...parseStudioReceipt(await request("/v1/models/set", "MODEL_SET", input.binding, studioModelSetPayload(input.modelId), { idempotencyKey: `${input.mutationId}:rollback`, expectedRevision: input.expectedRevision }), input.binding, input.mutationId), status: "ROLLED_BACK" as const }),
   listProfileFiles: async (binding) => Promise.all(STUDIO_PROFILE_KEYS.map((key) => employeeStudioAdapter.readProfileFile(binding, key).then((file) => ({ logicalKey: file.logicalKey, displayName: file.displayName, editable: file.editable, version: file.version, digest: file.digest, byteLength: file.byteLength })))),
   readProfileFile: async (binding, logicalKey) => { if (!isAllowedProfileFileKey(logicalKey)) throw new Error("EMPLOYEE_STUDIO_FILE_NOT_ALLOWED"); return parseStudioProfileFile(await request("/v1/profile-files/read", "PROFILE_FILE_READ", binding, { key: logicalKey }), binding); },
   writeProfileFile: async (input) => parseStudioReceipt(await request("/v1/profile-files/update", "PROFILE_FILE_UPDATE", input.binding, { key: input.logicalKey, content: input.content }, { idempotencyKey: input.mutationId, expectedRevision: input.expectedVersion, expectedFingerprint: input.expectedDigest }), input.binding, input.mutationId),
@@ -91,3 +108,11 @@ export const employeeStudioAdapter: EmployeeStudioAdapter = {
   listMcpServers: async () => [],
   reconcileMcp: async () => { throw new Error("EMPLOYEE_STUDIO_MCP_UNAVAILABLE"); },
 };
+
+export async function verifyStudioDefaultDeny(binding: StudioBinding) {
+  const [skillLifecycle, mcp] = await Promise.all([
+    request("/v1/skills/lifecycle", "SKILL_LIFECYCLE", binding, { skillId: "acceptance-probe", action: "ENABLE" }).then((value) => parseStudioDefaultDeny(value, binding, "skillLifecycle")),
+    request("/v1/mcp", "MCP", binding, {}).then((value) => parseStudioDefaultDeny(value, binding, "mcp")),
+  ]);
+  return { skillLifecycle, mcp };
+}

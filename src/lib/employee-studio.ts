@@ -300,7 +300,7 @@ export async function changeEmployeeStudioModel(
   await auditMutation(context, member.id, "runtime.studio.model.requested", claimed.mutation.id, "Employee model change requested", requestMetadata);
   let receipt: StudioMutationReceipt | null = null;
   try {
-    receipt = await adapter.changeModel({ binding, mutationId: claimed.mutation.id, catalogRevision: catalog.revision, expectedRevision: catalog.current.revision, expectedFingerprint: null, provider: input.provider, modelId: input.modelId, observedModelId: catalog.current.modelId });
+    receipt = await adapter.changeModel({ binding, mutationId: claimed.mutation.id, catalogRevision: catalog.revision, expectedRevision: catalog.current.revision, expectedFingerprint: null, provider: input.provider, modelId: input.modelId });
     const observed = modelFromReceipt(receipt);
     if (observed.provider !== input.provider || observed.modelId !== input.modelId) throw new EmployeeStudioError("MODEL_RECONCILIATION_MISMATCH");
     const updated = await prisma.$transaction(async (tx) => {
@@ -317,7 +317,7 @@ export async function changeEmployeeStudioModel(
     const code = safeFailure(error);
     if (receipt) {
       try {
-        const rollback = await adapter.rollbackModel({ binding, mutationId: claimed.mutation.id, receiptId: receipt.receiptId, expectedRevision: Number(receipt.observed.revision), provider: catalog.current.provider, modelId: catalog.current.modelId, observedModelId: input.modelId });
+        const rollback = await adapter.rollbackModel({ binding, mutationId: claimed.mutation.id, receiptId: receipt.receiptId, expectedRevision: Number(receipt.observed.revision), provider: catalog.current.provider, modelId: catalog.current.modelId });
         const rolledBack = modelFromReceipt(rollback);
         if (rollback.status !== "ROLLED_BACK" || rolledBack.provider !== catalog.current.provider || rolledBack.modelId !== catalog.current.modelId)
           throw new EmployeeStudioError("MODEL_ROLLBACK_MISMATCH");
